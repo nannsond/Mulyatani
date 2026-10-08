@@ -3,11 +3,11 @@ import { api, apiError } from "@/lib/api";
 import { rupiah } from "@/lib/format";
 import { useAuth } from "@/context/AuthContext";
 import { useSettings } from "@/context/SettingsContext";
-import { Plus, Pencil, Trash2, FileDown, FileSpreadsheet, X, Search, User, Users, Printer, AlertTriangle } from "lucide-react";
+import { Plus, Pencil, Trash2, FileDown, FileSpreadsheet, X, Search, User, Users, Printer, AlertTriangle, ShoppingBag } from "lucide-react";
 import { exportPDF, exportExcel, printPriceList } from "@/lib/exporter";
 import { toast } from "sonner";
 
-const EMPTY = { sku: "", name: "", category: "Pupuk", unit: "pcs", harga_beli: 0, harga_jual: 0, harga_reseller: 0, stok: 0, stok_minimal: 10 };
+const EMPTY = { sku: "", name: "", category: "Pupuk", unit: "pcs", harga_beli: 0, harga_jual: 0, harga_reseller: 0, harga_online: 0, stok: 0, stok_minimal: 10 };
 const CATS = ["Pupuk", "Benih", "Pestisida", "Alat Tani", "Lainnya"];
 
 export default function DaftarHarga() {
@@ -48,7 +48,7 @@ export default function DaftarHarga() {
     e.preventDefault();
     const body = { ...modal };
     delete body.id;
-    ["harga_beli", "harga_jual", "harga_reseller", "stok", "stok_minimal"].forEach((k) => (body[k] = Number(body[k])));
+    ["harga_beli", "harga_jual", "harga_reseller", "harga_online", "stok", "stok_minimal"].forEach((k) => (body[k] = Number(body[k])));
     try {
       if (modal.id) await api.put(`/products/${modal.id}`, body);
       else await api.post("/products", body);
@@ -64,21 +64,27 @@ export default function DaftarHarga() {
   };
 
   const isReseller = tab === "reseller";
-  const priceLabel = isReseller ? "Harga Reseller" : "Harga Normal";
+  const isOnline = tab === "online";
+  const priceLabel = isReseller ? "Harga Reseller" : isOnline ? "Harga Online" : "Harga Normal";
+  const priceOf = (p) => isReseller ? (p.harga_reseller || 0) : isOnline ? (p.harga_online || 0) : p.harga_jual;
   const cols = ["SKU", "Nama Produk", "Kategori", "Satuan", priceLabel, "Stok"];
-  const rows = sorted.map((p) => [p.sku, p.name, p.category, p.unit, isReseller ? (p.harga_reseller || 0) : p.harga_jual, p.stok]);
+  const rows = sorted.map((p) => [p.sku, p.name, p.category, p.unit, priceOf(p), p.stok]);
   const exportTitle = `Daftar ${priceLabel}`;
 
   return (
     <div className="space-y-5">
       <div className="flex rounded-xl border border-input overflow-hidden w-fit" data-testid="price-tab">
         <button onClick={() => setTab("normal")} data-testid="price-tab-normal"
-          className={`flex items-center gap-2 px-5 py-2.5 text-sm font-semibold transition-colors ${!isReseller ? "bg-[#1B5E3B] text-white" : "bg-card hover:bg-secondary"}`}>
+          className={`flex items-center gap-2 px-5 py-2.5 text-sm font-semibold transition-colors ${tab === "normal" ? "bg-[#1B5E3B] text-white" : "bg-card hover:bg-secondary"}`}>
           <User className="w-4 h-4" /> Harga Normal
         </button>
         <button onClick={() => setTab("reseller")} data-testid="price-tab-reseller"
-          className={`flex items-center gap-2 px-5 py-2.5 text-sm font-semibold transition-colors ${isReseller ? "bg-[#C85A32] text-white" : "bg-card hover:bg-secondary"}`}>
+          className={`flex items-center gap-2 px-5 py-2.5 text-sm font-semibold transition-colors ${tab === "reseller" ? "bg-[#C85A32] text-white" : "bg-card hover:bg-secondary"}`}>
           <Users className="w-4 h-4" /> Harga Reseller
+        </button>
+        <button onClick={() => setTab("online")} data-testid="price-tab-online"
+          className={`flex items-center gap-2 px-5 py-2.5 text-sm font-semibold transition-colors ${tab === "online" ? "bg-[#2563EB] text-white" : "bg-card hover:bg-secondary"}`}>
+          <ShoppingBag className="w-4 h-4" /> Harga Online
         </button>
       </div>
 
@@ -123,8 +129,9 @@ export default function DaftarHarga() {
               <th className="px-4 py-3 font-semibold">Nama Produk</th>
               <th className="px-4 py-3 font-semibold">Kategori</th>
               <th className="px-4 py-3 font-semibold text-right">Harga Beli</th>
-              <th className={`px-4 py-3 font-semibold text-right ${!isReseller ? "text-[#1B5E3B]" : ""}`}>Harga Normal</th>
+              <th className={`px-4 py-3 font-semibold text-right ${tab === "normal" ? "text-[#1B5E3B]" : ""}`}>Harga Normal</th>
               <th className={`px-4 py-3 font-semibold text-right ${isReseller ? "text-[#C85A32]" : ""}`}>Harga Reseller</th>
+              <th className={`px-4 py-3 font-semibold text-right ${isOnline ? "text-[#2563EB]" : ""}`}>Harga Online</th>
               <th className="px-4 py-3 font-semibold text-right">Stok</th>
               {isAdmin && <th className="px-4 py-3 font-semibold text-center">Aksi</th>}
             </tr>
@@ -149,8 +156,9 @@ export default function DaftarHarga() {
                 </td>
                 <td className="px-4 py-3"><span className="text-xs px-2 py-1 rounded-lg bg-secondary">{p.category}</span></td>
                 <td className="px-4 py-3 text-right font-mono">{rupiah(p.harga_beli)}</td>
-                <td className={`px-4 py-3 text-right font-mono ${!isReseller ? "font-semibold text-[#1B5E3B]" : "text-muted-foreground"}`}>{rupiah(p.harga_jual)}</td>
+                <td className={`px-4 py-3 text-right font-mono ${tab === "normal" ? "font-semibold text-[#1B5E3B]" : "text-muted-foreground"}`}>{rupiah(p.harga_jual)}</td>
                 <td className={`px-4 py-3 text-right font-mono ${isReseller ? "font-semibold text-[#C85A32]" : "text-muted-foreground"}`}>{rupiah(p.harga_reseller || 0)}</td>
+                <td className={`px-4 py-3 text-right font-mono ${isOnline ? "font-semibold text-[#2563EB]" : "text-muted-foreground"}`}>{p.harga_online ? rupiah(p.harga_online) : <span className="text-xs italic">belum diatur</span>}</td>
                 <td className="px-4 py-3 text-right font-mono"><span className={p.stok <= p.stok_minimal ? "text-destructive font-semibold" : ""}>{p.stok} {p.unit}</span></td>
                 {isAdmin && (
                   <td className="px-4 py-3">
@@ -188,6 +196,7 @@ export default function DaftarHarga() {
               <Field label="Harga Beli" type="number" testid="product-harga-beli-input" value={modal.harga_beli} onChange={(v) => setModal({ ...modal, harga_beli: v })} />
               <Field label="Harga Normal" type="number" testid="product-harga-jual-input" value={modal.harga_jual} onChange={(v) => setModal({ ...modal, harga_jual: v })} />
               <Field label="Harga Reseller" type="number" testid="product-harga-reseller-input" value={modal.harga_reseller} onChange={(v) => setModal({ ...modal, harga_reseller: v })} />
+              <Field label="Harga Online" type="number" testid="product-harga-online-input" value={modal.harga_online} onChange={(v) => setModal({ ...modal, harga_online: v })} />
               <Field label="Stok" type="number" testid="product-stok-input" value={modal.stok} onChange={(v) => setModal({ ...modal, stok: v })} />
               <Field label="Stok Minimal" type="number" testid="product-stok-min-input" value={modal.stok_minimal} onChange={(v) => setModal({ ...modal, stok_minimal: v })} />
             </div>

@@ -78,6 +78,11 @@ Aplikasi laporan penjualan sederhana untuk bisnis toko pertanian: laporan harian
 - Backend: PUT /attendance/{id} & DELETE /attendance/{id} (admin-only). Edit menghitung ulang work_minutes & late (bandingkan jam masuk vs jam standar WIB); status non-Hadir otomatis mengosongkan jam & durasi.
 - Diverifikasi via curl (edit 08:30→17:00 = 510 menit & late, ganti ke Izin mengosongkan jam, delete) + screenshot modal edit.
 
+## Implemented (2026-10-08) — Harga Online per Produk
+- Produk kini punya field `harga_online` sendiri (terpisah dari harga normal/reseller). Default halaman Penjualan Online memakai harga online produk (tetap bisa diedit saat input); jika belum diisi menampilkan "Harga online belum diatur" (nilai 0).
+- Daftar Harga: tab baru "Harga Online" (biru) + kolom "Harga Online" di tabel ("belum diatur" bila 0) + input "Harga Online" di form produk; cetak/ekspor PDF mengikuti tab aktif.
+- Backend: field `harga_online` ditambah di model Product & ProductInput. Diverifikasi via curl (persist 123.456) + screenshot Daftar Harga tab online & Penjualan Online.
+
 ## Backlog (P1/P2)
 - P1: Cetak struk/nota transaksi POS
 - P1: Manajemen user (tambah kasir dari UI)

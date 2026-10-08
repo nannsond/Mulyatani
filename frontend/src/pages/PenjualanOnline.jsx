@@ -57,7 +57,7 @@ export default function PenjualanOnline() {
         if (ex.qty >= p.stok) { toast.error("Melebihi stok"); return c; }
         return c.map((i) => i.product_id === p.id ? { ...i, qty: i.qty + 1 } : i);
       }
-      return [...c, { product_id: p.id, name: p.name, harga: p.harga_jual, qty: 1, stok: p.stok }];
+      return [...c, { product_id: p.id, name: p.name, harga: p.harga_online || 0, qty: 1, stok: p.stok }];
     });
   };
   const setQty = (id, delta) => setCart((c) =>
@@ -153,7 +153,7 @@ export default function PenjualanOnline() {
                 <span className="text-[10px] uppercase tracking-wider font-semibold text-[#C85A32]">{p.category}</span>
                 <p className="font-medium text-sm text-[#0F281E] mt-1 line-clamp-2 min-h-[2.5rem]">{p.name}</p>
                 <div className="flex items-center justify-between mt-2">
-                  <span className="font-mono font-bold text-[#1B5E3B]">{rupiah(p.harga_jual)}</span>
+                  <span className={`font-mono font-bold ${p.harga_online ? "text-[#1B5E3B]" : "text-muted-foreground text-xs"}`}>{p.harga_online ? rupiah(p.harga_online) : "Harga online belum diatur"}</span>
                   <span className={`text-xs ${p.stok <= p.stok_minimal ? "text-destructive" : "text-muted-foreground"}`}>Stok: {p.stok}</span>
                 </div>
               </button>

@@ -119,10 +119,11 @@ export async function printPriceList({ products, mode, logoUrl, info }) {
   if (info?.address) { doc.text(info.address, x, hy); hy += 5; }
   if (info?.phone) { doc.text("Telp: " + info.phone, x, hy); hy += 5; }
   doc.setFontSize(12); doc.setTextColor(20, 20, 20);
-  const reseller = mode === "reseller";
-  doc.text(reseller ? "DAFTAR HARGA RESELLER" : "DAFTAR HARGA NORMAL", 14, hy + 4);
+  const title = mode === "reseller" ? "DAFTAR HARGA RESELLER" : mode === "online" ? "DAFTAR HARGA ONLINE" : "DAFTAR HARGA NORMAL";
+  doc.text(title, 14, hy + 4);
+  const priceOf = (p) => mode === "reseller" ? (p.harga_reseller || p.harga_jual) : mode === "online" ? (p.harga_online || 0) : p.harga_jual;
   const cols = ["SKU", "Produk", "Kategori", "Satuan", "Harga"];
-  const rows = products.map((p) => [p.sku, p.name, p.category, p.unit, rp(reseller ? (p.harga_reseller || p.harga_jual) : p.harga_jual)]);
+  const rows = products.map((p) => [p.sku, p.name, p.category, p.unit, rp(priceOf(p))]);
   autoTable(doc, { startY: hy + 8, head: [cols], body: rows, headStyles: { fillColor: [27, 94, 59] }, styles: { fontSize: 8 } });
   doc.save(`Daftar_Harga_${mode}.pdf`);
 }

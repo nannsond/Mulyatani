@@ -208,6 +208,7 @@ class Product(BaseModel):
     harga_beli: float = 0
     harga_jual: float = 0
     harga_reseller: float = 0
+    harga_online: float = 0
     stok: int = 0
     stok_minimal: int = 5
 
@@ -219,6 +220,7 @@ class ProductInput(BaseModel):
     harga_beli: float = 0
     harga_jual: float = 0
     harga_reseller: float = 0
+    harga_online: float = 0
     stok: int = 0
     stok_minimal: int = 5
 
