@@ -17,6 +17,13 @@ export const fmtDateTime = (iso) => {
 
 export const todayStr = () => new Date().toISOString().slice(0, 10);
 
+export const fmtJam = (iso) => iso ? new Date(iso).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Jakarta" }) : "-";
+
+export const fmtDurasi = (m) => {
+  const mins = Math.max(0, Math.round(m || 0));
+  return `${Math.floor(mins / 60)}j ${mins % 60}m`;
+};
+
 export const ECOM_CHANNELS = ["Shopee", "Tokopedia", "Lazada", "TikTok Shop"];
 
 export const CHANNEL_COLORS = {

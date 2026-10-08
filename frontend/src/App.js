@@ -17,6 +17,8 @@ import Pengeluaran from "@/pages/Pengeluaran";
 import LabaRugi from "@/pages/LabaRugi";
 import PenjualanOnline from "@/pages/PenjualanOnline";
 import LaporanOnline from "@/pages/LaporanOnline";
+import Komisi from "@/pages/Komisi";
+import Kehadiran from "@/pages/Kehadiran";
 import { SettingsProvider } from "@/context/SettingsContext";
 import LaporanHarian from "@/pages/LaporanHarian";
 import LaporanBulanan from "@/pages/LaporanBulanan";
@@ -51,6 +53,8 @@ function AppRoutes() {
       <Route path="/laporan/laba-rugi" element={<Protected adminOnly><LabaRugi /></Protected>} />
       <Route path="/penjualan-online" element={<Protected><PenjualanOnline /></Protected>} />
       <Route path="/laporan/online" element={<Protected><LaporanOnline /></Protected>} />
+      <Route path="/komisi" element={<Protected adminOnly><Komisi /></Protected>} />
+      <Route path="/kehadiran" element={<Protected><Kehadiran /></Protected>} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );

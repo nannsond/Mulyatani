@@ -996,6 +996,122 @@ async def dashboard(user: dict = Depends(get_current_user)):
             "total_produk": len(products), "series7": series,
             "top_products": await top_products(today_all)}
 
+# ---------------- Komisi (commission for online sales) ----------------
+class CommissionSetting(BaseModel):
+    rate: float
+
+@api_router.get("/commission/settings")
+async def get_commission(user: dict = Depends(get_current_user)):
+    s = await db.settings.find_one({"key": "commission"})
+    return {"rate": (s or {}).get("rate", 0)}
+
+@api_router.post("/commission/settings")
+async def set_commission(data: CommissionSetting, admin: dict = Depends(require_admin)):
+    rate = max(0.0, data.rate)
+    await db.settings.update_one({"key": "commission"}, {"$set": {"rate": rate}}, upsert=True)
+    return {"ok": True, "rate": rate}
+
+@api_router.get("/commission/report")
+async def commission_report(month: str, admin: dict = Depends(require_admin)):
+    s = await db.settings.find_one({"key": "commission"})
+    rate = (s or {}).get("rate", 0)
+    sales = await db.ecommerce_sales.find({"status": "Selesai", "created_at": {"$regex": f"^{re.escape(month)}"}}).to_list(20000)
+    agg = {}
+    for sl in sales:
+        name = sl.get("user_name", "-")
+        e = agg.setdefault(name, {"user_name": name, "transaksi": 0, "omzet": 0, "laba_kotor": 0})
+        e["transaksi"] += 1
+        e["omzet"] += sl.get("omzet", 0)
+        e["laba_kotor"] += sl.get("laba_kotor", 0)
+    rows = []
+    for e in agg.values():
+        e["komisi"] = e["laba_kotor"] * rate / 100
+        rows.append(e)
+    rows.sort(key=lambda x: x["komisi"], reverse=True)
+    total = {"transaksi": sum(r["transaksi"] for r in rows), "omzet": sum(r["omzet"] for r in rows),
+             "laba_kotor": sum(r["laba_kotor"] for r in rows), "komisi": sum(r["komisi"] for r in rows)}
+    return {"month": month, "rate": rate, "rows": rows, "total": total}
+
+# ---------------- Kehadiran (employee attendance) ----------------
+WIB = timezone(timedelta(hours=7))
+
+def wib_now():
+    return datetime.now(WIB)
+
+class AttendanceSetting(BaseModel):
+    start_time: str = "08:00"
+
+async def get_attendance_start():
+    s = await db.settings.find_one({"key": "attendance"})
+    return (s or {}).get("start_time", "08:00")
+
+@api_router.get("/attendance/settings")
+async def get_att_settings(user: dict = Depends(get_current_user)):
+    return {"start_time": await get_attendance_start()}
+
+@api_router.post("/attendance/settings")
+async def set_att_settings(data: AttendanceSetting, admin: dict = Depends(require_admin)):
+    await db.settings.update_one({"key": "attendance"}, {"$set": {"start_time": data.start_time}}, upsert=True)
+    return {"ok": True, "start_time": data.start_time}
+
+@api_router.get("/attendance/today")
+async def attendance_today(user: dict = Depends(get_current_user)):
+    today = wib_now().strftime("%Y-%m-%d")
+    doc = await db.attendance.find_one({"user_id": user["id"], "date": today})
+    if doc:
+        doc["id"] = str(doc["_id"]); doc.pop("_id", None)
+    return {"date": today, "record": doc}
+
+@api_router.post("/attendance/checkin")
+async def attendance_checkin(user: dict = Depends(get_current_user)):
+    now = wib_now()
+    today = now.strftime("%Y-%m-%d")
+    existing = await db.attendance.find_one({"user_id": user["id"], "date": today})
+    if existing:
+        raise HTTPException(status_code=400, detail="Anda sudah absen masuk hari ini")
+    start = await get_attendance_start()
+    sh, sm = [int(x) for x in start.split(":")]
+    late = (now.hour, now.minute) > (sh, sm)
+    doc = {"user_id": user["id"], "user_name": user["name"], "date": today,
+           "check_in": now.isoformat(), "check_out": None, "work_minutes": 0,
+           "late": late, "created_at": now.isoformat()}
+    res = await db.attendance.insert_one(doc)
+    doc["id"] = str(res.inserted_id); doc.pop("_id", None)
+    return doc
+
+@api_router.post("/attendance/checkout")
+async def attendance_checkout(user: dict = Depends(get_current_user)):
+    now = wib_now()
+    today = now.strftime("%Y-%m-%d")
+    doc = await db.attendance.find_one({"user_id": user["id"], "date": today})
+    if not doc:
+        raise HTTPException(status_code=400, detail="Anda belum absen masuk hari ini")
+    if doc.get("check_out"):
+        raise HTTPException(status_code=400, detail="Anda sudah absen pulang hari ini")
+    ci = datetime.fromisoformat(doc["check_in"])
+    minutes = max(0, int((now - ci).total_seconds() // 60))
+    await db.attendance.update_one({"_id": doc["_id"]}, {"$set": {"check_out": now.isoformat(), "work_minutes": minutes}})
+    doc["check_out"] = now.isoformat(); doc["work_minutes"] = minutes
+    doc["id"] = str(doc["_id"]); doc.pop("_id", None)
+    return doc
+
+@api_router.get("/attendance")
+async def list_attendance(month: str, user: dict = Depends(get_current_user)):
+    q = {"date": {"$regex": f"^{re.escape(month)}"}}
+    if user.get("role") != "admin":
+        q["user_id"] = user["id"]
+    docs = await db.attendance.find(q).sort("date", -1).to_list(3000)
+    for d in docs:
+        d["id"] = str(d["_id"]); d.pop("_id", None)
+    recap = {}
+    for d in docs:
+        e = recap.setdefault(d["user_name"], {"user_name": d["user_name"], "hadir": 0, "telat": 0, "total_menit": 0})
+        e["hadir"] += 1
+        if d.get("late"):
+            e["telat"] += 1
+        e["total_menit"] += d.get("work_minutes", 0)
+    return {"month": month, "records": docs, "recap": sorted(recap.values(), key=lambda x: -x["hadir"])}
+
 app.include_router(api_router)
 
 app.add_middleware(
