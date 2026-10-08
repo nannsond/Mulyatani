@@ -32,6 +32,13 @@ Aplikasi laporan penjualan sederhana untuk bisnis toko pertanian: laporan harian
 - Admin: nannsond@gmail.com / admin123
 - Kasir: kasir@tokotani.com / kasir123
 
+## Implemented (2026-10-08) — Penjualan Online (Multi-Marketplace)
+- Input manual penjualan per channel: Shopee, Tokopedia, Lazada, TikTok Shop (halaman /penjualan-online)
+- Potong stok dari produk yang sama dengan toko fisik; hapus penjualan (admin) mengembalikan stok
+- Catat biaya marketplace per transaksi: biaya admin, ongkir, biaya lain → laba bersih akurat
+- Laporan Online (/laporan/online): mode Harian/Bulanan/Tahunan, kartu ringkasan, grafik perbandingan per channel, tren omzet, tabel rincian per channel + TOTAL; ekspor PDF/Excel
+- Backend: POST/GET/DELETE /api/ecommerce/sales, GET /api/ecommerce/reports (agregasi per channel + gabungan). Tested iter 7: 100%
+
 ## Backlog (P1/P2)
 - P1: Cetak struk/nota transaksi POS
 - P1: Manajemen user (tambah kasir dari UI)
