@@ -1091,7 +1091,7 @@ async def attendance_checkin(user: dict = Depends(get_current_user)):
     late = (now.hour, now.minute) > (sh, sm)
     doc = {"user_id": user["id"], "user_name": user["name"], "date": today,
            "check_in": now.isoformat(), "check_out": None, "work_minutes": 0,
-           "late": late, "created_at": now.isoformat()}
+           "late": late, "status": "Hadir", "created_at": now.isoformat()}
     res = await db.attendance.insert_one(doc)
     doc["id"] = str(res.inserted_id); doc.pop("_id", None)
     return doc
@@ -1112,6 +1112,28 @@ async def attendance_checkout(user: dict = Depends(get_current_user)):
     doc["id"] = str(doc["_id"]); doc.pop("_id", None)
     return doc
 
+class AttendanceMark(BaseModel):
+    date: str
+    status: str
+    user_id: Optional[str] = None
+
+@api_router.post("/attendance/mark")
+async def attendance_mark(data: AttendanceMark, user: dict = Depends(get_current_user)):
+    if data.status not in ["Hadir", "Izin", "Sakit", "Alpha"]:
+        raise HTTPException(status_code=400, detail="Status tidak valid")
+    target_uid = user["id"]; target_name = user["name"]
+    if data.user_id and data.user_id != user["id"]:
+        if user.get("role") != "admin":
+            raise HTTPException(status_code=403, detail="Akses khusus admin")
+        tu = await db.users.find_one({"_id": ObjectId(data.user_id)})
+        if not tu:
+            raise HTTPException(status_code=404, detail="Karyawan tidak ditemukan")
+        target_uid = str(tu["_id"]); target_name = tu["name"]
+    doc = {"user_id": target_uid, "user_name": target_name, "date": data.date, "status": data.status,
+           "check_in": None, "check_out": None, "work_minutes": 0, "late": False, "created_at": wib_now().isoformat()}
+    await db.attendance.update_one({"user_id": target_uid, "date": data.date}, {"$set": doc}, upsert=True)
+    return {"ok": True, "status": data.status}
+
 @api_router.get("/attendance")
 async def list_attendance(month: str, user: dict = Depends(get_current_user)):
     q = {"date": {"$regex": f"^{re.escape(month)}"}}
@@ -1122,11 +1144,20 @@ async def list_attendance(month: str, user: dict = Depends(get_current_user)):
         d["id"] = str(d["_id"]); d.pop("_id", None)
     recap = {}
     for d in docs:
-        e = recap.setdefault(d["user_name"], {"user_name": d["user_name"], "hadir": 0, "telat": 0, "total_menit": 0})
-        e["hadir"] += 1
-        if d.get("late"):
-            e["telat"] += 1
-        e["total_menit"] += d.get("work_minutes", 0)
+        e = recap.setdefault(d["user_name"], {"user_name": d["user_name"], "hadir": 0, "telat": 0,
+                                              "izin": 0, "sakit": 0, "alpha": 0, "total_menit": 0})
+        st = d.get("status", "Hadir")
+        if st == "Hadir":
+            e["hadir"] += 1
+            if d.get("late"):
+                e["telat"] += 1
+            e["total_menit"] += d.get("work_minutes", 0)
+        elif st == "Izin":
+            e["izin"] += 1
+        elif st == "Sakit":
+            e["sakit"] += 1
+        elif st == "Alpha":
+            e["alpha"] += 1
     return {"month": month, "records": docs, "recap": sorted(recap.values(), key=lambda x: -x["hadir"])}
 
 # ---------------- Rekap Gaji (payroll) ----------------
@@ -1152,8 +1183,7 @@ async def set_payroll_settings(data: PayrollSetting, admin: dict = Depends(requi
     await db.settings.update_one({"key": "payroll"}, {"$set": {"potongan_telat": val}}, upsert=True)
     return {"ok": True, "potongan_telat": val}
 
-@api_router.get("/payroll/report")
-async def payroll_report(month: str, admin: dict = Depends(require_admin)):
+async def _compute_payroll(month: str):
     users = await db.users.find().sort("created_at", 1).to_list(500)
     comm = (await db.settings.find_one({"key": "commission"}) or {}).get("rate", 0)
     pot_rate = (await db.settings.find_one({"key": "payroll"}) or {}).get("potongan_telat", 0)
@@ -1162,9 +1192,10 @@ async def payroll_report(month: str, admin: dict = Depends(require_admin)):
     att = await db.attendance.find({"date": {"$regex": f"^{re.escape(month)}"}}).to_list(5000)
     telat_by_uid = {}; hadir_by_uid = {}
     for a in att:
-        hadir_by_uid[a["user_id"]] = hadir_by_uid.get(a["user_id"], 0) + 1
-        if a.get("late"):
-            telat_by_uid[a["user_id"]] = telat_by_uid.get(a["user_id"], 0) + 1
+        if a.get("status", "Hadir") == "Hadir":
+            hadir_by_uid[a["user_id"]] = hadir_by_uid.get(a["user_id"], 0) + 1
+            if a.get("late"):
+                telat_by_uid[a["user_id"]] = telat_by_uid.get(a["user_id"], 0) + 1
     bases = {b["user_id"]: b.get("gaji_pokok", 0) for b in await db.employee_salary.find().to_list(500)}
     overrides = {o["user_id"]: o for o in await db.payroll.find({"month": month}).to_list(500)}
     rows = []
@@ -1185,6 +1216,28 @@ async def payroll_report(month: str, admin: dict = Depends(require_admin)):
                      "total": gaji_pokok + komisi - potongan, "komisi_calc": komisi_calc,
                      "potongan_calc": potongan_calc, "edited": edited, "note": (ov or {}).get("note", "")})
     return {"month": month, "commission_rate": comm, "potongan_telat": pot_rate, "rows": rows}
+
+@api_router.get("/payroll/report")
+async def payroll_report(month: str, admin: dict = Depends(require_admin)):
+    return await _compute_payroll(month)
+
+class PayrollArchive(BaseModel):
+    month: str
+
+@api_router.post("/payroll/archive")
+async def payroll_archive(data: PayrollArchive, admin: dict = Depends(require_admin)):
+    rep = await _compute_payroll(data.month)
+    for r in rep["rows"]:
+        await db.payroll.update_one({"user_id": r["user_id"], "month": data.month},
+            {"$set": {"gaji_pokok": r["gaji_pokok"], "komisi": r["komisi"], "potongan": r["potongan"],
+                      "total": r["total"], "note": r.get("note", "")}}, upsert=True)
+    return {"ok": True, "archived": len(rep["rows"])}
+
+@api_router.get("/payroll/archives")
+async def payroll_archives(admin: dict = Depends(require_admin)):
+    pipeline = [{"$group": {"_id": "$month", "total": {"$sum": "$total"}, "count": {"$sum": 1}}}, {"$sort": {"_id": -1}}]
+    docs = await db.payroll.aggregate(pipeline).to_list(200)
+    return [{"month": d["_id"], "total": d["total"], "count": d["count"]} for d in docs]
 
 @api_router.post("/payroll/save")
 async def payroll_save(data: PayrollSave, admin: dict = Depends(require_admin)):

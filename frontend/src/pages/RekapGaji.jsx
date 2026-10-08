@@ -3,7 +3,7 @@ import { api, apiError } from "@/lib/api";
 import { rupiah, MONTHS, todayStr } from "@/lib/format";
 import { printPayslip } from "@/lib/exporter";
 import { useSettings } from "@/context/SettingsContext";
-import { Wallet, Save, Loader2, Printer, RotateCcw, AlarmClock } from "lucide-react";
+import { Wallet, Save, Loader2, Printer, RotateCcw, AlarmClock, Archive, FolderOpen } from "lucide-react";
 import { toast } from "sonner";
 
 export default function RekapGaji() {
@@ -16,6 +16,10 @@ export default function RekapGaji() {
   const [potongan, setPotongan] = useState("");
   const [savingPot, setSavingPot] = useState(false);
   const [savingRow, setSavingRow] = useState(null);
+  const [archives, setArchives] = useState([]);
+  const [archiving, setArchiving] = useState(false);
+
+  const loadArchives = () => api.get("/payroll/archives").then((r) => setArchives(r.data));
 
   const load = () => {
     setReport(null);
@@ -28,6 +32,14 @@ export default function RekapGaji() {
     });
   };
   useEffect(() => { load(); }, [month]);
+  useEffect(() => { loadArchives(); }, []);
+
+  const archive = async () => {
+    setArchiving(true);
+    try { const { data } = await api.post("/payroll/archive", { month }); toast.success(`Slip gaji ${monthLabel} diarsipkan (${data.archived} karyawan)`); loadArchives(); load(); }
+    catch (err) { toast.error(apiError(err.response?.data?.detail)); }
+    finally { setArchiving(false); }
+  };
 
   const monthLabel = `${MONTHS[Number(month.slice(5, 7)) - 1]} ${month.slice(0, 4)}`;
   const setField = (uid, field, v) => setEdits((e) => ({ ...e, [uid]: { ...e[uid], [field]: Number(v) || 0 } }));
@@ -75,6 +87,9 @@ export default function RekapGaji() {
           </button>
         </div>
         <input type="month" value={month} onChange={(e) => setMonth(e.target.value)} data-testid="payroll-month-filter" className="px-3 py-2 rounded-xl border border-input text-sm bg-card" />
+        <button onClick={archive} disabled={archiving} data-testid="payroll-archive-button" className="flex items-center gap-2 px-3 py-2 rounded-xl bg-[#C85A32] hover:bg-[#B04B26] text-white text-sm font-semibold disabled:opacity-50">
+          {archiving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Archive className="w-4 h-4" />} Arsipkan Bulan Ini
+        </button>
       </div>
 
       <div className="bg-card rounded-2xl border border-slate-200 p-6" data-testid="payroll-table">
@@ -136,6 +151,26 @@ export default function RekapGaji() {
             <p className="text-xs text-muted-foreground mt-3">Total = Gaji Pokok + Komisi − Potongan Telat. Nilai bisa diedit; simpan untuk menyimpan slip bulan ini (gaji pokok dipakai ulang bulan berikutnya).</p>
           </div>
         )}
+      </div>
+
+      <div className="bg-card rounded-2xl border border-slate-200 p-6" data-testid="payroll-archives">
+        <h3 className="font-heading font-semibold text-lg mb-4 flex items-center gap-2"><FolderOpen className="w-5 h-5 text-[#1B5E3B]" /> Arsip Slip Gaji</h3>
+        {archives.length === 0 ? <p className="text-sm text-muted-foreground">Belum ada arsip. Klik "Arsipkan Bulan Ini" untuk menyimpan slip gaji bulan berjalan.</p> : (
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {archives.map((a) => (
+              <button key={a.month} onClick={() => setMonth(a.month)} data-testid={`payroll-archive-${a.month}`}
+                className={`text-left p-4 rounded-xl border transition-all hover:shadow-md ${a.month === month ? "border-[#1B5E3B] bg-green-50" : "border-slate-200 hover:border-[#1B5E3B]"}`}>
+                <div className="flex items-center justify-between">
+                  <span className="font-semibold text-[#0F281E]">{MONTHS[Number(a.month.slice(5, 7)) - 1]} {a.month.slice(0, 4)}</span>
+                  <Archive className="w-4 h-4 text-muted-foreground" />
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">{a.count} karyawan</p>
+                <p className="font-mono font-bold text-[#1B5E3B] mt-1">{rupiah(a.total)}</p>
+              </button>
+            ))}
+          </div>
+        )}
+        <p className="text-xs text-muted-foreground mt-3">Klik bulan untuk membuka kembali rekapnya, lalu cetak ulang slip tiap karyawan.</p>
       </div>
     </div>
   );
