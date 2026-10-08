@@ -99,7 +99,7 @@ export function Layout({ children }) {
               {open ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
             </button>
             <div>
-              <p className="text-xs text-muted-foreground">Toko Tani Makmur</p>
+              <p className="text-xs text-muted-foreground">Toko Pe-i Mulya Tani Caruban</p>
               <h2 className="font-heading font-bold text-lg text-[#0F281E] leading-tight">{current}</h2>
             </div>
           </div>
