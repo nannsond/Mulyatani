@@ -14,6 +14,7 @@ export default function RekapGaji() {
   const [report, setReport] = useState(null);
   const [edits, setEdits] = useState({});
   const [potongan, setPotongan] = useState("");
+  const [hariKerja, setHariKerja] = useState("26");
   const [savingPot, setSavingPot] = useState(false);
   const [savingRow, setSavingRow] = useState(null);
   const [archives, setArchives] = useState([]);
@@ -26,6 +27,7 @@ export default function RekapGaji() {
     api.get(`/payroll/report?month=${month}`).then((r) => {
       setReport(r.data);
       setPotongan(String(r.data.potongan_telat || 0));
+      setHariKerja(String(r.data.hari_kerja || 26));
       const e = {};
       r.data.rows.forEach((row) => { e[row.user_id] = { gaji_pokok: row.gaji_pokok, komisi: row.komisi, potongan: row.potongan }; });
       setEdits(e);
@@ -47,7 +49,7 @@ export default function RekapGaji() {
 
   const savePotongan = async () => {
     setSavingPot(true);
-    try { await api.post("/payroll/settings", { potongan_telat: Number(potongan) || 0 }); toast.success("Potongan telat disimpan"); load(); }
+    try { await api.post("/payroll/settings", { potongan_telat: Number(potongan) || 0, hari_kerja: Number(hariKerja) || 26 }); toast.success("Pengaturan potongan disimpan"); load(); }
     catch (err) { toast.error(apiError(err.response?.data?.detail)); }
     finally { setSavingPot(false); }
   };
@@ -78,10 +80,12 @@ export default function RekapGaji() {
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-2 bg-card rounded-xl border border-slate-200 px-3 py-2">
+        <div className="flex flex-wrap items-center gap-2 bg-card rounded-xl border border-slate-200 px-3 py-2">
           <AlarmClock className="w-4 h-4 text-[#C85A32]" />
-          <span className="text-sm text-muted-foreground">Potongan per telat (Rp)</span>
-          <input type="number" value={potongan} onChange={(e) => setPotongan(e.target.value)} data-testid="payroll-potongan-input" className="w-28 px-2 py-1 rounded-lg border border-input text-sm" placeholder="0" />
+          <span className="text-sm text-muted-foreground">Potongan/telat (Rp)</span>
+          <input type="number" value={potongan} onChange={(e) => setPotongan(e.target.value)} data-testid="payroll-potongan-input" className="w-24 px-2 py-1 rounded-lg border border-input text-sm" placeholder="0" />
+          <span className="text-sm text-muted-foreground">Hari kerja/bln</span>
+          <input type="number" value={hariKerja} onChange={(e) => setHariKerja(e.target.value)} data-testid="payroll-harikerja-input" className="w-16 px-2 py-1 rounded-lg border border-input text-sm" placeholder="26" />
           <button onClick={savePotongan} disabled={savingPot} data-testid="payroll-potongan-save" className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-[#1B5E3B] text-white text-sm font-semibold hover:bg-[#143D2B] disabled:opacity-50">
             {savingPot ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
           </button>
@@ -107,6 +111,7 @@ export default function RekapGaji() {
                 <th className="px-3 py-2.5 font-semibold">Karyawan</th>
                 <th className="px-3 py-2.5 font-semibold text-center">Hadir</th>
                 <th className="px-3 py-2.5 font-semibold text-center">Telat</th>
+                <th className="px-3 py-2.5 font-semibold text-center">Alpha</th>
                 <th className="px-3 py-2.5 font-semibold text-right">Gaji Pokok</th>
                 <th className="px-3 py-2.5 font-semibold text-right">Komisi</th>
                 <th className="px-3 py-2.5 font-semibold text-right">Potongan</th>
@@ -127,6 +132,7 @@ export default function RekapGaji() {
                       </td>
                       <td className="px-3 py-2.5 text-center">{row.hadir}</td>
                       <td className="px-3 py-2.5 text-center">{row.telat > 0 ? <span className="text-red-700 font-semibold">{row.telat}</span> : 0}</td>
+                      <td className="px-3 py-2.5 text-center">{row.alpha > 0 ? <span className="text-red-700 font-semibold">{row.alpha}</span> : 0}</td>
                       <td className="px-3 py-2.5 text-right"><input type="number" value={e.gaji_pokok ?? ""} onChange={(ev) => setField(row.user_id, "gaji_pokok", ev.target.value)} data-testid={`payroll-gaji-${row.user_id}`} className="w-28 px-2 py-1 rounded-lg border border-input text-xs font-mono text-right" /></td>
                       <td className="px-3 py-2.5 text-right"><input type="number" value={e.komisi ?? ""} onChange={(ev) => setField(row.user_id, "komisi", ev.target.value)} data-testid={`payroll-komisi-${row.user_id}`} className="w-28 px-2 py-1 rounded-lg border border-input text-xs font-mono text-right" /></td>
                       <td className="px-3 py-2.5 text-right"><input type="number" value={e.potongan ?? ""} onChange={(ev) => setField(row.user_id, "potongan", ev.target.value)} data-testid={`payroll-potongan-row-${row.user_id}`} className="w-28 px-2 py-1 rounded-lg border border-input text-xs font-mono text-right" /></td>
@@ -142,13 +148,13 @@ export default function RekapGaji() {
                   );
                 })}
                 <tr className="bg-secondary/40 font-semibold">
-                  <td className="px-3 py-2.5" colSpan={6}>TOTAL GAJI SEMUA KARYAWAN</td>
+                  <td className="px-3 py-2.5" colSpan={7}>TOTAL GAJI SEMUA KARYAWAN</td>
                   <td className="px-3 py-2.5 text-right font-mono text-[#1B5E3B]" data-testid="payroll-grand-total">{rupiah(grand)}</td>
                   <td></td>
                 </tr>
               </tbody>
             </table>
-            <p className="text-xs text-muted-foreground mt-3">Total = Gaji Pokok + Komisi − Potongan Telat. Nilai bisa diedit; simpan untuk menyimpan slip bulan ini (gaji pokok dipakai ulang bulan berikutnya).</p>
+            <p className="text-xs text-muted-foreground mt-3">Total = Gaji Pokok + Komisi − Potongan. Potongan = (telat × tarif) + (Alpha × gaji harian), gaji harian = gaji pokok ÷ hari kerja. Nilai bisa diedit; simpan untuk menyimpan slip bulan ini (gaji pokok dipakai ulang bulan berikutnya).</p>
           </div>
         )}
       </div>

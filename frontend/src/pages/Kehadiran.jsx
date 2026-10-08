@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { api, apiError } from "@/lib/api";
 import { fmtDate, fmtJam, fmtDurasi, todayWIB } from "@/lib/format";
-import { Clock, LogIn, LogOut, Loader2, Save, CheckCircle2, AlarmClock, FileText, UserCheck } from "lucide-react";
+import { Clock, LogIn, LogOut, Loader2, Save, CheckCircle2, AlarmClock, UserCheck } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/context/AuthContext";
 
@@ -40,11 +40,6 @@ export default function Kehadiran() {
     try { await api.post("/attendance/checkout"); toast.success("Absen pulang tercatat"); loadToday(); loadList(); }
     catch (err) { toast.error(apiError(err.response?.data?.detail)); } finally { setActing(false); }
   };
-  const markSelf = async (status) => {
-    setActing(true);
-    try { await api.post("/attendance/mark", { date: todayWIB(), status }); toast.success(`Tercatat: ${status}`); loadToday(); loadList(); }
-    catch (err) { toast.error(apiError(err.response?.data?.detail)); } finally { setActing(false); }
-  };
   const saveStart = async () => {
     setSavingStart(true);
     try { await api.post("/attendance/settings", { start_time: startTime }); toast.success(`Jam masuk disimpan: ${startTime}`); }
@@ -76,10 +71,7 @@ export default function Kehadiran() {
                       className="w-full bg-[#1B5E3B] hover:bg-[#143D2B] text-white py-3 rounded-xl font-semibold flex items-center justify-center gap-2 disabled:opacity-50">
                       {acting ? <Loader2 className="w-4 h-4 animate-spin" /> : <LogIn className="w-4 h-4" />} Absen Masuk
                     </button>
-                    <div className="flex gap-2">
-                      <button onClick={() => markSelf("Izin")} disabled={acting} data-testid="attendance-izin-button" className="flex-1 border border-blue-200 text-blue-700 py-2 rounded-xl text-sm font-semibold hover:bg-blue-50 flex items-center justify-center gap-1"><FileText className="w-4 h-4" /> Izin</button>
-                      <button onClick={() => markSelf("Sakit")} disabled={acting} data-testid="attendance-sakit-button" className="flex-1 border border-amber-200 text-amber-700 py-2 rounded-xl text-sm font-semibold hover:bg-amber-50 flex items-center justify-center gap-1"><FileText className="w-4 h-4" /> Sakit</button>
-                    </div>
+                    <p className="text-xs text-muted-foreground text-center">Izin/Sakit? Ajukan lewat menu <span className="font-semibold text-[#1B5E3B]">Pengajuan Izin</span> untuk disetujui admin.</p>
                   </div>
                 )}
                 {today && (today.status || "Hadir") !== "Hadir" && (

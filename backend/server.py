@@ -1163,6 +1163,7 @@ async def list_attendance(month: str, user: dict = Depends(get_current_user)):
 # ---------------- Rekap Gaji (payroll) ----------------
 class PayrollSetting(BaseModel):
     potongan_telat: float
+    hari_kerja: int = 26
 
 class PayrollSave(BaseModel):
     user_id: str
@@ -1174,48 +1175,55 @@ class PayrollSave(BaseModel):
 
 @api_router.get("/payroll/settings")
 async def get_payroll_settings(user: dict = Depends(get_current_user)):
-    s = await db.settings.find_one({"key": "payroll"})
-    return {"potongan_telat": (s or {}).get("potongan_telat", 0)}
+    s = await db.settings.find_one({"key": "payroll"}) or {}
+    return {"potongan_telat": s.get("potongan_telat", 0), "hari_kerja": s.get("hari_kerja", 26)}
 
 @api_router.post("/payroll/settings")
 async def set_payroll_settings(data: PayrollSetting, admin: dict = Depends(require_admin)):
     val = max(0.0, data.potongan_telat)
-    await db.settings.update_one({"key": "payroll"}, {"$set": {"potongan_telat": val}}, upsert=True)
-    return {"ok": True, "potongan_telat": val}
+    hk = max(1, data.hari_kerja)
+    await db.settings.update_one({"key": "payroll"}, {"$set": {"potongan_telat": val, "hari_kerja": hk}}, upsert=True)
+    return {"ok": True, "potongan_telat": val, "hari_kerja": hk}
 
 async def _compute_payroll(month: str):
     users = await db.users.find().sort("created_at", 1).to_list(500)
     comm = (await db.settings.find_one({"key": "commission"}) or {}).get("rate", 0)
-    pot_rate = (await db.settings.find_one({"key": "payroll"}) or {}).get("potongan_telat", 0)
+    pay = await db.settings.find_one({"key": "payroll"}) or {}
+    pot_rate = pay.get("potongan_telat", 0)
+    hari_kerja = pay.get("hari_kerja", 26) or 26
     sales = await db.ecommerce_sales.find({"status": "Selesai", "created_at": {"$regex": f"^{re.escape(month)}"}}).to_list(20000)
     komisi_agg = laba_by_user(sales, users)
     att = await db.attendance.find({"date": {"$regex": f"^{re.escape(month)}"}}).to_list(5000)
-    telat_by_uid = {}; hadir_by_uid = {}
+    telat_by_uid = {}; hadir_by_uid = {}; alpha_by_uid = {}
     for a in att:
-        if a.get("status", "Hadir") == "Hadir":
+        st = a.get("status", "Hadir")
+        if st == "Hadir":
             hadir_by_uid[a["user_id"]] = hadir_by_uid.get(a["user_id"], 0) + 1
             if a.get("late"):
                 telat_by_uid[a["user_id"]] = telat_by_uid.get(a["user_id"], 0) + 1
+        elif st == "Alpha":
+            alpha_by_uid[a["user_id"]] = alpha_by_uid.get(a["user_id"], 0) + 1
     bases = {b["user_id"]: b.get("gaji_pokok", 0) for b in await db.employee_salary.find().to_list(500)}
     overrides = {o["user_id"]: o for o in await db.payroll.find({"month": month}).to_list(500)}
     rows = []
     for u in users:
         uid = str(u["_id"]); name = u["name"]
-        telat = telat_by_uid.get(uid, 0); hadir = hadir_by_uid.get(uid, 0)
+        telat = telat_by_uid.get(uid, 0); hadir = hadir_by_uid.get(uid, 0); alpha = alpha_by_uid.get(uid, 0)
         komisi_calc = komisi_agg.get(uid, {}).get("laba_kotor", 0) * comm / 100
-        potongan_calc = telat * pot_rate
         base = bases.get(uid, 0)
+        potongan_alpha = round(alpha * base / hari_kerja) if hari_kerja else 0
+        potongan_calc = telat * pot_rate + potongan_alpha
         ov = overrides.get(uid)
         if ov:
             gaji_pokok = ov.get("gaji_pokok", base); komisi = ov.get("komisi", komisi_calc); potongan = ov.get("potongan", potongan_calc)
             edited = True
         else:
             gaji_pokok = base; komisi = komisi_calc; potongan = potongan_calc; edited = False
-        rows.append({"user_id": uid, "user_name": name, "role": u["role"], "hadir": hadir, "telat": telat,
+        rows.append({"user_id": uid, "user_name": name, "role": u["role"], "hadir": hadir, "telat": telat, "alpha": alpha,
                      "gaji_pokok": gaji_pokok, "komisi": komisi, "potongan": potongan,
                      "total": gaji_pokok + komisi - potongan, "komisi_calc": komisi_calc,
-                     "potongan_calc": potongan_calc, "edited": edited, "note": (ov or {}).get("note", "")})
-    return {"month": month, "commission_rate": comm, "potongan_telat": pot_rate, "rows": rows}
+                     "potongan_calc": potongan_calc, "potongan_alpha": potongan_alpha, "edited": edited, "note": (ov or {}).get("note", "")})
+    return {"month": month, "commission_rate": comm, "potongan_telat": pot_rate, "hari_kerja": hari_kerja, "rows": rows}
 
 @api_router.get("/payroll/report")
 async def payroll_report(month: str, admin: dict = Depends(require_admin)):
@@ -1250,6 +1258,68 @@ async def payroll_save(data: PayrollSave, admin: dict = Depends(require_admin)):
 @api_router.delete("/payroll/override")
 async def payroll_reset(user_id: str, month: str, admin: dict = Depends(require_admin)):
     await db.payroll.delete_one({"user_id": user_id, "month": month})
+    return {"ok": True}
+
+# ---------------- Pengajuan Izin/Sakit (leave requests) ----------------
+class LeaveInput(BaseModel):
+    date: str
+    type: str
+    reason: str = ""
+
+class LeaveReview(BaseModel):
+    approve: bool
+
+@api_router.post("/leave")
+async def create_leave(data: LeaveInput, user: dict = Depends(get_current_user)):
+    if data.type not in ["Izin", "Sakit"]:
+        raise HTTPException(status_code=400, detail="Jenis harus Izin atau Sakit")
+    doc = {"user_id": user["id"], "user_name": user["name"], "date": data.date, "type": data.type,
+           "reason": data.reason, "status": "Pending", "created_at": wib_now().isoformat(),
+           "reviewed_by": None, "reviewed_at": None}
+    res = await db.leave_requests.insert_one(doc)
+    doc["id"] = str(res.inserted_id); doc.pop("_id", None)
+    return doc
+
+@api_router.get("/leave")
+async def list_leave(month: Optional[str] = None, status: Optional[str] = None, user: dict = Depends(get_current_user)):
+    q = {}
+    if user.get("role") != "admin":
+        q["user_id"] = user["id"]
+    if month:
+        q["date"] = {"$regex": f"^{re.escape(month)}"}
+    if status:
+        q["status"] = status
+    docs = await db.leave_requests.find(q).sort("created_at", -1).to_list(2000)
+    for d in docs:
+        d["id"] = str(d["_id"]); d.pop("_id", None)
+    pending = await db.leave_requests.count_documents({"status": "Pending"})
+    return {"requests": docs, "pending_count": pending}
+
+@api_router.put("/leave/{lid}/review")
+async def review_leave(lid: str, data: LeaveReview, admin: dict = Depends(require_admin)):
+    doc = await db.leave_requests.find_one({"_id": ObjectId(lid)})
+    if not doc:
+        raise HTTPException(status_code=404, detail="Pengajuan tidak ditemukan")
+    if doc["status"] != "Pending":
+        raise HTTPException(status_code=400, detail="Pengajuan sudah diproses")
+    new_status = "Disetujui" if data.approve else "Ditolak"
+    await db.leave_requests.update_one({"_id": ObjectId(lid)},
+        {"$set": {"status": new_status, "reviewed_by": admin["name"], "reviewed_at": wib_now().isoformat()}})
+    if data.approve:
+        att_doc = {"user_id": doc["user_id"], "user_name": doc["user_name"], "date": doc["date"],
+                   "status": doc["type"], "check_in": None, "check_out": None, "work_minutes": 0,
+                   "late": False, "created_at": wib_now().isoformat()}
+        await db.attendance.update_one({"user_id": doc["user_id"], "date": doc["date"]}, {"$set": att_doc}, upsert=True)
+    return {"ok": True, "status": new_status}
+
+@api_router.delete("/leave/{lid}")
+async def delete_leave(lid: str, user: dict = Depends(get_current_user)):
+    doc = await db.leave_requests.find_one({"_id": ObjectId(lid)})
+    if not doc:
+        raise HTTPException(status_code=404, detail="Pengajuan tidak ditemukan")
+    if user.get("role") != "admin" and (doc["user_id"] != user["id"] or doc["status"] != "Pending"):
+        raise HTTPException(status_code=403, detail="Tidak diizinkan")
+    await db.leave_requests.delete_one({"_id": ObjectId(lid)})
     return {"ok": True}
 
 app.include_router(api_router)
