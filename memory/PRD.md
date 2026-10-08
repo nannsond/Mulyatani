@@ -39,6 +39,15 @@ Aplikasi laporan penjualan sederhana untuk bisnis toko pertanian: laporan harian
 - Laporan Online (/laporan/online): mode Harian/Bulanan/Tahunan, kartu ringkasan, grafik perbandingan per channel, tren omzet, tabel rincian per channel + TOTAL; ekspor PDF/Excel
 - Backend: POST/GET/DELETE /api/ecommerce/sales, GET /api/ecommerce/reports (agregasi per channel + gabungan). Tested iter 7: 100%
 
+## Implemented (2026-10-08) — Karyawan: Komisi & Kehadiran
+- Komisi Online (/komisi, admin): tarif global % dari laba kotor, hanya pesanan online "Selesai", dikreditkan ke karyawan penginput; rekap bulanan per karyawan (layar saja). Tested iter 9: 100%
+- Kehadiran (/kehadiran, semua user): absen Masuk/Pulang mandiri (WIB), hitung durasi kerja & status Telat vs jam masuk standar (diatur admin, default 08:00); rekap bulanan per karyawan (admin) / milik sendiri (kasir). Tested iter 9: 100%
+
+## Implemented (2026-10-08) — Penjualan Online lanjutan
+- Status pesanan Diproses→Dikirim→Selesai→Dikembalikan; hanya "Selesai" masuk ke Laba Rugi + Dashboard + Laporan Harian/Bulanan/Tahunan (biaya marketplace mengurangi laba bersih)
+- Refund: admin pilih kembalikan stok atau tidak (idempotent)
+- Channel kustom (tambah/aktif/nonaktif/hapus) di Pengaturan; target omzet bulanan per channel + progress di Laporan Online; impor Excel massal + unduh template. Tested iter 8: 100%
+
 ## Backlog (P1/P2)
 - P1: Cetak struk/nota transaksi POS
 - P1: Manajemen user (tambah kasir dari UI)
