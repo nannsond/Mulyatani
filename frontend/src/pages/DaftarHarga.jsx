@@ -22,7 +22,6 @@ export default function DaftarHarga() {
   const [sortBy, setSortBy] = useState("name");
   const [lowOnly, setLowOnly] = useState(false);
   const [modal, setModal] = useState(null);
-  const [massModal, setMassModal] = useState(null);
 
   const load = () => api.get("/products").then((r) => setProducts(r.data));
   useEffect(() => { load(); }, []);
@@ -62,18 +61,6 @@ export default function DaftarHarga() {
     if (!window.confirm("Hapus produk ini?")) return;
     await api.delete(`/products/${id}`);
     toast.success("Produk dihapus"); load();
-  };
-
-  const applyMass = async () => {
-    const value = Number(massModal.value);
-    if (isNaN(value) || value < 0) { toast.error("Nilai tidak valid"); return; }
-    try {
-      const r = await api.post("/products/bulk-online-price", {
-        product_ids: sorted.map((p) => p.id), mode: massModal.mode, value, round_to: 100,
-      });
-      toast.success(`Harga online diperbarui untuk ${r.data.updated} produk`);
-      setMassModal(null); setTab("online"); load();
-    } catch (err) { toast.error(apiError(err.response?.data?.detail)); }
   };
 
   const isReseller = tab === "reseller";
@@ -127,10 +114,6 @@ export default function DaftarHarga() {
             className="flex items-center gap-2 px-3 py-2.5 rounded-xl border border-input text-sm hover:bg-secondary"><FileDown className="w-4 h-4" /> PDF</button>
           <button onClick={() => exportExcel({ filename: exportTitle.replace(/\s+/g, "_"), sheetName: "Produk", columns: cols, rows })} data-testid="export-excel-button"
             className="flex items-center gap-2 px-3 py-2.5 rounded-xl border border-input text-sm hover:bg-secondary"><FileSpreadsheet className="w-4 h-4" /> Excel</button>
-          {isAdmin && isOnline && (
-            <button onClick={() => setMassModal({ mode: "persen", value: 10 })} data-testid="mass-online-trigger"
-              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#2563EB] text-white text-sm font-semibold hover:bg-[#1D4ED8]"><ShoppingBag className="w-4 h-4" /> Set Massal</button>
-          )}
           {isAdmin && (
             <button onClick={() => setModal({ ...EMPTY })} data-testid="product-add-modal-trigger"
               className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#1B5E3B] text-white text-sm font-semibold hover:bg-[#143D2B]"><Plus className="w-4 h-4" /> Tambah</button>
@@ -219,38 +202,6 @@ export default function DaftarHarga() {
             </div>
             <button type="submit" data-testid="product-save-button" className="mt-5 w-full bg-[#1B5E3B] text-white py-3 rounded-xl font-semibold hover:bg-[#143D2B]">Simpan</button>
           </form>
-        </div>
-      )}
-
-      {massModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/50" onClick={() => setMassModal(null)} />
-          <div className="relative bg-white rounded-2xl w-full max-w-md p-6" data-testid="mass-online-modal">
-            <div className="flex items-center justify-between mb-1">
-              <h3 className="font-heading font-bold text-lg">Set Massal Harga Online</h3>
-              <button onClick={() => setMassModal(null)}><X className="w-5 h-5" /></button>
-            </div>
-            <p className="text-sm text-muted-foreground mb-4">Hitung otomatis dari <b>Harga Normal</b> untuk <b>{sorted.length} produk</b> yang sedang tampil. Hasil dibulatkan ke Rp100 terdekat.</p>
-            <div className="space-y-3">
-              <div>
-                <label className="text-sm font-medium">Metode</label>
-                <select value={massModal.mode} onChange={(e) => setMassModal({ ...massModal, mode: e.target.value })} data-testid="mass-mode-select"
-                  className="mt-1 w-full px-3 py-2.5 rounded-xl border border-input text-sm bg-white">
-                  <option value="persen">Harga Normal + Markup Persen (%)</option>
-                  <option value="nominal">Harga Normal + Markup Nominal (Rp)</option>
-                </select>
-              </div>
-              <div>
-                <label className="text-sm font-medium">{massModal.mode === "persen" ? "Markup (%)" : "Markup (Rp)"}</label>
-                <input type="number" value={massModal.value} onChange={(e) => setMassModal({ ...massModal, value: e.target.value })} data-testid="mass-value-input"
-                  className="mt-1 w-full px-3 py-2.5 rounded-xl border border-input text-sm focus:outline-none focus:ring-2 focus:ring-[#2563EB]" />
-              </div>
-              <div className="rounded-xl bg-blue-50 border border-blue-200 p-3 text-xs text-blue-800" data-testid="mass-preview">
-                Contoh: Harga Normal Rp 10.000 &rarr; <b>{(() => { const v = Number(massModal.value) || 0; const r = massModal.mode === "persen" ? 10000 * (1 + v / 100) : 10000 + v; return rupiah(Math.round(r / 100) * 100); })()}</b>
-              </div>
-              <button onClick={applyMass} data-testid="mass-apply-button" className="w-full bg-[#2563EB] text-white py-2.5 rounded-xl font-semibold hover:bg-[#1D4ED8]">Terapkan ke {sorted.length} Produk</button>
-            </div>
-          </div>
         </div>
       )}
     </div>

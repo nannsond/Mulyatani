@@ -88,6 +88,11 @@ Aplikasi laporan penjualan sederhana untuk bisnis toko pertanian: laporan harian
 - Berlaku ke produk yang sedang tampil (ikut filter pencarian/stok). Hasil dibulatkan ke Rp100 terdekat ("sesuai uang fisik").
 - Backend: POST /products/bulk-online-price (admin-only). Diverifikasi via curl (+15% → pembulatan Rp100 akurat utk 3 produk) + screenshot modal (preview Rp10.000→Rp11.000, "Terapkan ke 12 Produk"). Data uji dikembalikan.
 
+## Implemented (2026-10-08) — Kas Saat Ini (Uang Fisik) & hapus Set Massal
+- Fitur "Set Massal Harga Online" DIHAPUS (frontend tombol/modal + backend endpoint `/products/bulk-online-price`).
+- Kartu "Kas Saat Ini (Uang Fisik)" di halaman Laba Rugi: Kas = Saldo Awal + Omzet Diterima (kas) − Pembelian Dibayar − Pengeluaran − Biaya Marketplace. Semua basis kas & akumulasi seluruh periode (hutang pembelian/piutang belum dihitung sampai benar-benar dibayar).
+- Input "Saldo Awal Kas" ditambah di Pengaturan (admin). Backend: GET /reports/cash + POST /settings/saldo-awal; `saldo_awal_kas` disimpan di settings & dikembalikan di GET /settings. Diverifikasi via curl (math benar) + screenshot kartu Kas & Pengaturan.
+
 ## Backlog (P1/P2)
 - P1: Cetak struk/nota transaksi POS
 - P1: Manajemen user (tambah kasir dari UI)

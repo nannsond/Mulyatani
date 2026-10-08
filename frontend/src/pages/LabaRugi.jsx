@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { rupiah, MONTHS } from "@/lib/format";
 import { exportPDF, exportExcel } from "@/lib/exporter";
-import { Scale, Loader2, FileDown, FileSpreadsheet, ArrowUp, ArrowDown, Minus } from "lucide-react";
+import { Scale, Loader2, FileDown, FileSpreadsheet, ArrowUp, ArrowDown, Minus, Wallet } from "lucide-react";
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 
 const now = new Date();
@@ -15,6 +15,9 @@ export default function LabaRugi() {
   const [yearData, setYearData] = useState(null);
   const [expenses, setExpenses] = useState([]);
   const [prev, setPrev] = useState(null);
+  const [cash, setCash] = useState(null);
+
+  useEffect(() => { api.get("/reports/cash").then((r) => setCash(r.data)); }, [mode, year, month]);
 
   useEffect(() => {
     setData(null);
@@ -92,6 +95,7 @@ export default function LabaRugi() {
       </div>
 
       {!data ? <div className="flex justify-center py-20"><Loader2 className="w-8 h-8 animate-spin text-[#1B5E3B]" /></div> : (
+        <>
         <div className="grid lg:grid-cols-2 gap-5">
           <div className="bg-card rounded-2xl border border-slate-200 p-6 sm:p-8" data-testid="laba-rugi-statement">
             <div className="flex items-center gap-3 mb-6">
@@ -160,6 +164,25 @@ export default function LabaRugi() {
             </div>
           </div>
         </div>
+        {cash && (
+          <div className="bg-card rounded-2xl border border-slate-200 p-6 sm:p-8" data-testid="kas-card">
+            <div className="flex items-center gap-3 mb-5">
+              <div className="w-11 h-11 rounded-xl bg-[#0F281E] flex items-center justify-center"><Wallet className="w-6 h-6 text-white" /></div>
+              <div>
+                <h2 className="font-heading font-bold text-xl text-[#0F281E]">Kas Saat Ini (Uang Fisik)</h2>
+                <p className="text-sm text-muted-foreground">Akumulasi seluruh periode hingga sekarang</p>
+              </div>
+            </div>
+            <Line label="Saldo Awal Kas" value={cash.saldo_awal_kas} testid="kas-saldo-awal" />
+            <Line label="Omzet Diterima (Kas)" value={cash.omzet} testid="kas-omzet" />
+            <Line label="Pembelian Dibayar" value={cash.pembelian} negative testid="kas-pembelian" />
+            <Line label="Pengeluaran" value={cash.pengeluaran} negative testid="kas-pengeluaran" />
+            <Line label="Biaya Marketplace" value={cash.biaya_marketplace} negative testid="kas-marketplace" />
+            <Line label="Kas Saat Ini" value={cash.kas_saat_ini} bold accent testid="kas-total" />
+            <p className="text-xs text-muted-foreground mt-3">Kas = Saldo Awal + Omzet Diterima − Pembelian Dibayar − Pengeluaran − Biaya Marketplace. Hutang pembelian & piutang belum dihitung sampai benar-benar dibayar.</p>
+          </div>
+        )}
+        </>
       )}
     </div>
   );

@@ -303,30 +303,6 @@ async def delete_product(pid: str, admin: dict = Depends(require_admin)):
     await db.products.delete_one({"_id": ObjectId(pid)})
     return {"ok": True}
 
-class BulkOnlinePrice(BaseModel):
-    product_ids: List[str]
-    mode: str
-    value: float
-    round_to: int = 100
-
-@api_router.post("/products/bulk-online-price")
-async def bulk_online_price(data: BulkOnlinePrice, admin: dict = Depends(require_admin)):
-    if data.mode not in ["persen", "nominal"]:
-        raise HTTPException(status_code=400, detail="Mode tidak valid")
-    updated = 0
-    for pid in data.product_ids:
-        p = await db.products.find_one({"_id": ObjectId(pid)})
-        if not p:
-            continue
-        base = p.get("harga_jual", 0) or 0
-        val = base * (1 + data.value / 100) if data.mode == "persen" else base + data.value
-        if data.round_to and data.round_to > 0:
-            val = round(val / data.round_to) * data.round_to
-        await db.products.update_one({"_id": ObjectId(pid)}, {"$set": {"harga_online": float(max(0, val))}})
-        updated += 1
-    return {"ok": True, "updated": updated}
-
-
 # ---------------- Transaction routes ----------------
 async def gen_invoice() -> str:
     count = await db.transactions.count_documents({})
@@ -578,13 +554,40 @@ async def get_settings(user: dict = Depends(get_current_user)):
             "logo_updated": s.get("updated_at"),
             "store_name": s.get("store_name", ""),
             "address": s.get("address", ""),
-            "phone": s.get("phone", "")}
+            "phone": s.get("phone", ""),
+            "saldo_awal_kas": s.get("saldo_awal_kas", 0)}
 
 @api_router.post("/settings/info")
 async def set_store_info(data: StoreInfo, admin: dict = Depends(require_admin)):
     await db.settings.update_one({"key": "store"},
         {"$set": {"store_name": data.store_name, "address": data.address, "phone": data.phone}}, upsert=True)
     return {"ok": True}
+
+class SaldoAwal(BaseModel):
+    saldo_awal_kas: float = 0
+
+@api_router.post("/settings/saldo-awal")
+async def set_saldo_awal(data: SaldoAwal, admin: dict = Depends(require_admin)):
+    await db.settings.update_one({"key": "store"},
+        {"$set": {"saldo_awal_kas": max(0.0, data.saldo_awal_kas)}}, upsert=True)
+    return {"ok": True}
+
+@api_router.get("/reports/cash")
+async def report_cash(user: dict = Depends(get_current_user)):
+    s = await db.settings.find_one({"key": "store"}) or {}
+    saldo = s.get("saldo_awal_kas", 0) or 0
+    txs = await db.transactions.find().to_list(100000)
+    omzet_offline = sum(t["total"] * tx_fraction(t) for t in txs)
+    online, fee = await fetch_online_selesai("")
+    omzet_online = sum(t["total"] for t in online)
+    purchases = await db.purchases.find().to_list(100000)
+    pembelian = sum(p.get("amount_paid", 0) for p in purchases)
+    exps = await db.expenses.find().to_list(100000)
+    pengeluaran = sum(e.get("amount", 0) for e in exps)
+    omzet = omzet_offline + omzet_online
+    kas = saldo + omzet - pembelian - pengeluaran - fee
+    return {"saldo_awal_kas": saldo, "omzet": omzet, "pembelian": pembelian,
+            "pengeluaran": pengeluaran, "biaya_marketplace": fee, "kas_saat_ini": kas}
 
 @api_router.post("/settings/logo")
 async def upload_logo(file: UploadFile = File(...), admin: dict = Depends(require_admin)):

@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { api, apiError } from "@/lib/api";
 import { useSettings } from "@/context/SettingsContext";
-import { Upload, Loader2, Image as ImageIcon, Store, Globe, Plus, Trash2, Power } from "lucide-react";
+import { Upload, Loader2, Image as ImageIcon, Store, Globe, Plus, Trash2, Power, Wallet } from "lucide-react";
 import { toast } from "sonner";
 
 export default function Pengaturan() {
@@ -11,6 +11,8 @@ export default function Pengaturan() {
   const [saving, setSaving] = useState(false);
   const [info, setInfo] = useState({ store_name: "", address: "", phone: "" });
   const [savingInfo, setSavingInfo] = useState(false);
+  const [saldo, setSaldo] = useState(0);
+  const [savingSaldo, setSavingSaldo] = useState(false);
   const [channels, setChannels] = useState([]);
   const [newCh, setNewCh] = useState({ name: "", color: "#2563eb" });
   const loadChannels = () => api.get("/channels").then((r) => setChannels(r.data));
@@ -29,7 +31,22 @@ export default function Pengaturan() {
       address: settings?.address || "",
       phone: settings?.phone || "",
     });
+    setSaldo(settings?.saldo_awal_kas || 0);
   }, [settings]);
+
+  const saveSaldo = async (e) => {
+    e.preventDefault();
+    setSavingSaldo(true);
+    try {
+      await api.post("/settings/saldo-awal", { saldo_awal_kas: Number(saldo) || 0 });
+      toast.success("Saldo awal kas disimpan");
+      refresh();
+    } catch (err) {
+      toast.error(apiError(err.response?.data?.detail));
+    } finally {
+      setSavingSaldo(false);
+    }
+  };
 
   const logoUrl = settings?.has_logo
     ? `${process.env.REACT_APP_BACKEND_URL}/api/settings/logo?v=${encodeURIComponent(settings.logo_updated || "")}`
@@ -100,6 +117,22 @@ export default function Pengaturan() {
           <button type="submit" disabled={savingInfo} data-testid="info-save-button"
             className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#1B5E3B] text-white text-sm font-semibold hover:bg-[#143D2B] disabled:opacity-50">
             {savingInfo && <Loader2 className="w-4 h-4 animate-spin" />} Simpan Info
+          </button>
+        </div>
+      </form>
+
+      <form onSubmit={saveSaldo} className="bg-card rounded-2xl border border-slate-200 p-6">
+        <h3 className="font-heading font-semibold text-lg text-[#0F281E] mb-1 flex items-center gap-2"><Wallet className="w-5 h-5 text-[#1B5E3B]" /> Saldo Awal Kas</h3>
+        <p className="text-sm text-muted-foreground mb-5">Jumlah uang fisik (laci/rekening) saat mulai memakai aplikasi. Dipakai untuk menghitung <b>Kas Saat Ini</b> di halaman Laba Rugi.</p>
+        <div className="flex items-end gap-3">
+          <div className="flex-1">
+            <label className="text-sm font-medium">Saldo Awal (Rp)</label>
+            <input type="number" value={saldo} onChange={(e) => setSaldo(e.target.value)} data-testid="saldo-awal-input"
+              placeholder="0" className="mt-1 w-full px-3 py-2.5 rounded-xl border border-input text-sm focus:outline-none focus:ring-2 focus:ring-[#1B5E3B]" />
+          </div>
+          <button type="submit" disabled={savingSaldo} data-testid="saldo-save-button"
+            className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#1B5E3B] text-white text-sm font-semibold hover:bg-[#143D2B] disabled:opacity-50">
+            {savingSaldo && <Loader2 className="w-4 h-4 animate-spin" />} Simpan
           </button>
         </div>
       </form>
