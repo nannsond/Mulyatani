@@ -1,16 +1,28 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { api, apiError } from "@/lib/api";
-import { rupiah, fmtDate, todayStr, ECOM_CHANNELS, CHANNEL_COLORS } from "@/lib/format";
-import { Search, Plus, Minus, Trash2, ShoppingBag, Loader2, CheckCircle2 } from "lucide-react";
+import { rupiah, fmtDate, todayStr, CHANNEL_COLORS } from "@/lib/format";
+import { exportEcomTemplate, readEcomExcel } from "@/lib/exporter";
+import { Search, Plus, Minus, Trash2, ShoppingBag, Loader2, CheckCircle2, FileSpreadsheet, Upload } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/context/AuthContext";
 
+const STATUSES = ["Diproses", "Dikirim", "Selesai", "Dikembalikan"];
+const STATUS_STYLE = {
+  "Diproses": "bg-slate-100 text-slate-700",
+  "Dikirim": "bg-blue-100 text-blue-700",
+  "Selesai": "bg-green-100 text-green-700",
+  "Dikembalikan": "bg-red-100 text-red-700",
+};
+
 export default function PenjualanOnline() {
   const { user } = useAuth();
+  const isAdmin = user?.role === "admin";
+  const fileRef = useRef(null);
   const [products, setProducts] = useState([]);
+  const [channels, setChannels] = useState([]);
   const [search, setSearch] = useState("");
   const [cart, setCart] = useState([]);
-  const [channel, setChannel] = useState("Shopee");
+  const [channel, setChannel] = useState("");
   const [adminFee, setAdminFee] = useState("");
   const [ongkir, setOngkir] = useState("");
   const [biayaLain, setBiayaLain] = useState("");
@@ -18,13 +30,20 @@ export default function PenjualanOnline() {
   const [orderNo, setOrderNo] = useState("");
   const [date, setDate] = useState(todayStr());
   const [saving, setSaving] = useState(false);
+  const [importing, setImporting] = useState(false);
   const [recent, setRecent] = useState([]);
   const [filterMonth, setFilterMonth] = useState(todayStr().slice(0, 7));
   const [filterChannel, setFilterChannel] = useState("");
 
+  const colorOf = (n) => channels.find((c) => c.name === n)?.color || CHANNEL_COLORS[n] || "#64748b";
+  const activeChannels = channels.filter((c) => c.active);
+
   const loadProducts = () => api.get("/products").then((r) => setProducts(r.data));
   const loadRecent = () => api.get(`/ecommerce/sales?month=${filterMonth}${filterChannel ? `&channel=${encodeURIComponent(filterChannel)}` : ""}`).then((r) => setRecent(r.data));
-  useEffect(() => { loadProducts(); }, []);
+  useEffect(() => {
+    loadProducts();
+    api.get("/channels").then((r) => { setChannels(r.data); const act = r.data.filter((c) => c.active); if (act.length) setChannel(act[0].name); });
+  }, []);
   useEffect(() => { loadRecent(); }, [filterMonth, filterChannel]);
 
   const filtered = products.filter((p) =>
@@ -51,6 +70,7 @@ export default function PenjualanOnline() {
   const estNet = omzet - totalFee;
 
   const submit = async () => {
+    if (!channel) { toast.error("Pilih channel"); return; }
     if (!cart.length) { toast.error("Tambahkan produk dulu"); return; }
     setSaving(true);
     try {
@@ -64,12 +84,25 @@ export default function PenjualanOnline() {
         order_no: orderNo,
         date,
       });
-      toast.success(`Penjualan ${channel} ${data.ecom_no} tersimpan!`);
+      toast.success(`Penjualan ${channel} ${data.ecom_no} tersimpan (status: Diproses)`);
       setCart([]); setAdminFee(""); setOngkir(""); setBiayaLain(""); setCustomerName(""); setOrderNo("");
       loadProducts(); loadRecent();
     } catch (err) {
       toast.error(apiError(err.response?.data?.detail));
     } finally { setSaving(false); }
+  };
+
+  const changeStatus = async (s, newStatus) => {
+    if (newStatus === s.status) return;
+    let restore = false;
+    if (newStatus === "Dikembalikan") {
+      restore = window.confirm("Kembalikan stok produk ke gudang?\n\nOK = stok dikembalikan, Batal = stok tidak dikembalikan.");
+    }
+    try {
+      await api.put(`/ecommerce/sales/${s.id}/status`, { status: newStatus, restore_stock: restore });
+      toast.success(`Status ${s.ecom_no} → ${newStatus}${restore ? " (stok dikembalikan)" : ""}`);
+      loadProducts(); loadRecent();
+    } catch (err) { toast.error(apiError(err.response?.data?.detail)); }
   };
 
   const del = async (id) => {
@@ -78,18 +111,35 @@ export default function PenjualanOnline() {
     catch (err) { toast.error(apiError(err.response?.data?.detail)); }
   };
 
+  const onImport = async (e) => {
+    const f = e.target.files?.[0];
+    if (!f) return;
+    setImporting(true);
+    try {
+      const rows = await readEcomExcel(f);
+      if (!rows.length) { toast.error("File kosong atau format tidak sesuai template"); return; }
+      const { data } = await api.post("/ecommerce/sales/bulk", { rows });
+      if (data.created > 0) toast.success(`${data.created} penjualan diimpor`);
+      if (data.errors?.length) toast.error(`${data.errors.length} baris gagal: ${data.errors.slice(0, 3).join("; ")}${data.errors.length > 3 ? "…" : ""}`);
+      if (data.created === 0 && !data.errors?.length) toast.error("Tidak ada data yang diimpor");
+      loadProducts(); loadRecent();
+    } catch (err) { toast.error("Gagal membaca file Excel"); }
+    finally { setImporting(false); if (fileRef.current) fileRef.current.value = ""; }
+  };
+
   return (
     <div className="space-y-6">
       <div className="grid lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-4">
-          <div className="flex flex-wrap gap-2" data-testid="ecom-channel-selector">
-            {ECOM_CHANNELS.map((c) => (
-              <button key={c} onClick={() => setChannel(c)} data-testid={`ecom-channel-${c.replace(/\s+/g, "-").toLowerCase()}`}
-                className={`px-4 py-2.5 rounded-xl text-sm font-semibold border transition-all ${channel === c ? "text-white border-transparent shadow-md" : "bg-card hover:bg-secondary border-input"}`}
-                style={channel === c ? { backgroundColor: CHANNEL_COLORS[c] } : {}}>
-                {c}
+          <div className="flex flex-wrap items-center gap-2" data-testid="ecom-channel-selector">
+            {activeChannels.map((c) => (
+              <button key={c.name} onClick={() => setChannel(c.name)} data-testid={`ecom-channel-${c.name.replace(/\s+/g, "-").toLowerCase()}`}
+                className={`px-4 py-2.5 rounded-xl text-sm font-semibold border transition-all ${channel === c.name ? "text-white border-transparent shadow-md" : "bg-card hover:bg-secondary border-input"}`}
+                style={channel === c.name ? { backgroundColor: c.color } : {}}>
+                {c.name}
               </button>
             ))}
+            {activeChannels.length === 0 && <span className="text-sm text-muted-foreground">Belum ada channel aktif. Tambahkan di Pengaturan.</span>}
           </div>
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -114,7 +164,7 @@ export default function PenjualanOnline() {
         <div className="bg-card rounded-2xl border border-slate-200 p-5 h-fit lg:sticky lg:top-24">
           <div className="flex items-center justify-between mb-4">
             <h3 className="font-heading font-semibold text-lg text-[#0F281E] flex items-center gap-2"><ShoppingBag className="w-5 h-5" /> Pesanan</h3>
-            <span className="text-[10px] uppercase tracking-wider font-bold px-2 py-1 rounded-lg text-white" style={{ backgroundColor: CHANNEL_COLORS[channel] }}>{channel}</span>
+            {channel && <span className="text-[10px] uppercase tracking-wider font-bold px-2 py-1 rounded-lg text-white" style={{ backgroundColor: colorOf(channel) }}>{channel}</span>}
           </div>
           {cart.length === 0 ? <p className="text-sm text-muted-foreground py-8 text-center">Belum ada item.</p> : (
             <div className="space-y-3 max-h-[35vh] overflow-y-auto">
@@ -163,10 +213,19 @@ export default function PenjualanOnline() {
       <div className="bg-card rounded-2xl border border-slate-200 p-6">
         <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
           <h3 className="font-heading font-semibold text-lg">Penjualan Online Terbaru</h3>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
+            {isAdmin && (
+              <>
+                <button onClick={exportEcomTemplate} data-testid="ecom-template-button" className="flex items-center gap-2 px-3 py-2 rounded-xl border border-input text-sm hover:bg-secondary"><FileSpreadsheet className="w-4 h-4" /> Template</button>
+                <label data-testid="ecom-import-label" className="flex items-center gap-2 px-3 py-2 rounded-xl border border-input text-sm hover:bg-secondary cursor-pointer">
+                  {importing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />} Impor Excel
+                  <input ref={fileRef} type="file" accept=".xlsx,.xls" onChange={onImport} className="hidden" data-testid="ecom-import-input" />
+                </label>
+              </>
+            )}
             <select value={filterChannel} onChange={(e) => setFilterChannel(e.target.value)} data-testid="ecom-filter-channel" className="px-3 py-2 rounded-xl border border-input text-sm bg-card">
               <option value="">Semua channel</option>
-              {ECOM_CHANNELS.map((c) => <option key={c} value={c}>{c}</option>)}
+              {channels.map((c) => <option key={c.name} value={c.name}>{c.name}</option>)}
             </select>
             <input type="month" value={filterMonth} onChange={(e) => setFilterMonth(e.target.value)} data-testid="ecom-filter-month" className="px-3 py-2 rounded-xl border border-input text-sm" />
           </div>
@@ -176,24 +235,35 @@ export default function PenjualanOnline() {
             <thead><tr className="border-b border-slate-200 bg-secondary/50 text-left">
               <th className="px-3 py-2.5 font-semibold">No</th><th className="px-3 py-2.5 font-semibold">Channel</th><th className="px-3 py-2.5 font-semibold">Tanggal</th>
               <th className="px-3 py-2.5 font-semibold text-right">Omzet</th><th className="px-3 py-2.5 font-semibold text-right">Biaya</th>
-              <th className="px-3 py-2.5 font-semibold text-right">Laba Bersih</th>{user?.role === "admin" && <th className="px-3 py-2.5 font-semibold text-center">Aksi</th>}
+              <th className="px-3 py-2.5 font-semibold text-right">Laba Bersih</th><th className="px-3 py-2.5 font-semibold text-center">Status</th>{isAdmin && <th className="px-3 py-2.5 font-semibold text-center">Aksi</th>}
             </tr></thead>
             <tbody>
-              {recent.length === 0 && <tr><td colSpan={user?.role === "admin" ? 7 : 6} className="px-3 py-8 text-center text-muted-foreground">Belum ada penjualan online.</td></tr>}
+              {recent.length === 0 && <tr><td colSpan={isAdmin ? 8 : 7} className="px-3 py-8 text-center text-muted-foreground">Belum ada penjualan online.</td></tr>}
               {recent.map((s) => (
                 <tr key={s.id} className="border-b border-slate-100" data-testid={`ecom-row-${s.id}`}>
                   <td className="px-3 py-2.5 font-mono text-xs">{s.ecom_no}</td>
-                  <td className="px-3 py-2.5"><span className="text-xs px-2 py-1 rounded-lg text-white font-semibold" style={{ backgroundColor: CHANNEL_COLORS[s.channel] || "#64748b" }}>{s.channel}</span></td>
+                  <td className="px-3 py-2.5"><span className="text-xs px-2 py-1 rounded-lg text-white font-semibold" style={{ backgroundColor: colorOf(s.channel) }}>{s.channel}</span></td>
                   <td className="px-3 py-2.5 text-xs text-muted-foreground">{fmtDate(s.created_at)}</td>
                   <td className="px-3 py-2.5 text-right font-mono">{rupiah(s.omzet)}</td>
                   <td className="px-3 py-2.5 text-right font-mono text-destructive">{rupiah(s.total_fee)}</td>
                   <td className="px-3 py-2.5 text-right font-mono font-semibold text-[#1B5E3B]">{rupiah(s.laba_bersih)}</td>
-                  {user?.role === "admin" && <td className="px-3 py-2.5 text-center"><button onClick={() => del(s.id)} data-testid={`ecom-delete-${s.id}`} className="text-destructive"><Trash2 className="w-4 h-4" /></button></td>}
+                  <td className="px-3 py-2.5 text-center">
+                    {isAdmin ? (
+                      <select value={s.status || "Diproses"} onChange={(e) => changeStatus(s, e.target.value)} data-testid={`ecom-status-${s.id}`}
+                        className={`text-xs px-2 py-1 rounded-lg font-semibold border-0 cursor-pointer ${STATUS_STYLE[s.status] || STATUS_STYLE.Diproses}`}>
+                        {STATUSES.map((st) => <option key={st} value={st}>{st}</option>)}
+                      </select>
+                    ) : (
+                      <span className={`text-xs px-2 py-1 rounded-lg font-semibold ${STATUS_STYLE[s.status] || STATUS_STYLE.Diproses}`}>{s.status || "Diproses"}</span>
+                    )}
+                  </td>
+                  {isAdmin && <td className="px-3 py-2.5 text-center"><button onClick={() => del(s.id)} data-testid={`ecom-delete-${s.id}`} className="text-destructive"><Trash2 className="w-4 h-4" /></button></td>}
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
+        <p className="text-xs text-muted-foreground mt-3">Hanya pesanan berstatus <span className="font-semibold text-green-700">Selesai</span> yang dihitung ke Laba Rugi, Dashboard, dan laporan harian/bulanan/tahunan.</p>
       </div>
     </div>
   );

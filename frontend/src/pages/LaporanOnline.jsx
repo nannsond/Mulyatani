@@ -1,36 +1,59 @@
 import { useEffect, useState } from "react";
-import { api } from "@/lib/api";
-import { rupiah, MONTHS, todayStr, ECOM_CHANNELS, CHANNEL_COLORS } from "@/lib/format";
+import { api, apiError } from "@/lib/api";
+import { rupiah, MONTHS, todayStr, CHANNEL_COLORS } from "@/lib/format";
 import { exportPDF, exportExcel } from "@/lib/exporter";
-import { Loader2, FileDown, FileSpreadsheet, Globe, Wallet, TrendingUp, Receipt } from "lucide-react";
+import { Loader2, FileDown, FileSpreadsheet, Globe, Wallet, TrendingUp, Receipt, Target, Save } from "lucide-react";
 import { BarChart, Bar, AreaChart, Area, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer, CartesianGrid, Cell } from "recharts";
+import { toast } from "sonner";
+import { useAuth } from "@/context/AuthContext";
 
 const now = new Date();
+const STATUSES = ["Diproses", "Dikirim", "Selesai", "Dikembalikan"];
 
 export default function LaporanOnline() {
+  const { user } = useAuth();
+  const isAdmin = user?.role === "admin";
   const [mode, setMode] = useState("bulanan");
   const [date, setDate] = useState(todayStr());
   const [year, setYear] = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth() + 1);
+  const [status, setStatus] = useState("");
   const [data, setData] = useState(null);
+  const [targetEdits, setTargetEdits] = useState({});
 
-  useEffect(() => {
-    setData(null);
+  const load = () => {
     let url = `/ecommerce/reports?mode=${mode}`;
     if (mode === "harian") url += `&date=${date}`;
     else if (mode === "tahunan") url += `&year=${year}`;
     else url += `&year=${year}&month=${month}`;
-    api.get(url).then((r) => setData(r.data));
-  }, [mode, date, year, month]);
+    if (status) url += `&status=${encodeURIComponent(status)}`;
+    api.get(url).then((r) => {
+      setData(r.data);
+      const te = {};
+      (r.data.channels || []).forEach((c) => { te[c.channel] = c.target || ""; });
+      setTargetEdits(te);
+    });
+  };
+  useEffect(() => { setData(null); load(); }, [mode, date, year, month, status]);
 
+  const colorOf = (n) => data?.channel_colors?.[n] || CHANNEL_COLORS[n] || "#64748b";
   const periodeLabel = mode === "harian" ? date : mode === "tahunan" ? `Tahun ${year}` : `${MONTHS[month - 1]} ${year}`;
   const s = data?.summary;
   const channels = data?.channels || [];
+  const names = data?.channel_names || [];
   const barData = channels.filter((c) => c.omzet > 0 || c.transaksi > 0);
   const trend = (data?.series || []).map((row) => ({
     ...row,
     label: mode === "tahunan" ? MONTHS[parseInt(row.label, 10) - 1].slice(0, 3) : row.label,
   }));
+
+  const saveTarget = async (channel) => {
+    try {
+      await api.post("/ecommerce/targets", { channel, year, month, target_omzet: Number(targetEdits[channel]) || 0 });
+      toast.success(`Target ${channel} disimpan`);
+      load();
+    } catch (err) { toast.error(apiError(err.response?.data?.detail)); }
+  };
 
   const cards = [
     { label: "Total Omzet", value: s?.omzet, icon: Globe, color: "#1B5E3B" },
@@ -64,6 +87,10 @@ export default function LaporanOnline() {
               {[0, 1, 2].map((d) => <option key={d} value={now.getFullYear() - d}>{now.getFullYear() - d}</option>)}
             </select>
           )}
+          <select value={status} onChange={(e) => setStatus(e.target.value)} data-testid="ecom-rep-status" className="px-3 py-2 rounded-xl border border-input text-sm bg-card">
+            <option value="">Semua status</option>
+            {STATUSES.map((st) => <option key={st} value={st}>{st}</option>)}
+          </select>
         </div>
         <div className="flex gap-2">
           <button onClick={() => exportPDF({ title: "Laporan Penjualan Online", subtitle: periodeLabel, columns: exportCols, rows: exportRows, foot: exportFoot })} data-testid="export-pdf-button" className="flex items-center gap-2 px-3 py-2 rounded-xl border border-input text-sm hover:bg-secondary"><FileDown className="w-4 h-4" /> PDF</button>
@@ -73,6 +100,14 @@ export default function LaporanOnline() {
 
       {!data ? <div className="flex justify-center py-20"><Loader2 className="w-8 h-8 animate-spin text-[#1B5E3B]" /></div> : (
         <>
+          {data.status_counts && Object.keys(data.status_counts).length > 0 && (
+            <div className="flex flex-wrap gap-2" data-testid="ecom-rep-status-counts">
+              {STATUSES.filter((st) => data.status_counts[st]).map((st) => (
+                <span key={st} className="text-xs px-3 py-1.5 rounded-full bg-secondary font-medium">{st}: <b>{data.status_counts[st]}</b></span>
+              ))}
+            </div>
+          )}
+
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4" data-testid="ecom-rep-summary">
             {cards.map((c) => (
               <div key={c.label} className="bg-card rounded-2xl border border-slate-200 p-5">
@@ -94,7 +129,7 @@ export default function LaporanOnline() {
                     <YAxis tick={{ fontSize: 10 }} tickFormatter={(v) => `${Math.round(v / 1000)}rb`} />
                     <Tooltip formatter={(v) => rupiah(v)} />
                     <Bar dataKey="omzet" name="Omzet" radius={[6, 6, 0, 0]}>
-                      {channels.map((c) => <Cell key={c.channel} fill={CHANNEL_COLORS[c.channel] || "#64748b"} />)}
+                      {channels.map((c) => <Cell key={c.channel} fill={colorOf(c.channel)} />)}
                     </Bar>
                   </BarChart>
                 </ResponsiveContainer>
@@ -112,7 +147,7 @@ export default function LaporanOnline() {
                       <YAxis tick={{ fontSize: 10 }} tickFormatter={(v) => `${Math.round(v / 1000)}rb`} />
                       <Tooltip formatter={(v) => rupiah(v)} />
                       <Bar dataKey="laba_bersih" name="Laba Bersih" radius={[6, 6, 0, 0]}>
-                        {channels.map((c) => <Cell key={c.channel} fill={CHANNEL_COLORS[c.channel] || "#64748b"} />)}
+                        {channels.map((c) => <Cell key={c.channel} fill={colorOf(c.channel)} />)}
                       </Bar>
                     </BarChart>
                   </ResponsiveContainer>
@@ -125,14 +160,47 @@ export default function LaporanOnline() {
                     <YAxis tick={{ fontSize: 10 }} tickFormatter={(v) => `${Math.round(v / 1000)}rb`} />
                     <Tooltip formatter={(v) => rupiah(v)} />
                     <Legend wrapperStyle={{ fontSize: 11 }} />
-                    {ECOM_CHANNELS.map((c) => (
-                      <Area key={c} type="monotone" dataKey={c} stackId="1" stroke={CHANNEL_COLORS[c]} fill={CHANNEL_COLORS[c]} fillOpacity={0.5} />
+                    {names.map((c) => (
+                      <Area key={c} type="monotone" dataKey={c} stackId="1" stroke={colorOf(c)} fill={colorOf(c)} fillOpacity={0.5} />
                     ))}
                   </AreaChart>
                 </ResponsiveContainer>
               )}
             </div>
           </div>
+
+          {mode === "bulanan" && (
+            <div className="bg-card rounded-2xl border border-slate-200 p-6" data-testid="ecom-rep-targets">
+              <h3 className="font-heading font-semibold text-lg mb-4 flex items-center gap-2"><Target className="w-5 h-5 text-[#1B5E3B]" /> Target Omzet per Channel — {MONTHS[month - 1]} {year}</h3>
+              <div className="space-y-4">
+                {channels.map((c) => {
+                  const tgt = c.target || 0;
+                  const pct = tgt > 0 ? Math.min(100, (c.omzet / tgt) * 100) : 0;
+                  return (
+                    <div key={c.channel} data-testid={`ecom-target-${c.channel.replace(/\s+/g, "-").toLowerCase()}`}>
+                      <div className="flex flex-wrap items-center justify-between gap-2 mb-1.5">
+                        <span className="text-sm font-medium flex items-center gap-2"><span className="w-3 h-3 rounded-sm" style={{ backgroundColor: colorOf(c.channel) }} />{c.channel}</span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-muted-foreground font-mono">{rupiah(c.omzet)}{tgt > 0 ? ` / ${rupiah(tgt)}` : ""}</span>
+                          {tgt > 0 && <span className={`text-xs font-semibold ${pct >= 100 ? "text-green-700" : "text-[#C85A32]"}`}>{pct.toFixed(0)}%</span>}
+                          {isAdmin && (
+                            <div className="flex items-center gap-1">
+                              <input type="number" value={targetEdits[c.channel] ?? ""} onChange={(e) => setTargetEdits({ ...targetEdits, [c.channel]: e.target.value })} data-testid={`ecom-target-input-${c.channel.replace(/\s+/g, "-").toLowerCase()}`}
+                                placeholder="Set target" className="w-28 px-2 py-1 rounded-lg border border-input text-xs" />
+                              <button onClick={() => saveTarget(c.channel)} data-testid={`ecom-target-save-${c.channel.replace(/\s+/g, "-").toLowerCase()}`} className="p-1.5 rounded-lg bg-[#1B5E3B] text-white hover:bg-[#143D2B]"><Save className="w-3.5 h-3.5" /></button>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                      <div className="h-2.5 rounded-full bg-secondary overflow-hidden">
+                        <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, backgroundColor: colorOf(c.channel) }} />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           <div className="bg-card rounded-2xl border border-slate-200 p-6" data-testid="ecom-rep-table">
             <h3 className="font-heading font-semibold text-lg mb-4">Rincian per Channel — {periodeLabel}</h3>
@@ -146,7 +214,7 @@ export default function LaporanOnline() {
                 <tbody>
                   {channels.map((c) => (
                     <tr key={c.channel} className="border-b border-slate-100" data-testid={`ecom-rep-channel-${c.channel.replace(/\s+/g, "-").toLowerCase()}`}>
-                      <td className="px-3 py-2.5"><span className="text-xs px-2 py-1 rounded-lg text-white font-semibold" style={{ backgroundColor: CHANNEL_COLORS[c.channel] || "#64748b" }}>{c.channel}</span></td>
+                      <td className="px-3 py-2.5"><span className="text-xs px-2 py-1 rounded-lg text-white font-semibold" style={{ backgroundColor: colorOf(c.channel) }}>{c.channel}</span></td>
                       <td className="px-3 py-2.5 text-right font-mono">{rupiah(c.omzet)}</td>
                       <td className="px-3 py-2.5 text-right font-mono text-destructive">{rupiah(c.fee)}</td>
                       <td className="px-3 py-2.5 text-right font-mono">{rupiah(c.laba_kotor)}</td>

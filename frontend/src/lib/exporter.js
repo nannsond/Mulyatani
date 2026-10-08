@@ -126,3 +126,40 @@ export async function printPriceList({ products, mode, logoUrl, info }) {
   autoTable(doc, { startY: hy + 8, head: [cols], body: rows, headStyles: { fillColor: [27, 94, 59] }, styles: { fontSize: 8 } });
   doc.save(`Daftar_Harga_${mode}.pdf`);
 }
+
+
+export function exportEcomTemplate() {
+  const cols = ["Tanggal (YYYY-MM-DD)", "Channel", "SKU", "Qty", "Harga", "Biaya Admin", "Ongkir", "Biaya Lain"];
+  const example = ["2026-10-08", "Shopee", "SKU-1001", 2, 155000, 5000, 10000, 0];
+  const ws = XLSX.utils.aoa_to_sheet([cols, example]);
+  ws["!cols"] = cols.map(() => ({ wch: 18 }));
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Template");
+  XLSX.writeFile(wb, "Template_Penjualan_Online.xlsx");
+}
+
+export async function readEcomExcel(file) {
+  const buf = await file.arrayBuffer();
+  const wb = XLSX.read(buf, { type: "array", cellDates: true });
+  const ws = wb.Sheets[wb.SheetNames[0]];
+  const rows = XLSX.utils.sheet_to_json(ws, { header: 1, blankrows: false });
+  const out = [];
+  for (let i = 1; i < rows.length; i++) {
+    const r = rows[i];
+    if (!r || r.length === 0) continue;
+    const sku = String(r[2] ?? "").trim();
+    if (!sku) continue;
+    const dateVal = r[0] instanceof Date ? r[0].toISOString().slice(0, 10) : (r[0] ? String(r[0]).slice(0, 10) : null);
+    out.push({
+      date: dateVal,
+      channel: String(r[1] ?? "").trim(),
+      sku,
+      qty: Number(r[3]) || 0,
+      harga: Number(r[4]) || 0,
+      admin_fee: Number(r[5]) || 0,
+      ongkir: Number(r[6]) || 0,
+      biaya_lain: Number(r[7]) || 0,
+    });
+  }
+  return out;
+}
