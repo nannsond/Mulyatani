@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
 import { api, apiError } from "@/lib/api";
 import { rupiah } from "@/lib/format";
-import { exportPDF, exportExcel } from "@/lib/exporter";
 import { useAuth } from "@/context/AuthContext";
-import { Plus, Pencil, Trash2, FileDown, FileSpreadsheet, X, Search, User, Users } from "lucide-react";
+import { useSettings } from "@/context/SettingsContext";
+import { Plus, Pencil, Trash2, FileDown, FileSpreadsheet, X, Search, User, Users, Printer } from "lucide-react";
+import { exportPDF, exportExcel, printPriceList } from "@/lib/exporter";
 import { toast } from "sonner";
 
 const EMPTY = { sku: "", name: "", category: "Pupuk", unit: "pcs", harga_beli: 0, harga_jual: 0, harga_reseller: 0, stok: 0, stok_minimal: 10 };
@@ -11,7 +12,10 @@ const CATS = ["Pupuk", "Benih", "Pestisida", "Alat Tani", "Lainnya"];
 
 export default function DaftarHarga() {
   const { user } = useAuth();
+  const { settings } = useSettings();
   const isAdmin = user?.role === "admin";
+  const logoUrl = settings?.has_logo ? `${process.env.REACT_APP_BACKEND_URL}/api/settings/logo?v=${encodeURIComponent(settings.logo_updated || "")}` : undefined;
+  const storeInfo = { store_name: settings?.store_name, address: settings?.address, phone: settings?.phone };
   const [products, setProducts] = useState([]);
   const [search, setSearch] = useState("");
   const [tab, setTab] = useState("normal");
@@ -68,6 +72,8 @@ export default function DaftarHarga() {
             placeholder="Cari produk..." className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-input bg-card text-sm focus:outline-none focus:ring-2 focus:ring-[#1B5E3B]" />
         </div>
         <div className="flex gap-2">
+          <button onClick={() => printPriceList({ products: filtered, mode: tab, logoUrl, info: storeInfo })} data-testid="print-pricelist-button"
+            className="flex items-center gap-2 px-3 py-2.5 rounded-xl border border-input text-sm hover:bg-secondary"><Printer className="w-4 h-4" /> Cetak</button>
           <button onClick={() => exportPDF({ title: exportTitle, columns: cols, rows })} data-testid="export-pdf-button"
             className="flex items-center gap-2 px-3 py-2.5 rounded-xl border border-input text-sm hover:bg-secondary"><FileDown className="w-4 h-4" /> PDF</button>
           <button onClick={() => exportExcel({ filename: exportTitle.replace(/\s+/g, "_"), sheetName: "Produk", columns: cols, rows })} data-testid="export-excel-button"

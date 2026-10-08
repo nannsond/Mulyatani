@@ -17,6 +17,7 @@ export default function LaporanBulanan() {
   const [year, setYear] = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth() + 1);
   const [data, setData] = useState(null);
+  const [products, setProducts] = useState([]);
   const [targetInput, setTargetInput] = useState("");
 
   const load = () => {
@@ -24,6 +25,7 @@ export default function LaporanBulanan() {
     api.get(`/reports/monthly?year=${year}&month=${month}`).then((r) => { setData(r.data); setTargetInput(String(r.data.target_omzet || "")); });
   };
   useEffect(() => { load(); }, [year, month]);
+  useEffect(() => { api.get("/products").then((r) => setProducts(r.data)); }, []);
 
   const saveTarget = async () => {
     try {
@@ -60,9 +62,11 @@ export default function LaporanBulanan() {
 
       {!data ? <div className="flex justify-center py-20"><Loader2 className="w-8 h-8 animate-spin text-[#1B5E3B]" /></div> : (
         <>
-          <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
             <div className="bg-card rounded-2xl border border-slate-200 p-5"><div className="flex items-center gap-2 text-muted-foreground mb-2"><Wallet className="w-4 h-4" /><span className="text-xs font-semibold uppercase tracking-wider">Total Omzet</span></div><p className="font-mono font-bold text-2xl text-[#0F281E]">{rupiah(data.summary.total_omzet)}</p></div>
             <div className="bg-card rounded-2xl border border-slate-200 p-5"><div className="flex items-center gap-2 text-muted-foreground mb-2"><Wallet className="w-4 h-4" /><span className="text-xs font-semibold uppercase tracking-wider">Laba Kotor</span></div><p className="font-mono font-bold text-2xl text-[#0F281E]">{rupiah(data.summary.total_laba)}</p></div>
+            <div className="bg-card rounded-2xl border border-slate-200 p-5"><div className="flex items-center gap-2 text-muted-foreground mb-2"><span className="text-xs font-semibold uppercase tracking-wider">Pengeluaran</span></div><p className="font-mono font-bold text-2xl text-destructive">{rupiah(data.summary.total_pengeluaran || 0)}</p></div>
+            <div className="bg-card rounded-2xl border-2 border-[#1B5E3B]/30 p-5" data-testid="stat-laba-bersih"><div className="flex items-center gap-2 text-muted-foreground mb-2"><span className="text-xs font-semibold uppercase tracking-wider">Laba Bersih</span></div><p className="font-mono font-bold text-2xl text-[#1B5E3B]">{rupiah(data.summary.laba_bersih ?? data.summary.total_laba)}</p></div>
             <div className="bg-card rounded-2xl border border-slate-200 p-5"><div className="flex items-center gap-2 text-muted-foreground mb-2"><Receipt className="w-4 h-4" /><span className="text-xs font-semibold uppercase tracking-wider">Transaksi</span></div><p className="font-mono font-bold text-2xl text-[#0F281E]">{data.summary.jumlah_transaksi}</p></div>
             <div className="bg-card rounded-2xl border border-slate-200 p-5"><div className="flex items-center gap-2 text-muted-foreground mb-2"><span className="text-xs font-semibold uppercase tracking-wider">Item Terjual</span></div><p className="font-mono font-bold text-2xl text-[#0F281E]">{data.summary.total_item}</p></div>
             <div className="bg-card rounded-2xl border border-slate-200 p-5"><div className="flex items-center gap-2 text-muted-foreground mb-2"><span className="text-xs font-semibold uppercase tracking-wider">Rata-rata/Tx</span></div><p className="font-mono font-bold text-2xl text-[#0F281E]">{rupiah(data.summary.rata_rata)}</p></div>
@@ -137,6 +141,21 @@ export default function LaporanBulanan() {
           <ProductLaba data={data.product_laba} />
 
           <CategoryLaba data={data.category_laba} />
+
+          <div className="bg-card rounded-2xl border border-slate-200 p-6" data-testid="price-comparison">
+            <h3 className="font-heading font-semibold text-lg mb-4">Perbandingan Margin Normal vs Reseller</h3>
+            <ResponsiveContainer width="100%" height={320}>
+              <BarChart data={products.map((p) => ({ name: p.name.length > 12 ? p.name.slice(0, 12) + "…" : p.name, Normal: p.harga_jual - p.harga_beli, Reseller: (p.harga_reseller || p.harga_jual) - p.harga_beli }))}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#eef2f0" />
+                <XAxis dataKey="name" tick={{ fontSize: 10 }} interval={0} angle={-35} textAnchor="end" height={90} />
+                <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => `${v / 1000}k`} />
+                <Tooltip formatter={(v) => rupiah(v)} />
+                <Legend />
+                <Bar dataKey="Normal" fill="#1B5E3B" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="Reseller" fill="#C85A32" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
 
           <div className="bg-card rounded-2xl border border-slate-200 p-6">
             <h3 className="font-heading font-semibold text-lg mb-4">Produk Terlaris</h3>

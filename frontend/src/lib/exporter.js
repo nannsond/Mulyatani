@@ -55,7 +55,7 @@ function loadImageData(url) {
 export async function printReceipt(tx, logoUrl, info = {}) {
   const lineH = 5;
   const itemsCount = tx.items.length;
-  const height = 115 + itemsCount * 8;
+  const height = 140 + itemsCount * 8;
   const doc = new jsPDF({ unit: "mm", format: [80, height] });
   let y = 8;
   if (logoUrl) {
@@ -87,14 +87,42 @@ export async function printReceipt(tx, logoUrl, info = {}) {
     doc.text(rp(i.subtotal), 75, y, { align: "right" }); y += lineH;
   });
   doc.text("--------------------------------", 5, y); y += lineH;
+  if (tx.discount && tx.discount > 0) {
+    doc.setFont("courier", "normal"); doc.setFontSize(8);
+    doc.text("Subtotal", 5, y); doc.text(rp(tx.subtotal || tx.total), 75, y, { align: "right" }); y += 4;
+    doc.text("Diskon", 5, y); doc.text("-" + rp(tx.discount), 75, y, { align: "right" }); y += 4;
+  }
   doc.setFont("courier", "bold");
   doc.setFontSize(10);
   doc.text("TOTAL", 5, y);
   doc.text(rp(tx.total), 75, y, { align: "right" }); y += lineH + 1;
   doc.setFont("courier", "normal");
   doc.setFontSize(8);
-  doc.text(`Pembayaran: ${tx.payment_method}`, 5, y); y += lineH + 2;
-  doc.setFontSize(8);
+  doc.text(`Pembayaran: ${tx.payment_method}`, 5, y); y += lineH - 1;
+  if (tx.customer_name) { doc.text(`Pelanggan: ${tx.customer_name}`, 5, y); y += 4; }
+  if (tx.status && tx.status !== "lunas") {
+    doc.text(`Dibayar: ${rp(tx.amount_paid || 0)}`, 5, y); y += 4;
+    doc.text(`Sisa (Piutang): ${rp((tx.total || 0) - (tx.amount_paid || 0))}`, 5, y); y += 4;
+  }
+  y += 2;
   doc.text("Terima kasih atas kunjungan Anda!", 40, y, { align: "center" });
   doc.save(`Struk_${tx.invoice_no}.pdf`);
+}
+
+export async function printPriceList({ products, mode, logoUrl, info }) {
+  const doc = new jsPDF();
+  if (logoUrl) { try { const d = await loadImageData(logoUrl); doc.addImage(d, "PNG", 14, 8, 16, 16); } catch (e) { /* skip */ } }
+  const x = logoUrl ? 34 : 14;
+  doc.setFontSize(15); doc.setTextColor(27, 94, 59);
+  doc.text(info?.store_name || "Toko Tani Makmur", x, 16);
+  let hy = 22; doc.setFontSize(9); doc.setTextColor(90, 90, 90);
+  if (info?.address) { doc.text(info.address, x, hy); hy += 5; }
+  if (info?.phone) { doc.text("Telp: " + info.phone, x, hy); hy += 5; }
+  doc.setFontSize(12); doc.setTextColor(20, 20, 20);
+  const reseller = mode === "reseller";
+  doc.text(reseller ? "DAFTAR HARGA RESELLER" : "DAFTAR HARGA NORMAL", 14, hy + 4);
+  const cols = ["SKU", "Produk", "Kategori", "Satuan", "Harga"];
+  const rows = products.map((p) => [p.sku, p.name, p.category, p.unit, rp(reseller ? (p.harga_reseller || p.harga_jual) : p.harga_jual)]);
+  autoTable(doc, { startY: hy + 8, head: [cols], body: rows, headStyles: { fillColor: [27, 94, 59] }, styles: { fontSize: 8 } });
+  doc.save(`Daftar_Harga_${mode}.pdf`);
 }

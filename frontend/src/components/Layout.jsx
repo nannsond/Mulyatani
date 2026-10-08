@@ -2,12 +2,15 @@ import { useState } from "react";
 import { NavLink, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import { useSettings } from "@/context/SettingsContext";
-import { LayoutDashboard, ShoppingCart, Tag, Boxes, Calendar, BarChart3, TrendingUp, LogOut, Menu, X, Sprout, Users, ReceiptText, Settings } from "lucide-react";
+import { LayoutDashboard, ShoppingCart, Tag, Boxes, Calendar, BarChart3, TrendingUp, LogOut, Menu, X, Sprout, Users, ReceiptText, Settings, Truck, HandCoins, Banknote } from "lucide-react";
 
 const LINKS = [
   { label: "Dashboard", icon: LayoutDashboard, path: "/" },
   { label: "Kasir Penjualan", icon: ShoppingCart, path: "/pos" },
   { label: "Riwayat Transaksi", icon: ReceiptText, path: "/riwayat" },
+  { label: "Pembelian", icon: Truck, path: "/pembelian" },
+  { label: "Hutang & Piutang", icon: HandCoins, path: "/hutang-piutang" },
+  { label: "Pengeluaran", icon: Banknote, path: "/pengeluaran" },
   { label: "Daftar Harga", icon: Tag, path: "/daftar-harga" },
   { label: "Stok Opname", icon: Boxes, path: "/stok-opname" },
   { label: "Laporan Harian", icon: Calendar, path: "/laporan/harian" },

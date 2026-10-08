@@ -166,6 +166,13 @@ class CartItem(BaseModel):
 class TransactionInput(BaseModel):
     items: List[CartItem]
     payment_method: str = "Tunai"
+    discount: float = 0
+    discount_reason: str = ""
+    customer_name: str = ""
+    amount_paid: Optional[float] = None
+
+class PaymentInput(BaseModel):
+    amount: float
 
 class OpnameInput(BaseModel):
     product_id: str
@@ -238,16 +245,22 @@ async def create_transaction(data: TransactionInput, user: dict = Depends(get_cu
     if not data.items:
         raise HTTPException(status_code=400, detail="Keranjang kosong")
     items = []
-    total = 0.0
+    subtotal = 0.0
     for it in data.items:
-        subtotal = it.qty * it.harga
-        total += subtotal
+        line = it.qty * it.harga
+        subtotal += line
         items.append({"product_id": it.product_id, "name": it.name, "qty": it.qty,
-                      "harga": it.harga, "subtotal": subtotal})
+                      "harga": it.harga, "subtotal": line})
         await db.products.update_one({"_id": ObjectId(it.product_id)}, {"$inc": {"stok": -it.qty}})
-    doc = {"invoice_no": await gen_invoice(), "items": items, "total": total,
-           "payment_method": data.payment_method, "cashier_id": user["id"],
-           "cashier_name": user["name"], "created_at": now_iso()}
+    discount = max(0.0, min(data.discount, subtotal))
+    total = subtotal - discount
+    amount_paid = total if data.amount_paid is None else max(0.0, min(data.amount_paid, total))
+    status = "lunas" if amount_paid >= total else ("sebagian" if amount_paid > 0 else "belum")
+    doc = {"invoice_no": await gen_invoice(), "items": items, "subtotal": subtotal,
+           "discount": discount, "discount_reason": data.discount_reason, "total": total,
+           "payment_method": data.payment_method, "customer_name": data.customer_name,
+           "amount_paid": amount_paid, "status": status, "payments": [],
+           "cashier_id": user["id"], "cashier_name": user["name"], "created_at": now_iso()}
     res = await db.transactions.insert_one(doc)
     doc["id"] = str(res.inserted_id)
     doc.pop("_id", None)
@@ -340,6 +353,9 @@ async def report_monthly(year: int, month: int, user: dict = Depends(get_current
         d["omzet"] += t["total"]; d["transaksi"] += 1
         d["laba"] += compute_profit([t], cost)
     s = summarize(txs); s["total_laba"] = compute_profit(txs, cost)
+    peng = await db.expenses.find({"created_at": {"$regex": f"^{prefix}"}}).to_list(2000)
+    s["total_pengeluaran"] = sum(e["amount"] for e in peng)
+    s["laba_bersih"] = s["total_laba"] - s["total_pengeluaran"]
     target = await db.targets.find_one({"year": year, "month": month})
     return {"year": year, "month": month, "summary": s,
             "target_omzet": target["target_omzet"] if target else 0,
@@ -358,6 +374,9 @@ async def report_yearly(year: int, user: dict = Depends(get_current_user)):
         monthly[m]["omzet"] += t["total"]; monthly[m]["transaksi"] += 1
         monthly[m]["laba"] += compute_profit([t], cost)
     s = summarize(txs); s["total_laba"] = compute_profit(txs, cost)
+    peng = await db.expenses.find({"created_at": {"$regex": f"^{year}"}}).to_list(5000)
+    s["total_pengeluaran"] = sum(e["amount"] for e in peng)
+    s["laba_bersih"] = s["total_laba"] - s["total_pengeluaran"]
     target = await db.targets.find_one({"year": year, "month": 0})
     return {"year": year, "summary": s,
             "target_omzet": target["target_omzet"] if target else 0,
@@ -463,6 +482,131 @@ async def get_logo():
         raise HTTPException(status_code=404, detail="Logo belum diset")
     data, ct = get_object(s["logo_path"])
     return Response(content=data, media_type=s.get("content_type", ct))
+
+# ---------------- Piutang (receivables from sales) ----------------
+@api_router.get("/piutang")
+async def list_piutang(user: dict = Depends(get_current_user)):
+    docs = await db.transactions.find({"status": {"$in": ["belum", "sebagian"]}}).sort("created_at", -1).to_list(500)
+    out = []
+    for d in docs:
+        d["id"] = str(d["_id"]); d.pop("_id", None)
+        d["sisa"] = d["total"] - d.get("amount_paid", 0)
+        out.append(d)
+    return out
+
+@api_router.post("/transactions/{tid}/pay")
+async def pay_transaction(tid: str, data: PaymentInput, user: dict = Depends(get_current_user)):
+    t = await db.transactions.find_one({"_id": ObjectId(tid)})
+    if not t:
+        raise HTTPException(status_code=404, detail="Transaksi tidak ditemukan")
+    paid = min(t.get("amount_paid", 0) + data.amount, t["total"])
+    status = "lunas" if paid >= t["total"] else ("sebagian" if paid > 0 else "belum")
+    payments = t.get("payments", []) + [{"amount": data.amount, "date": now_iso(), "by": user["name"]}]
+    await db.transactions.update_one({"_id": ObjectId(tid)}, {"$set": {"amount_paid": paid, "status": status, "payments": payments}})
+    return {"ok": True, "amount_paid": paid, "status": status}
+
+# ---------------- Pembelian (purchases) ----------------
+class PurchaseItem(BaseModel):
+    product_id: str
+    name: str
+    qty: int
+    harga_beli: float
+
+class PurchaseInput(BaseModel):
+    supplier: str
+    items: List[PurchaseItem]
+    amount_paid: Optional[float] = None
+    note: str = ""
+
+async def gen_purchase_no():
+    count = await db.purchases.count_documents({})
+    return f"PO-{datetime.now().strftime('%Y%m%d')}-{count + 1:04d}"
+
+@api_router.post("/purchases")
+async def create_purchase(data: PurchaseInput, user: dict = Depends(get_current_user)):
+    if not data.items:
+        raise HTTPException(status_code=400, detail="Item pembelian kosong")
+    items = []
+    total = 0.0
+    for it in data.items:
+        line = it.qty * it.harga_beli
+        total += line
+        items.append({"product_id": it.product_id, "name": it.name, "qty": it.qty,
+                      "harga_beli": it.harga_beli, "subtotal": line})
+        await db.products.update_one({"_id": ObjectId(it.product_id)},
+                                     {"$inc": {"stok": it.qty}, "$set": {"harga_beli": it.harga_beli}})
+    amount_paid = total if data.amount_paid is None else max(0.0, min(data.amount_paid, total))
+    status = "lunas" if amount_paid >= total else ("sebagian" if amount_paid > 0 else "belum")
+    doc = {"po_no": await gen_purchase_no(), "supplier": data.supplier, "items": items, "total": total,
+           "amount_paid": amount_paid, "status": status, "payments": [], "note": data.note,
+           "user_name": user["name"], "created_at": now_iso()}
+    res = await db.purchases.insert_one(doc)
+    doc["id"] = str(res.inserted_id); doc.pop("_id", None)
+    return doc
+
+@api_router.get("/purchases")
+async def list_purchases(month: Optional[str] = None, user: dict = Depends(get_current_user)):
+    q = {}
+    if month:
+        q = {"created_at": {"$regex": f"^{month}"}}
+    docs = await db.purchases.find(q).sort("created_at", -1).to_list(500)
+    for d in docs:
+        d["id"] = str(d["_id"]); d.pop("_id", None)
+    return docs
+
+@api_router.get("/hutang")
+async def list_hutang(user: dict = Depends(get_current_user)):
+    docs = await db.purchases.find({"status": {"$in": ["belum", "sebagian"]}}).sort("created_at", -1).to_list(500)
+    out = []
+    for d in docs:
+        d["id"] = str(d["_id"]); d.pop("_id", None)
+        d["sisa"] = d["total"] - d.get("amount_paid", 0)
+        out.append(d)
+    return out
+
+@api_router.post("/purchases/{pid}/pay")
+async def pay_purchase(pid: str, data: PaymentInput, user: dict = Depends(get_current_user)):
+    p = await db.purchases.find_one({"_id": ObjectId(pid)})
+    if not p:
+        raise HTTPException(status_code=404, detail="Pembelian tidak ditemukan")
+    paid = min(p.get("amount_paid", 0) + data.amount, p["total"])
+    status = "lunas" if paid >= p["total"] else ("sebagian" if paid > 0 else "belum")
+    payments = p.get("payments", []) + [{"amount": data.amount, "date": now_iso(), "by": user["name"]}]
+    await db.purchases.update_one({"_id": ObjectId(pid)}, {"$set": {"amount_paid": paid, "status": status, "payments": payments}})
+    return {"ok": True, "amount_paid": paid, "status": status}
+
+# ---------------- Pengeluaran (expenses) ----------------
+class ExpenseInput(BaseModel):
+    category: str
+    amount: float
+    note: str = ""
+    date: Optional[str] = None
+
+@api_router.post("/expenses")
+async def create_expense(data: ExpenseInput, user: dict = Depends(get_current_user)):
+    created = data.date or now_iso()
+    if len(created) == 10:
+        created = created + "T00:00:00+00:00"
+    doc = {"category": data.category, "amount": data.amount, "note": data.note,
+           "user_name": user["name"], "created_at": created}
+    res = await db.expenses.insert_one(doc)
+    doc["id"] = str(res.inserted_id); doc.pop("_id", None)
+    return doc
+
+@api_router.get("/expenses")
+async def list_expenses(month: Optional[str] = None, user: dict = Depends(get_current_user)):
+    q = {}
+    if month:
+        q = {"created_at": {"$regex": f"^{month}"}}
+    docs = await db.expenses.find(q).sort("created_at", -1).to_list(1000)
+    for d in docs:
+        d["id"] = str(d["_id"]); d.pop("_id", None)
+    return docs
+
+@api_router.delete("/expenses/{eid}")
+async def delete_expense(eid: str, user: dict = Depends(get_current_user)):
+    await db.expenses.delete_one({"_id": ObjectId(eid)})
+    return {"ok": True}
 
 # ---------------- Stok Opname ----------------
 @api_router.get("/stok-opname")

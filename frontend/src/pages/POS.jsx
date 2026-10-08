@@ -17,6 +17,12 @@ export default function POS() {
   const [priceMode, setPriceMode] = useState("normal");
   const [saving, setSaving] = useState(false);
   const [lastInvoice, setLastInvoice] = useState(null);
+  const [customerName, setCustomerName] = useState("");
+  const [discRp, setDiscRp] = useState("");
+  const [discPct, setDiscPct] = useState("");
+  const [discReason, setDiscReason] = useState("");
+  const [isHutang, setIsHutang] = useState(false);
+  const [amountPaid, setAmountPaid] = useState("");
 
   const priceOf = (p) => (priceMode === "reseller" ? (p.harga_reseller || p.harga_jual) : p.harga_jual);
 
@@ -53,7 +59,10 @@ export default function POS() {
 
   const removeItem = (id) => setCart((c) => c.filter((i) => i.product_id !== id));
 
-  const total = cart.reduce((s, i) => s + i.qty * i.harga, 0);
+  const subtotal = cart.reduce((s, i) => s + i.qty * i.harga, 0);
+  const discount = Math.min(subtotal, (Number(discRp) || 0) + Math.round(subtotal * (Number(discPct) || 0) / 100));
+  const total = subtotal - discount;
+  const paid = isHutang ? (Number(amountPaid) || 0) : total;
 
   const checkout = async () => {
     if (!cart.length) return;
@@ -62,11 +71,15 @@ export default function POS() {
       const { data } = await api.post("/transactions", {
         items: cart.map((i) => ({ product_id: i.product_id, name: i.name, qty: i.qty, harga: i.harga })),
         payment_method: payment,
+        discount,
+        discount_reason: discReason,
+        customer_name: customerName,
+        amount_paid: isHutang ? paid : null,
       });
       setLastInvoice(data);
       toast.success(`Transaksi ${data.invoice_no} berhasil!`);
       printReceipt(data, logoUrl, storeInfo);
-      setCart([]);
+      setCart([]); setCustomerName(""); setDiscRp(""); setDiscPct(""); setDiscReason(""); setIsHutang(false); setAmountPaid("");
       load();
     } catch (err) {
       toast.error(apiError(err.response?.data?.detail));
@@ -148,6 +161,19 @@ export default function POS() {
         )}
 
         <div className="mt-4 pt-4 border-t border-slate-200 space-y-3">
+          <input value={customerName} onChange={(e) => setCustomerName(e.target.value)} data-testid="pos-customer-input"
+            placeholder="Nama pelanggan (opsional)"
+            className="w-full px-3 py-2 rounded-lg border border-input text-sm focus:outline-none focus:ring-2 focus:ring-[#1B5E3B]" />
+          <div className="flex gap-2">
+            <input type="number" value={discRp} onChange={(e) => setDiscRp(e.target.value)} data-testid="pos-discount-rp" placeholder="Diskon Rp"
+              className="w-1/2 px-3 py-2 rounded-lg border border-input text-sm" />
+            <input type="number" value={discPct} onChange={(e) => setDiscPct(e.target.value)} data-testid="pos-discount-pct" placeholder="Diskon %"
+              className="w-1/2 px-3 py-2 rounded-lg border border-input text-sm" />
+          </div>
+          {(discRp || discPct) && (
+            <input value={discReason} onChange={(e) => setDiscReason(e.target.value)} data-testid="pos-discount-reason" placeholder="Alasan diskon"
+              className="w-full px-3 py-2 rounded-lg border border-input text-sm" />
+          )}
           <div className="flex gap-2">
             {["Tunai", "Transfer", "QRIS"].map((m) => (
               <button key={m} onClick={() => setPayment(m)}
@@ -157,10 +183,22 @@ export default function POS() {
               </button>
             ))}
           </div>
+          <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={isHutang} onChange={(e) => setIsHutang(e.target.checked)} data-testid="pos-hutang-check" /> Bayar sebagian / Piutang</label>
+          {isHutang && (
+            <input type="number" value={amountPaid} onChange={(e) => setAmountPaid(e.target.value)} data-testid="pos-amount-paid" placeholder="Jumlah dibayar sekarang"
+              className="w-full px-3 py-2 rounded-lg border border-input text-sm" />
+          )}
+          {discount > 0 && (
+            <div className="text-sm text-muted-foreground space-y-0.5">
+              <div className="flex justify-between"><span>Subtotal</span><span className="font-mono">{rupiah(subtotal)}</span></div>
+              <div className="flex justify-between text-destructive"><span>Diskon</span><span className="font-mono">-{rupiah(discount)}</span></div>
+            </div>
+          )}
           <div className="flex items-center justify-between">
             <span className="text-sm font-medium">Total</span>
             <span className="font-mono font-bold text-2xl text-[#1B5E3B]" data-testid="pos-total">{rupiah(total)}</span>
           </div>
+          {isHutang && <p className="text-xs text-[#C85A32] text-right" data-testid="pos-sisa">Sisa piutang: {rupiah(Math.max(0, total - paid))}</p>}
           <button
             onClick={checkout} disabled={!cart.length || saving}
             data-testid="pos-checkout-button"

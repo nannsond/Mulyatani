@@ -11,6 +11,9 @@ import StokOpname from "@/pages/StokOpname";
 import KelolaKasir from "@/pages/KelolaKasir";
 import RiwayatTransaksi from "@/pages/RiwayatTransaksi";
 import Pengaturan from "@/pages/Pengaturan";
+import Pembelian from "@/pages/Pembelian";
+import HutangPiutang from "@/pages/HutangPiutang";
+import Pengeluaran from "@/pages/Pengeluaran";
 import { SettingsProvider } from "@/context/SettingsContext";
 import LaporanHarian from "@/pages/LaporanHarian";
 import LaporanBulanan from "@/pages/LaporanBulanan";
@@ -38,6 +41,9 @@ function AppRoutes() {
       <Route path="/kelola-kasir" element={<Protected><KelolaKasir /></Protected>} />
       <Route path="/riwayat" element={<Protected><RiwayatTransaksi /></Protected>} />
       <Route path="/pengaturan" element={<Protected><Pengaturan /></Protected>} />
+      <Route path="/pembelian" element={<Protected><Pembelian /></Protected>} />
+      <Route path="/hutang-piutang" element={<Protected><HutangPiutang /></Protected>} />
+      <Route path="/pengeluaran" element={<Protected><Pengeluaran /></Protected>} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
