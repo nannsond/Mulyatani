@@ -385,6 +385,13 @@ async def report_yearly(year: int, user: dict = Depends(get_current_user)):
     peng = await db.expenses.find({"created_at": {"$regex": f"^{year}"}}).to_list(5000)
     s["total_pengeluaran"] = sum(e["amount"] for e in peng)
     s["laba_bersih"] = s["total_laba"] - s["total_pengeluaran"]
+    peng_by_month = {}
+    for e in peng:
+        em = int(e["created_at"][5:7])
+        peng_by_month[em] = peng_by_month.get(em, 0) + e["amount"]
+    for mm in range(1, 13):
+        monthly[mm]["pengeluaran"] = peng_by_month.get(mm, 0)
+        monthly[mm]["laba_bersih"] = monthly[mm]["laba"] - peng_by_month.get(mm, 0)
     target = await db.targets.find_one({"year": year, "month": 0})
     return {"year": year, "summary": s,
             "target_omzet": target["target_omzet"] if target else 0,
