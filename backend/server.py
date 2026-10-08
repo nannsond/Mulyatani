@@ -70,6 +70,22 @@ async def get_current_user(request: Request) -> dict:
     except jwt.InvalidTokenError:
         raise HTTPException(status_code=401, detail="Token tidak valid")
 
+async def require_admin(user: dict = Depends(get_current_user)) -> dict:
+    if user.get("role") != "admin":
+        raise HTTPException(status_code=403, detail="Akses khusus admin")
+    return user
+
+async def product_cost_map() -> dict:
+    prods = await db.products.find().to_list(1000)
+    return {str(p["_id"]): p.get("harga_beli", 0) for p in prods}
+
+def compute_profit(txs: List[dict], cost: dict) -> float:
+    laba = 0.0
+    for t in txs:
+        for i in t["items"]:
+            laba += i["qty"] * (i["harga"] - cost.get(i["product_id"], 0))
+    return laba
+
 # ---------------- Models ----------------
 class LoginInput(BaseModel):
     email: EmailStr
@@ -244,32 +260,97 @@ async def report_daily(date: str, user: dict = Depends(get_current_user)):
     txs = await db.transactions.find({"created_at": {"$regex": f"^{date}"}}).sort("created_at", 1).to_list(2000)
     for t in txs:
         t["id"] = str(t["_id"]); t.pop("_id", None)
-    return {"date": date, "summary": summarize(txs), "transactions": txs,
+    cost = await product_cost_map()
+    s = summarize(txs); s["total_laba"] = compute_profit(txs, cost)
+    return {"date": date, "summary": s, "transactions": txs,
             "top_products": await top_products(txs), "categories": await category_breakdown(txs)}
 
 @api_router.get("/reports/monthly")
 async def report_monthly(year: int, month: int, user: dict = Depends(get_current_user)):
     prefix = f"{year}-{month:02d}"
     txs = await db.transactions.find({"created_at": {"$regex": f"^{prefix}"}}).to_list(5000)
+    cost = await product_cost_map()
     daily = {}
     for t in txs:
         day = t["created_at"][:10]
-        d = daily.setdefault(day, {"date": day, "omzet": 0, "transaksi": 0})
+        d = daily.setdefault(day, {"date": day, "omzet": 0, "transaksi": 0, "laba": 0})
         d["omzet"] += t["total"]; d["transaksi"] += 1
-    return {"year": year, "month": month, "summary": summarize(txs),
+        d["laba"] += compute_profit([t], cost)
+    s = summarize(txs); s["total_laba"] = compute_profit(txs, cost)
+    target = await db.targets.find_one({"year": year, "month": month})
+    return {"year": year, "month": month, "summary": s,
+            "target_omzet": target["target_omzet"] if target else 0,
             "daily": sorted(daily.values(), key=lambda x: x["date"]),
             "top_products": await top_products(txs), "categories": await category_breakdown(txs)}
 
 @api_router.get("/reports/yearly")
 async def report_yearly(year: int, user: dict = Depends(get_current_user)):
     txs = await db.transactions.find({"created_at": {"$regex": f"^{year}"}}).to_list(20000)
-    monthly = {m: {"month": m, "omzet": 0, "transaksi": 0} for m in range(1, 13)}
+    cost = await product_cost_map()
+    monthly = {m: {"month": m, "omzet": 0, "transaksi": 0, "laba": 0} for m in range(1, 13)}
     for t in txs:
         m = int(t["created_at"][5:7])
         monthly[m]["omzet"] += t["total"]; monthly[m]["transaksi"] += 1
-    return {"year": year, "summary": summarize(txs),
+        monthly[m]["laba"] += compute_profit([t], cost)
+    s = summarize(txs); s["total_laba"] = compute_profit(txs, cost)
+    return {"year": year, "summary": s,
             "monthly": list(monthly.values()),
             "top_products": await top_products(txs, 8), "categories": await category_breakdown(txs)}
+
+# ---------------- Users (admin) ----------------
+class UserCreate(BaseModel):
+    email: EmailStr
+    password: str
+    name: str
+    role: str = "kasir"
+
+@api_router.get("/users")
+async def list_users(admin: dict = Depends(require_admin)):
+    docs = await db.users.find().sort("created_at", 1).to_list(500)
+    return [{"id": str(d["_id"]), "email": d["email"], "name": d["name"],
+             "role": d["role"], "created_at": d.get("created_at")} for d in docs]
+
+@api_router.post("/users")
+async def create_user(data: UserCreate, admin: dict = Depends(require_admin)):
+    email = data.email.lower()
+    if await db.users.find_one({"email": email}):
+        raise HTTPException(status_code=400, detail="Email sudah terdaftar")
+    doc = {"email": email, "password_hash": hash_password(data.password),
+           "name": data.name, "role": data.role, "created_at": now_iso()}
+    res = await db.users.insert_one(doc)
+    return {"id": str(res.inserted_id), "email": email, "name": data.name, "role": data.role}
+
+@api_router.put("/users/{uid}")
+async def update_user(uid: str, data: UserCreate, admin: dict = Depends(require_admin)):
+    update = {"name": data.name, "role": data.role, "email": data.email.lower()}
+    if data.password:
+        update["password_hash"] = hash_password(data.password)
+    await db.users.update_one({"_id": ObjectId(uid)}, {"$set": update})
+    return {"ok": True}
+
+@api_router.delete("/users/{uid}")
+async def delete_user(uid: str, admin: dict = Depends(require_admin)):
+    if uid == admin["id"]:
+        raise HTTPException(status_code=400, detail="Tidak bisa menghapus akun sendiri")
+    await db.users.delete_one({"_id": ObjectId(uid)})
+    return {"ok": True}
+
+# ---------------- Targets ----------------
+class TargetInput(BaseModel):
+    year: int
+    month: int
+    target_omzet: float
+
+@api_router.get("/targets")
+async def get_target(year: int, month: int, user: dict = Depends(get_current_user)):
+    t = await db.targets.find_one({"year": year, "month": month})
+    return {"year": year, "month": month, "target_omzet": t["target_omzet"] if t else 0}
+
+@api_router.post("/targets")
+async def set_target(data: TargetInput, admin: dict = Depends(require_admin)):
+    await db.targets.update_one({"year": data.year, "month": data.month},
+                                {"$set": {"target_omzet": data.target_omzet}}, upsert=True)
+    return {"ok": True}
 
 # ---------------- Stok Opname ----------------
 @api_router.get("/stok-opname")

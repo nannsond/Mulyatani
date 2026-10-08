@@ -44,8 +44,9 @@ export default function LaporanHarian() {
 
       {!data ? <div className="flex justify-center py-20"><Loader2 className="w-8 h-8 animate-spin text-[#1B5E3B]" /></div> : (
         <>
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
             <Stat label="Total Omzet" value={rupiah(data.summary.total_omzet)} icon={Wallet} />
+            <Stat label="Laba Kotor" value={rupiah(data.summary.total_laba)} icon={Wallet} />
             <Stat label="Transaksi" value={data.summary.jumlah_transaksi} icon={Receipt} />
             <Stat label="Item Terjual" value={data.summary.total_item} icon={Package} />
             <Stat label="Rata-rata" value={rupiah(data.summary.rata_rata)} icon={Wallet} />

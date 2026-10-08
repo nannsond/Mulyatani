@@ -34,3 +34,41 @@ export function exportExcel({ filename, sheetName, columns, rows }) {
   XLSX.utils.book_append_sheet(wb, ws, sheetName || "Sheet1");
   XLSX.writeFile(wb, `${filename}.xlsx`);
 }
+
+const rp = (n) => "Rp " + Math.round(n || 0).toLocaleString("id-ID");
+
+export function printReceipt(tx) {
+  const lineH = 5;
+  const itemsCount = tx.items.length;
+  const height = 70 + itemsCount * 8;
+  const doc = new jsPDF({ unit: "mm", format: [80, height] });
+  let y = 8;
+  doc.setFont("courier", "bold");
+  doc.setFontSize(12);
+  doc.text("TOKO TANI MAKMUR", 40, y, { align: "center" }); y += 5;
+  doc.setFont("courier", "normal");
+  doc.setFontSize(7);
+  doc.text("Sistem Laporan Penjualan Pertanian", 40, y, { align: "center" }); y += 5;
+  doc.setFontSize(8);
+  doc.text(`No: ${tx.invoice_no}`, 5, y); y += lineH - 1;
+  const d = new Date(tx.created_at);
+  doc.text(`Tgl: ${d.toLocaleString("id-ID")}`, 5, y); y += lineH - 1;
+  doc.text(`Kasir: ${tx.cashier_name}`, 5, y); y += lineH - 1;
+  doc.text("--------------------------------", 5, y); y += lineH - 1;
+  tx.items.forEach((i) => {
+    doc.text(i.name.slice(0, 32), 5, y); y += 4;
+    doc.text(`${i.qty} x ${rp(i.harga)}`, 5, y);
+    doc.text(rp(i.subtotal), 75, y, { align: "right" }); y += lineH;
+  });
+  doc.text("--------------------------------", 5, y); y += lineH;
+  doc.setFont("courier", "bold");
+  doc.setFontSize(10);
+  doc.text("TOTAL", 5, y);
+  doc.text(rp(tx.total), 75, y, { align: "right" }); y += lineH + 1;
+  doc.setFont("courier", "normal");
+  doc.setFontSize(8);
+  doc.text(`Pembayaran: ${tx.payment_method}`, 5, y); y += lineH + 2;
+  doc.setFontSize(8);
+  doc.text("Terima kasih atas kunjungan Anda!", 40, y, { align: "center" });
+  doc.save(`Struk_${tx.invoice_no}.pdf`);
+}

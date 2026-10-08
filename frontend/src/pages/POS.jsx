@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
 import { api, apiError } from "@/lib/api";
 import { rupiah } from "@/lib/format";
-import { Search, Plus, Minus, Trash2, ShoppingCart, Loader2, CheckCircle2 } from "lucide-react";
+import { Search, Plus, Minus, Trash2, ShoppingCart, Loader2, CheckCircle2, Printer } from "lucide-react";
 import { toast } from "sonner";
+import { printReceipt } from "@/lib/exporter";
 
 export default function POS() {
   const [products, setProducts] = useState([]);
@@ -48,6 +49,7 @@ export default function POS() {
       });
       setLastInvoice(data);
       toast.success(`Transaksi ${data.invoice_no} berhasil!`);
+      printReceipt(data);
       setCart([]);
       load();
     } catch (err) {
@@ -139,6 +141,10 @@ export default function POS() {
           <div className="mt-4 p-3 rounded-xl bg-green-50 border border-green-200 text-sm" data-testid="pos-last-invoice">
             <p className="font-semibold text-green-800">Transaksi terakhir: {lastInvoice.invoice_no}</p>
             <p className="font-mono text-green-700">{rupiah(lastInvoice.total)} • {lastInvoice.payment_method}</p>
+            <button onClick={() => printReceipt(lastInvoice)} data-testid="pos-print-receipt-button"
+              className="mt-2 w-full flex items-center justify-center gap-2 border border-green-300 text-green-800 py-2 rounded-lg text-sm font-semibold hover:bg-green-100">
+              <Printer className="w-4 h-4" /> Cetak Struk PDF
+            </button>
           </div>
         )}
       </div>

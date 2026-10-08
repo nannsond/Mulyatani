@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { NavLink, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
-import { LayoutDashboard, ShoppingCart, Tag, Boxes, Calendar, BarChart3, TrendingUp, LogOut, Menu, X, Sprout } from "lucide-react";
+import { LayoutDashboard, ShoppingCart, Tag, Boxes, Calendar, BarChart3, TrendingUp, LogOut, Menu, X, Sprout, Users } from "lucide-react";
 
 const LINKS = [
   { label: "Dashboard", icon: LayoutDashboard, path: "/" },
@@ -11,6 +11,7 @@ const LINKS = [
   { label: "Laporan Harian", icon: Calendar, path: "/laporan/harian" },
   { label: "Laporan Bulanan", icon: BarChart3, path: "/laporan/bulanan" },
   { label: "Laporan Tahunan", icon: TrendingUp, path: "/laporan/tahunan" },
+  { label: "Kelola Kasir", icon: Users, path: "/kelola-kasir", adminOnly: true },
 ];
 
 export function Layout({ children }) {
@@ -20,6 +21,7 @@ export function Layout({ children }) {
   const [open, setOpen] = useState(false);
 
   const current = LINKS.find((l) => l.path === location.pathname)?.label || "Dashboard";
+  const links = LINKS.filter((l) => !l.adminOnly || user?.role === "admin");
 
   const handleLogout = () => { logout(); navigate("/login"); };
 
@@ -35,7 +37,7 @@ export function Layout({ children }) {
         </div>
       </div>
       <nav className="flex-1 px-3 py-5 space-y-1 overflow-y-auto">
-        {LINKS.map((l) => (
+        {links.map((l) => (
           <NavLink
             key={l.path}
             to={l.path}

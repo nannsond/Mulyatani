@@ -8,6 +8,7 @@ import Dashboard from "@/pages/Dashboard";
 import POS from "@/pages/POS";
 import DaftarHarga from "@/pages/DaftarHarga";
 import StokOpname from "@/pages/StokOpname";
+import KelolaKasir from "@/pages/KelolaKasir";
 import LaporanHarian from "@/pages/LaporanHarian";
 import LaporanBulanan from "@/pages/LaporanBulanan";
 import LaporanTahunan from "@/pages/LaporanTahunan";
@@ -31,6 +32,7 @@ function AppRoutes() {
       <Route path="/laporan/harian" element={<Protected><LaporanHarian /></Protected>} />
       <Route path="/laporan/bulanan" element={<Protected><LaporanBulanan /></Protected>} />
       <Route path="/laporan/tahunan" element={<Protected><LaporanTahunan /></Protected>} />
+      <Route path="/kelola-kasir" element={<Protected><KelolaKasir /></Protected>} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
