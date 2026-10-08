@@ -18,6 +18,9 @@ import bcrypt
 import random
 import uuid
 import requests
+import re
+from fastapi.responses import JSONResponse
+from bson.errors import InvalidId
 
 # ---------------- DB ----------------
 mongo_url = os.environ['MONGO_URL']
@@ -63,6 +66,10 @@ def get_object(path):
 
 app = FastAPI()
 api_router = APIRouter(prefix="/api")
+
+@app.exception_handler(InvalidId)
+async def _invalid_id_handler(request, exc):
+    return JSONResponse(status_code=400, content={"detail": "ID tidak valid"})
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -186,12 +193,13 @@ async def register(data: RegisterInput, response: Response):
     email = data.email.lower()
     if await db.users.find_one({"email": email}):
         raise HTTPException(status_code=400, detail="Email sudah terdaftar")
+    role = "kasir"  # SEC: role is never client-controlled; admins are created only via /api/users
     doc = {"email": email, "password_hash": hash_password(data.password),
-           "name": data.name, "role": data.role, "created_at": now_iso()}
+           "name": data.name, "role": role, "created_at": now_iso()}
     res = await db.users.insert_one(doc)
     uid = str(res.inserted_id)
-    token = create_access_token(uid, email, data.role)
-    return {"token": token, "user": {"id": uid, "email": email, "name": data.name, "role": data.role}}
+    token = create_access_token(uid, email, role)
+    return {"token": token, "user": {"id": uid, "email": email, "name": data.name, "role": role}}
 
 @api_router.post("/auth/login")
 async def login(data: LoginInput):
@@ -214,7 +222,7 @@ async def list_products(user: dict = Depends(get_current_user)):
     return [Product(**d).model_dump() for d in docs]
 
 @api_router.post("/products")
-async def create_product(data: ProductInput, user: dict = Depends(get_current_user)):
+async def create_product(data: ProductInput, admin: dict = Depends(require_admin)):
     if await db.products.find_one({"sku": data.sku}):
         raise HTTPException(status_code=400, detail="SKU sudah digunakan")
     doc = data.model_dump()
@@ -223,7 +231,7 @@ async def create_product(data: ProductInput, user: dict = Depends(get_current_us
     return Product(**doc).model_dump()
 
 @api_router.put("/products/{pid}")
-async def update_product(pid: str, data: ProductInput, user: dict = Depends(get_current_user)):
+async def update_product(pid: str, data: ProductInput, admin: dict = Depends(require_admin)):
     await db.products.update_one({"_id": ObjectId(pid)}, {"$set": data.model_dump()})
     doc = await db.products.find_one({"_id": ObjectId(pid)})
     if not doc:
@@ -231,7 +239,7 @@ async def update_product(pid: str, data: ProductInput, user: dict = Depends(get_
     return Product(**doc).model_dump()
 
 @api_router.delete("/products/{pid}")
-async def delete_product(pid: str, user: dict = Depends(get_current_user)):
+async def delete_product(pid: str, admin: dict = Depends(require_admin)):
     await db.products.delete_one({"_id": ObjectId(pid)})
     return {"ok": True}
 
@@ -270,9 +278,9 @@ async def create_transaction(data: TransactionInput, user: dict = Depends(get_cu
 async def list_transactions(date: Optional[str] = None, q: Optional[str] = None, limit: int = 50, user: dict = Depends(get_current_user)):
     query = {}
     if date:
-        query["created_at"] = {"$regex": f"^{date}"}
+        query["created_at"] = {"$regex": f"^{re.escape(date)}"}
     if q:
-        query["invoice_no"] = {"$regex": q, "$options": "i"}
+        query["invoice_no"] = {"$regex": re.escape(q), "$options": "i"}
     docs = await db.transactions.find(query).sort("created_at", -1).to_list(min(limit, 500))
     for d in docs:
         d["id"] = str(d["_id"])
@@ -333,7 +341,7 @@ async def category_profit(txs: List[dict], cost: dict):
 
 @api_router.get("/reports/daily")
 async def report_daily(date: str, user: dict = Depends(get_current_user)):
-    txs = await db.transactions.find({"created_at": {"$regex": f"^{date}"}}).sort("created_at", 1).to_list(2000)
+    txs = await db.transactions.find({"created_at": {"$regex": f"^{re.escape(date)}"}}).sort("created_at", 1).to_list(2000)
     for t in txs:
         t["id"] = str(t["_id"]); t.pop("_id", None)
     cost = await product_cost_map()
@@ -469,10 +477,14 @@ async def upload_logo(file: UploadFile = File(...), admin: dict = Depends(requir
     data = await file.read()
     if len(data) > 2 * 1024 * 1024:
         raise HTTPException(status_code=400, detail="Ukuran maksimal 2MB")
+    sig_ok = data[:8].startswith(b"\x89PNG") or data[:3] == b"\xff\xd8\xff" or (data[:4] == b"RIFF" and data[8:12] == b"WEBP")
+    if not sig_ok:
+        raise HTTPException(status_code=400, detail="File bukan gambar yang valid")
+    ctype = {"png": "image/png", "jpg": "image/jpeg", "jpeg": "image/jpeg", "webp": "image/webp"}[ext]
     path = f"{APP_NAME}/logo/{uuid.uuid4()}.{ext}"
-    put_object(path, data, file.content_type or "image/png")
+    put_object(path, data, ctype)
     await db.settings.update_one({"key": "store"},
-        {"$set": {"logo_path": path, "content_type": file.content_type or "image/png", "updated_at": now_iso()}}, upsert=True)
+        {"$set": {"logo_path": path, "content_type": ctype, "updated_at": now_iso()}}, upsert=True)
     return {"ok": True, "updated_at": now_iso()}
 
 @api_router.get("/settings/logo")
@@ -481,7 +493,10 @@ async def get_logo():
     if not s or not s.get("logo_path"):
         raise HTTPException(status_code=404, detail="Logo belum diset")
     data, ct = get_object(s["logo_path"])
-    return Response(content=data, media_type=s.get("content_type", ct))
+    mt = s.get("content_type") or ct
+    if not str(mt).startswith("image/"):
+        mt = "image/png"
+    return Response(content=data, media_type=mt)
 
 # ---------------- Piutang (receivables from sales) ----------------
 @api_router.get("/piutang")
@@ -523,7 +538,7 @@ async def gen_purchase_no():
     return f"PO-{datetime.now().strftime('%Y%m%d')}-{count + 1:04d}"
 
 @api_router.post("/purchases")
-async def create_purchase(data: PurchaseInput, user: dict = Depends(get_current_user)):
+async def create_purchase(data: PurchaseInput, admin: dict = Depends(require_admin)):
     if not data.items:
         raise HTTPException(status_code=400, detail="Item pembelian kosong")
     items = []
@@ -539,7 +554,7 @@ async def create_purchase(data: PurchaseInput, user: dict = Depends(get_current_
     status = "lunas" if amount_paid >= total else ("sebagian" if amount_paid > 0 else "belum")
     doc = {"po_no": await gen_purchase_no(), "supplier": data.supplier, "items": items, "total": total,
            "amount_paid": amount_paid, "status": status, "payments": [], "note": data.note,
-           "user_name": user["name"], "created_at": now_iso()}
+           "user_name": admin["name"], "created_at": now_iso()}
     res = await db.purchases.insert_one(doc)
     doc["id"] = str(res.inserted_id); doc.pop("_id", None)
     return doc
@@ -548,7 +563,7 @@ async def create_purchase(data: PurchaseInput, user: dict = Depends(get_current_
 async def list_purchases(month: Optional[str] = None, user: dict = Depends(get_current_user)):
     q = {}
     if month:
-        q = {"created_at": {"$regex": f"^{month}"}}
+        q = {"created_at": {"$regex": f"^{re.escape(month)}"}}
     docs = await db.purchases.find(q).sort("created_at", -1).to_list(500)
     for d in docs:
         d["id"] = str(d["_id"]); d.pop("_id", None)
@@ -583,12 +598,12 @@ class ExpenseInput(BaseModel):
     date: Optional[str] = None
 
 @api_router.post("/expenses")
-async def create_expense(data: ExpenseInput, user: dict = Depends(get_current_user)):
+async def create_expense(data: ExpenseInput, admin: dict = Depends(require_admin)):
     created = data.date or now_iso()
     if len(created) == 10:
         created = created + "T00:00:00+00:00"
     doc = {"category": data.category, "amount": data.amount, "note": data.note,
-           "user_name": user["name"], "created_at": created}
+           "user_name": admin["name"], "created_at": created}
     res = await db.expenses.insert_one(doc)
     doc["id"] = str(res.inserted_id); doc.pop("_id", None)
     return doc
@@ -597,14 +612,14 @@ async def create_expense(data: ExpenseInput, user: dict = Depends(get_current_us
 async def list_expenses(month: Optional[str] = None, user: dict = Depends(get_current_user)):
     q = {}
     if month:
-        q = {"created_at": {"$regex": f"^{month}"}}
+        q = {"created_at": {"$regex": f"^{re.escape(month)}"}}
     docs = await db.expenses.find(q).sort("created_at", -1).to_list(1000)
     for d in docs:
         d["id"] = str(d["_id"]); d.pop("_id", None)
     return docs
 
 @api_router.delete("/expenses/{eid}")
-async def delete_expense(eid: str, user: dict = Depends(get_current_user)):
+async def delete_expense(eid: str, admin: dict = Depends(require_admin)):
     await db.expenses.delete_one({"_id": ObjectId(eid)})
     return {"ok": True}
 
@@ -688,8 +703,6 @@ async def seed():
         if not existing:
             await db.users.insert_one({"email": email, "password_hash": hash_password(pwd),
                                        "name": name, "role": role, "created_at": now_iso()})
-        elif not verify_password(pwd, existing["password_hash"]):
-            await db.users.update_one({"email": email}, {"$set": {"password_hash": hash_password(pwd)}})
 
     if await db.products.count_documents({}) == 0:
         sku_n = 1001

@@ -28,7 +28,7 @@ export default function Login() {
     }
   };
 
-  const demo = (em, pw) => { setEmail(em); setPassword(pw); };
+  const demo = () => {};
 
   return (
     <div className="min-h-screen grid lg:grid-cols-2">
@@ -73,7 +73,7 @@ export default function Login() {
                 type="password" value={password} onChange={(e) => setPassword(e.target.value)} required
                 data-testid="login-password-input"
                 className="mt-1 w-full px-4 py-3 rounded-xl border border-input bg-white focus:outline-none focus:ring-2 focus:ring-[#1B5E3B] text-sm"
-                placeholder="admin123"
+                placeholder="••••••••"
               />
             </div>
             {error && <p className="text-sm text-destructive" data-testid="login-error">{error}</p>}
@@ -85,20 +85,6 @@ export default function Login() {
               {loading && <Loader2 className="w-4 h-4 animate-spin" />} Masuk
             </button>
           </form>
-
-          <div className="mt-6 space-y-2">
-            <p className="text-xs text-muted-foreground text-center">Akun demo (klik untuk isi otomatis):</p>
-            <div className="grid grid-cols-2 gap-2">
-              <button onClick={() => demo("nannsond@gmail.com", "admin123")} data-testid="demo-admin-button"
-                className="text-xs border border-input rounded-lg py-2 hover:bg-secondary transition-colors">
-                Admin / Pemilik
-              </button>
-              <button onClick={() => demo("kasir@tokotani.com", "kasir123")} data-testid="demo-kasir-button"
-                className="text-xs border border-input rounded-lg py-2 hover:bg-secondary transition-colors">
-                Kasir
-              </button>
-            </div>
-          </div>
         </div>
       </div>
     </div>
