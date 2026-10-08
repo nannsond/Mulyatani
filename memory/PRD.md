@@ -83,6 +83,11 @@ Aplikasi laporan penjualan sederhana untuk bisnis toko pertanian: laporan harian
 - Daftar Harga: tab baru "Harga Online" (biru) + kolom "Harga Online" di tabel ("belum diatur" bila 0) + input "Harga Online" di form produk; cetak/ekspor PDF mengikuti tab aktif.
 - Backend: field `harga_online` ditambah di model Product & ProductInput. Diverifikasi via curl (persist 123.456) + screenshot Daftar Harga tab online & Penjualan Online.
 
+## Implemented (2026-10-08) — Set Massal Harga Online
+- Tombol "Set Massal" (admin, muncul di tab Harga Online) mengisi harga online banyak produk sekaligus dari Harga Normal: metode markup persen (%) atau nominal (Rp), dengan live preview.
+- Berlaku ke produk yang sedang tampil (ikut filter pencarian/stok). Hasil dibulatkan ke Rp100 terdekat ("sesuai uang fisik").
+- Backend: POST /products/bulk-online-price (admin-only). Diverifikasi via curl (+15% → pembulatan Rp100 akurat utk 3 produk) + screenshot modal (preview Rp10.000→Rp11.000, "Terapkan ke 12 Produk"). Data uji dikembalikan.
+
 ## Backlog (P1/P2)
 - P1: Cetak struk/nota transaksi POS
 - P1: Manajemen user (tambah kasir dari UI)

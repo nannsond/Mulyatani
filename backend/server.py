@@ -303,6 +303,30 @@ async def delete_product(pid: str, admin: dict = Depends(require_admin)):
     await db.products.delete_one({"_id": ObjectId(pid)})
     return {"ok": True}
 
+class BulkOnlinePrice(BaseModel):
+    product_ids: List[str]
+    mode: str
+    value: float
+    round_to: int = 100
+
+@api_router.post("/products/bulk-online-price")
+async def bulk_online_price(data: BulkOnlinePrice, admin: dict = Depends(require_admin)):
+    if data.mode not in ["persen", "nominal"]:
+        raise HTTPException(status_code=400, detail="Mode tidak valid")
+    updated = 0
+    for pid in data.product_ids:
+        p = await db.products.find_one({"_id": ObjectId(pid)})
+        if not p:
+            continue
+        base = p.get("harga_jual", 0) or 0
+        val = base * (1 + data.value / 100) if data.mode == "persen" else base + data.value
+        if data.round_to and data.round_to > 0:
+            val = round(val / data.round_to) * data.round_to
+        await db.products.update_one({"_id": ObjectId(pid)}, {"$set": {"harga_online": float(max(0, val))}})
+        updated += 1
+    return {"ok": True, "updated": updated}
+
+
 # ---------------- Transaction routes ----------------
 async def gen_invoice() -> str:
     count = await db.transactions.count_documents({})
