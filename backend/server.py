@@ -654,6 +654,138 @@ async def create_opname(data: OpnameInput, user: dict = Depends(get_current_user
     doc["id"] = str(res.inserted_id); doc.pop("_id", None)
     return doc
 
+# ---------------- Penjualan Online (E-commerce) ----------------
+ECOM_CHANNELS = ["Shopee", "Tokopedia", "Lazada", "TikTok Shop"]
+
+class EcomItem(BaseModel):
+    product_id: str
+    name: str
+    qty: int
+    harga: float
+
+class EcomSaleInput(BaseModel):
+    channel: str
+    items: List[EcomItem]
+    admin_fee: float = 0
+    ongkir: float = 0
+    biaya_lain: float = 0
+    customer_name: str = ""
+    order_no: str = ""
+    date: Optional[str] = None
+
+async def gen_ecom_no():
+    count = await db.ecommerce_sales.count_documents({})
+    return f"ECOM-{datetime.now().strftime('%Y%m%d')}-{count + 1:04d}"
+
+@api_router.post("/ecommerce/sales")
+async def create_ecom_sale(data: EcomSaleInput, user: dict = Depends(get_current_user)):
+    if data.channel not in ECOM_CHANNELS:
+        raise HTTPException(status_code=400, detail="Channel tidak valid")
+    if not data.items:
+        raise HTTPException(status_code=400, detail="Item penjualan kosong")
+    cost = await product_cost_map()
+    items = []
+    omzet = 0.0
+    hpp = 0.0
+    for it in data.items:
+        line = it.qty * it.harga
+        omzet += line
+        hpp += it.qty * cost.get(it.product_id, 0)
+        items.append({"product_id": it.product_id, "name": it.name, "qty": it.qty,
+                      "harga": it.harga, "subtotal": line})
+        await db.products.update_one({"_id": ObjectId(it.product_id)}, {"$inc": {"stok": -it.qty}})
+    admin_fee = max(0.0, data.admin_fee)
+    ongkir = max(0.0, data.ongkir)
+    biaya_lain = max(0.0, data.biaya_lain)
+    total_fee = admin_fee + ongkir + biaya_lain
+    laba_kotor = omzet - hpp
+    laba_bersih = laba_kotor - total_fee
+    created = data.date or now_iso()
+    if len(created) == 10:
+        created = created + "T00:00:00+00:00"
+    doc = {"ecom_no": await gen_ecom_no(), "channel": data.channel, "items": items,
+           "omzet": omzet, "hpp": hpp, "laba_kotor": laba_kotor,
+           "admin_fee": admin_fee, "ongkir": ongkir, "biaya_lain": biaya_lain,
+           "total_fee": total_fee, "laba_bersih": laba_bersih,
+           "customer_name": data.customer_name, "order_no": data.order_no,
+           "user_name": user["name"], "created_at": created}
+    res = await db.ecommerce_sales.insert_one(doc)
+    doc["id"] = str(res.inserted_id); doc.pop("_id", None)
+    return doc
+
+@api_router.get("/ecommerce/sales")
+async def list_ecom_sales(month: Optional[str] = None, channel: Optional[str] = None, limit: int = 200, user: dict = Depends(get_current_user)):
+    q = {}
+    if month:
+        q["created_at"] = {"$regex": f"^{re.escape(month)}"}
+    if channel:
+        q["channel"] = channel
+    docs = await db.ecommerce_sales.find(q).sort("created_at", -1).to_list(min(limit, 500))
+    for d in docs:
+        d["id"] = str(d["_id"]); d.pop("_id", None)
+    return docs
+
+@api_router.delete("/ecommerce/sales/{sid}")
+async def delete_ecom_sale(sid: str, admin: dict = Depends(require_admin)):
+    doc = await db.ecommerce_sales.find_one({"_id": ObjectId(sid)})
+    if not doc:
+        raise HTTPException(status_code=404, detail="Penjualan tidak ditemukan")
+    for i in doc.get("items", []):
+        await db.products.update_one({"_id": ObjectId(i["product_id"])}, {"$inc": {"stok": i["qty"]}})
+    await db.ecommerce_sales.delete_one({"_id": ObjectId(sid)})
+    return {"ok": True}
+
+def ecom_channel_agg(sales: List[dict]):
+    agg = {c: {"channel": c, "omzet": 0, "fee": 0, "laba_kotor": 0, "laba_bersih": 0, "transaksi": 0, "item": 0} for c in ECOM_CHANNELS}
+    for s in sales:
+        c = s["channel"]
+        e = agg.setdefault(c, {"channel": c, "omzet": 0, "fee": 0, "laba_kotor": 0, "laba_bersih": 0, "transaksi": 0, "item": 0})
+        e["omzet"] += s.get("omzet", 0); e["fee"] += s.get("total_fee", 0)
+        e["laba_kotor"] += s.get("laba_kotor", 0); e["laba_bersih"] += s.get("laba_bersih", 0)
+        e["transaksi"] += 1; e["item"] += sum(i["qty"] for i in s.get("items", []))
+    return list(agg.values())
+
+def ecom_summary(sales: List[dict]):
+    return {"omzet": sum(s.get("omzet", 0) for s in sales),
+            "fee": sum(s.get("total_fee", 0) for s in sales),
+            "laba_kotor": sum(s.get("laba_kotor", 0) for s in sales),
+            "laba_bersih": sum(s.get("laba_bersih", 0) for s in sales),
+            "transaksi": len(sales),
+            "item": sum(i["qty"] for s in sales for i in s.get("items", []))}
+
+@api_router.get("/ecommerce/reports")
+async def ecom_reports(mode: str = "bulanan", date: Optional[str] = None, year: Optional[int] = None, month: Optional[int] = None, user: dict = Depends(get_current_user)):
+    if mode == "harian":
+        prefix = date or datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        periode = prefix
+    elif mode == "tahunan":
+        y = year or datetime.now().year
+        prefix = f"{y}"
+        periode = f"Tahun {y}"
+    else:
+        y = year or datetime.now().year
+        m = month or datetime.now().month
+        prefix = f"{y}-{m:02d}"
+        periode = f"{y}-{m:02d}"
+    sales = await db.ecommerce_sales.find({"created_at": {"$regex": f"^{re.escape(prefix)}"}}).to_list(10000)
+    series = []
+    if mode == "bulanan":
+        buckets = {}
+        for s in sales:
+            day = s["created_at"][8:10]
+            b = buckets.setdefault(day, {})
+            b[s["channel"]] = b.get(s["channel"], 0) + s.get("omzet", 0)
+        series = [{"label": k, **{c: buckets[k].get(c, 0) for c in ECOM_CHANNELS}} for k in sorted(buckets)]
+    elif mode == "tahunan":
+        buckets = {}
+        for s in sales:
+            mo = f"{int(s['created_at'][5:7]):02d}"
+            b = buckets.setdefault(mo, {})
+            b[s["channel"]] = b.get(s["channel"], 0) + s.get("omzet", 0)
+        series = [{"label": k, **{c: buckets[k].get(c, 0) for c in ECOM_CHANNELS}} for k in sorted(buckets)]
+    return {"mode": mode, "periode": periode, "summary": ecom_summary(sales),
+            "channels": ecom_channel_agg(sales), "series": series, "channel_names": ECOM_CHANNELS}
+
 # ---------------- Dashboard ----------------
 @api_router.get("/dashboard")
 async def dashboard(user: dict = Depends(get_current_user)):

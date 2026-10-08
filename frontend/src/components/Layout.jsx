@@ -2,11 +2,12 @@ import { useState } from "react";
 import { NavLink, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import { useSettings } from "@/context/SettingsContext";
-import { LayoutDashboard, ShoppingCart, Tag, Boxes, Calendar, BarChart3, TrendingUp, LogOut, Menu, X, Sprout, Users, ReceiptText, Settings, Truck, HandCoins, Banknote, Scale } from "lucide-react";
+import { LayoutDashboard, ShoppingCart, Tag, Boxes, Calendar, BarChart3, TrendingUp, LogOut, Menu, X, Sprout, Users, ReceiptText, Settings, Truck, HandCoins, Banknote, Scale, ShoppingBag, Globe } from "lucide-react";
 
 const LINKS = [
   { label: "Dashboard", icon: LayoutDashboard, path: "/" },
   { label: "Kasir Penjualan", icon: ShoppingCart, path: "/pos" },
+  { label: "Penjualan Online", icon: ShoppingBag, path: "/penjualan-online" },
   { label: "Riwayat Transaksi", icon: ReceiptText, path: "/riwayat" },
   { label: "Pembelian", icon: Truck, path: "/pembelian", adminOnly: true },
   { label: "Hutang & Piutang", icon: HandCoins, path: "/hutang-piutang" },
@@ -16,6 +17,7 @@ const LINKS = [
   { label: "Laporan Harian", icon: Calendar, path: "/laporan/harian" },
   { label: "Laporan Bulanan", icon: BarChart3, path: "/laporan/bulanan" },
   { label: "Laporan Tahunan", icon: TrendingUp, path: "/laporan/tahunan" },
+  { label: "Laporan Online", icon: Globe, path: "/laporan/online" },
   { label: "Laba Rugi", icon: Scale, path: "/laporan/laba-rugi", adminOnly: true },
   { label: "Kelola Kasir", icon: Users, path: "/kelola-kasir", adminOnly: true },
   { label: "Pengaturan", icon: Settings, path: "/pengaturan", adminOnly: true },

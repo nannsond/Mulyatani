@@ -16,3 +16,12 @@ export const fmtDateTime = (iso) => {
 };
 
 export const todayStr = () => new Date().toISOString().slice(0, 10);
+
+export const ECOM_CHANNELS = ["Shopee", "Tokopedia", "Lazada", "TikTok Shop"];
+
+export const CHANNEL_COLORS = {
+  "Shopee": "#EE4D2D",
+  "Tokopedia": "#42B549",
+  "Lazada": "#2E4CE5",
+  "TikTok Shop": "#111827",
+};
