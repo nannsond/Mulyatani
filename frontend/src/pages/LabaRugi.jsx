@@ -16,8 +16,12 @@ export default function LabaRugi() {
   const [expenses, setExpenses] = useState([]);
   const [prev, setPrev] = useState(null);
   const [cash, setCash] = useState(null);
+  const [cashScope, setCashScope] = useState("total");
 
-  useEffect(() => { api.get("/reports/cash").then((r) => setCash(r.data)); }, [mode, year, month]);
+  useEffect(() => {
+    const period = cashScope === "period" ? (mode === "bulanan" ? `${year}-${String(month).padStart(2, "0")}` : `${year}`) : null;
+    api.get(`/reports/cash${period ? `?period=${period}` : ""}`).then((r) => setCash(r.data));
+  }, [cashScope, mode, year, month]);
 
   useEffect(() => {
     setData(null);
@@ -166,20 +170,28 @@ export default function LabaRugi() {
         </div>
         {cash && (
           <div className="bg-card rounded-2xl border border-slate-200 p-6 sm:p-8" data-testid="kas-card">
-            <div className="flex items-center gap-3 mb-5">
-              <div className="w-11 h-11 rounded-xl bg-[#0F281E] flex items-center justify-center"><Wallet className="w-6 h-6 text-white" /></div>
-              <div>
-                <h2 className="font-heading font-bold text-xl text-[#0F281E]">Kas Saat Ini (Uang Fisik)</h2>
-                <p className="text-sm text-muted-foreground">Akumulasi seluruh periode hingga sekarang</p>
+            <div className="flex items-start justify-between gap-3 mb-5">
+              <div className="flex items-center gap-3">
+                <div className="w-11 h-11 rounded-xl bg-[#0F281E] flex items-center justify-center"><Wallet className="w-6 h-6 text-white" /></div>
+                <div>
+                  <h2 className="font-heading font-bold text-xl text-[#0F281E]">{cash.is_period ? `Arus Kas ${periode}` : "Kas Saat Ini (Uang Fisik)"}</h2>
+                  <p className="text-sm text-muted-foreground">{cash.is_period ? "Pemasukan & pengeluaran kas pada periode terpilih" : "Akumulasi seluruh periode hingga sekarang"}</p>
+                </div>
+              </div>
+              <div className="flex rounded-xl border border-input overflow-hidden shrink-0">
+                <button onClick={() => setCashScope("total")} data-testid="kas-scope-total" className={`px-3 py-2 text-xs font-semibold ${cashScope === "total" ? "bg-[#1B5E3B] text-white" : "bg-card hover:bg-secondary"}`}>Total</button>
+                <button onClick={() => setCashScope("period")} data-testid="kas-scope-period" className={`px-3 py-2 text-xs font-semibold ${cashScope === "period" ? "bg-[#1B5E3B] text-white" : "bg-card hover:bg-secondary"}`}>Periode Ini</button>
               </div>
             </div>
-            <Line label="Saldo Awal Kas" value={cash.saldo_awal_kas} testid="kas-saldo-awal" />
+            {!cash.is_period && <Line label="Saldo Awal Kas" value={cash.saldo_awal_kas} testid="kas-saldo-awal" />}
             <Line label="Omzet Diterima (Kas)" value={cash.omzet} testid="kas-omzet" />
             <Line label="Pembelian Dibayar" value={cash.pembelian} negative testid="kas-pembelian" />
             <Line label="Pengeluaran" value={cash.pengeluaran} negative testid="kas-pengeluaran" />
             <Line label="Biaya Marketplace" value={cash.biaya_marketplace} negative testid="kas-marketplace" />
-            <Line label="Kas Saat Ini" value={cash.kas_saat_ini} bold accent testid="kas-total" />
-            <p className="text-xs text-muted-foreground mt-3">Kas = Saldo Awal + Omzet Diterima − Pembelian Dibayar − Pengeluaran − Biaya Marketplace. Hutang pembelian & piutang belum dihitung sampai benar-benar dibayar.</p>
+            <Line label={cash.is_period ? "Arus Kas Bersih Periode" : "Kas Saat Ini"} value={cash.kas_saat_ini} bold accent testid="kas-total" />
+            <p className="text-xs text-muted-foreground mt-3">{cash.is_period
+              ? "Arus Kas = Omzet Diterima − Pembelian Dibayar − Pengeluaran − Biaya Marketplace pada periode ini (basis kas)."
+              : "Kas = Saldo Awal + Omzet Diterima − Pembelian Dibayar − Pengeluaran − Biaya Marketplace. Hutang pembelian & piutang belum dihitung sampai benar-benar dibayar."}</p>
           </div>
         )}
         </>

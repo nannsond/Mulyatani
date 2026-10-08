@@ -347,6 +347,46 @@ async def list_transactions(date: Optional[str] = None, q: Optional[str] = None,
         d.pop("_id", None)
     return docs
 
+@api_router.put("/transactions/{tid}")
+async def update_transaction(tid: str, data: TransactionInput, admin: dict = Depends(require_admin)):
+    old = await db.transactions.find_one({"_id": ObjectId(tid)})
+    if not old:
+        raise HTTPException(status_code=404, detail="Transaksi tidak ditemukan")
+    if not data.items:
+        raise HTTPException(status_code=400, detail="Item tidak boleh kosong")
+    for i in old.get("items", []):
+        await db.products.update_one({"_id": ObjectId(i["product_id"])}, {"$inc": {"stok": i["qty"]}})
+    items = []
+    subtotal = 0.0
+    for it in data.items:
+        line = it.qty * it.harga
+        subtotal += line
+        items.append({"product_id": it.product_id, "name": it.name, "qty": it.qty,
+                      "harga": it.harga, "subtotal": line})
+        await db.products.update_one({"_id": ObjectId(it.product_id)}, {"$inc": {"stok": -it.qty}})
+    discount = max(0.0, min(data.discount, subtotal))
+    total = subtotal - discount
+    amount_paid = total if data.amount_paid is None else max(0.0, min(data.amount_paid, total))
+    status = "lunas" if amount_paid >= total else ("sebagian" if amount_paid > 0 else "belum")
+    await db.transactions.update_one({"_id": ObjectId(tid)}, {"$set": {
+        "items": items, "subtotal": subtotal, "discount": discount, "discount_reason": data.discount_reason,
+        "total": total, "payment_method": data.payment_method, "customer_name": data.customer_name,
+        "amount_paid": amount_paid, "status": status, "edited_at": now_iso(), "edited_by": admin["name"]}})
+    doc = await db.transactions.find_one({"_id": ObjectId(tid)})
+    doc["id"] = str(doc["_id"]); doc.pop("_id", None)
+    return doc
+
+@api_router.delete("/transactions/{tid}")
+async def delete_transaction(tid: str, admin: dict = Depends(require_admin)):
+    t = await db.transactions.find_one({"_id": ObjectId(tid)})
+    if not t:
+        raise HTTPException(status_code=404, detail="Transaksi tidak ditemukan")
+    for i in t.get("items", []):
+        await db.products.update_one({"_id": ObjectId(i["product_id"])}, {"$inc": {"stok": i["qty"]}})
+    await db.transactions.delete_one({"_id": ObjectId(tid)})
+    return {"ok": True}
+
+
 # ---------------- Reports ----------------
 def summarize(txs: List[dict]) -> dict:
     total = 0.0
@@ -573,21 +613,30 @@ async def set_saldo_awal(data: SaldoAwal, admin: dict = Depends(require_admin)):
     return {"ok": True}
 
 @api_router.get("/reports/cash")
-async def report_cash(user: dict = Depends(get_current_user)):
+async def report_cash(period: Optional[str] = None, user: dict = Depends(get_current_user)):
     s = await db.settings.find_one({"key": "store"}) or {}
-    saldo = s.get("saldo_awal_kas", 0) or 0
-    txs = await db.transactions.find().to_list(100000)
+    if period:
+        rx = {"created_at": {"$regex": f"^{re.escape(period)}"}}
+        txs = await db.transactions.find(rx).to_list(100000)
+        online, fee = await fetch_online_selesai(period)
+        purchases = await db.purchases.find(rx).to_list(100000)
+        exps = await db.expenses.find(rx).to_list(100000)
+        saldo = 0
+    else:
+        saldo = s.get("saldo_awal_kas", 0) or 0
+        txs = await db.transactions.find().to_list(100000)
+        online, fee = await fetch_online_selesai("")
+        purchases = await db.purchases.find().to_list(100000)
+        exps = await db.expenses.find().to_list(100000)
     omzet_offline = sum(t["total"] * tx_fraction(t) for t in txs)
-    online, fee = await fetch_online_selesai("")
     omzet_online = sum(t["total"] for t in online)
-    purchases = await db.purchases.find().to_list(100000)
     pembelian = sum(p.get("amount_paid", 0) for p in purchases)
-    exps = await db.expenses.find().to_list(100000)
     pengeluaran = sum(e.get("amount", 0) for e in exps)
     omzet = omzet_offline + omzet_online
     kas = saldo + omzet - pembelian - pengeluaran - fee
     return {"saldo_awal_kas": saldo, "omzet": omzet, "pembelian": pembelian,
-            "pengeluaran": pengeluaran, "biaya_marketplace": fee, "kas_saat_ini": kas}
+            "pengeluaran": pengeluaran, "biaya_marketplace": fee, "kas_saat_ini": kas,
+            "is_period": bool(period)}
 
 @api_router.post("/settings/logo")
 async def upload_logo(file: UploadFile = File(...), admin: dict = Depends(require_admin)):
@@ -709,6 +758,33 @@ async def pay_purchase(pid: str, data: PaymentInput, user: dict = Depends(get_cu
     payments = p.get("payments", []) + [{"amount": data.amount, "date": now_iso(), "by": user["name"]}]
     await db.purchases.update_one({"_id": ObjectId(pid)}, {"$set": {"amount_paid": paid, "status": status, "payments": payments}})
     return {"ok": True, "amount_paid": paid, "status": status}
+
+@api_router.put("/purchases/{pid}")
+async def update_purchase(pid: str, data: PurchaseInput, admin: dict = Depends(require_admin)):
+    old = await db.purchases.find_one({"_id": ObjectId(pid)})
+    if not old:
+        raise HTTPException(status_code=404, detail="Pembelian tidak ditemukan")
+    if not data.items:
+        raise HTTPException(status_code=400, detail="Item pembelian kosong")
+    for i in old.get("items", []):
+        await db.products.update_one({"_id": ObjectId(i["product_id"])}, {"$inc": {"stok": -i["qty"]}})
+    items = []
+    total = 0.0
+    for it in data.items:
+        line = it.qty * it.harga_beli
+        total += line
+        items.append({"product_id": it.product_id, "name": it.name, "qty": it.qty,
+                      "harga_beli": it.harga_beli, "subtotal": line})
+        await db.products.update_one({"_id": ObjectId(it.product_id)},
+                                     {"$inc": {"stok": it.qty}, "$set": {"harga_beli": it.harga_beli}})
+    amount_paid = total if data.amount_paid is None else max(0.0, min(data.amount_paid, total))
+    status = "lunas" if amount_paid >= total else ("sebagian" if amount_paid > 0 else "belum")
+    await db.purchases.update_one({"_id": ObjectId(pid)}, {"$set": {
+        "supplier": data.supplier, "items": items, "total": total, "amount_paid": amount_paid,
+        "status": status, "note": data.note, "edited_at": now_iso(), "edited_by": admin["name"]}})
+    doc = await db.purchases.find_one({"_id": ObjectId(pid)})
+    doc["id"] = str(doc["_id"]); doc.pop("_id", None)
+    return doc
 
 # ---------------- Pengeluaran (expenses) ----------------
 class ExpenseInput(BaseModel):

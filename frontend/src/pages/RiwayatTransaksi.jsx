@@ -1,16 +1,23 @@
 import { useEffect, useState } from "react";
-import { api } from "@/lib/api";
+import { api, apiError } from "@/lib/api";
 import { rupiah, fmtDateTime } from "@/lib/format";
 import { printReceipt, exportPDF, exportExcel } from "@/lib/exporter";
 import { useSettings } from "@/context/SettingsContext";
-import { Search, Printer, Loader2, FileDown, FileSpreadsheet, X, Eye } from "lucide-react";
+import { useAuth } from "@/context/AuthContext";
+import { toast } from "sonner";
+import { Search, Printer, Loader2, FileDown, FileSpreadsheet, X, Eye, Pencil, Trash2, Plus } from "lucide-react";
 
 export default function RiwayatTransaksi() {
   const { settings } = useSettings();
+  const { user } = useAuth();
+  const isAdmin = user?.role === "admin";
   const [txs, setTxs] = useState([]);
   const [q, setQ] = useState("");
   const [loading, setLoading] = useState(true);
   const [detail, setDetail] = useState(null);
+  const [products, setProducts] = useState([]);
+  const [edit, setEdit] = useState(null);
+  useEffect(() => { if (isAdmin) api.get("/products").then((r) => setProducts(r.data)); }, [isAdmin]);
 
   const logoUrl = settings?.has_logo
     ? `${process.env.REACT_APP_BACKEND_URL}/api/settings/logo?v=${encodeURIComponent(settings.logo_updated || "")}`
@@ -25,6 +32,41 @@ export default function RiwayatTransaksi() {
   useEffect(() => { load(); }, []);
 
   const onSearch = (e) => { e.preventDefault(); load(q); };
+
+  const openEdit = (t) => setEdit({
+    id: t.id, invoice_no: t.invoice_no,
+    items: t.items.map((i) => ({ product_id: i.product_id, name: i.name, qty: i.qty, harga: i.harga })),
+    discount: t.discount || 0, discount_reason: t.discount_reason || "",
+    payment_method: t.payment_method || "Tunai", customer_name: t.customer_name || "",
+    amount_paid: t.amount_paid ?? t.total,
+  });
+  const editSubtotal = edit ? edit.items.reduce((s, i) => s + (Number(i.qty) || 0) * (Number(i.harga) || 0), 0) : 0;
+  const editTotal = Math.max(0, editSubtotal - (Number(edit?.discount) || 0));
+  const setItem = (idx, patch) => setEdit((e) => ({ ...e, items: e.items.map((it, k) => (k === idx ? { ...it, ...patch } : it)) }));
+  const removeItem = (idx) => setEdit((e) => ({ ...e, items: e.items.filter((_, k) => k !== idx) }));
+  const addItem = (pid) => {
+    const p = products.find((x) => x.id === pid);
+    if (!p) return;
+    setEdit((e) => (e.items.some((i) => i.product_id === pid)
+      ? { ...e, items: e.items.map((i) => (i.product_id === pid ? { ...i, qty: Number(i.qty) + 1 } : i)) }
+      : { ...e, items: [...e.items, { product_id: p.id, name: p.name, qty: 1, harga: p.harga_jual }] }));
+  };
+  const saveEdit = async () => {
+    if (edit.items.length === 0) { toast.error("Minimal 1 item"); return; }
+    try {
+      await api.put(`/transactions/${edit.id}`, {
+        items: edit.items.map((i) => ({ product_id: i.product_id, name: i.name, qty: Number(i.qty), harga: Number(i.harga) })),
+        payment_method: edit.payment_method, discount: Number(edit.discount) || 0, discount_reason: edit.discount_reason,
+        customer_name: edit.customer_name, amount_paid: Number(edit.amount_paid),
+      });
+      toast.success("Transaksi diperbarui"); setEdit(null); load(q);
+    } catch (err) { toast.error(apiError(err.response?.data?.detail)); }
+  };
+  const delTx = async (t) => {
+    if (!window.confirm(`Hapus transaksi ${t.invoice_no}? Stok akan dikembalikan.`)) return;
+    try { await api.delete(`/transactions/${t.id}`); toast.success("Transaksi dihapus"); load(q); }
+    catch (err) { toast.error(apiError(err.response?.data?.detail)); }
+  };
 
   const cols = ["Invoice", "Waktu", "Kasir", "Pembayaran", "Item", "Total"];
   const rows = txs.map((t) => [t.invoice_no, fmtDateTime(t.created_at), t.cashier_name, t.payment_method, t.items.reduce((s, i) => s + i.qty, 0), t.total]);
@@ -80,6 +122,14 @@ export default function RiwayatTransaksi() {
                         className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-input text-xs hover:bg-secondary"><Eye className="w-3.5 h-3.5" /> Detail</button>
                       <button onClick={() => printReceipt(t, logoUrl, storeInfo)} data-testid={`riwayat-print-${t.id}`}
                         className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-input text-xs hover:bg-secondary"><Printer className="w-3.5 h-3.5" /> Cetak</button>
+                      {isAdmin && (
+                        <>
+                          <button onClick={() => openEdit(t)} data-testid={`riwayat-edit-${t.id}`}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-input text-xs hover:bg-secondary"><Pencil className="w-3.5 h-3.5" /> Edit</button>
+                          <button onClick={() => delTx(t)} data-testid={`riwayat-delete-${t.id}`}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-input text-xs text-destructive hover:bg-red-50"><Trash2 className="w-3.5 h-3.5" /></button>
+                        </>
+                      )}
                     </div>
                   </td>
                 </tr>
@@ -122,6 +172,76 @@ export default function RiwayatTransaksi() {
               className="mt-4 w-full flex items-center justify-center gap-2 bg-[#1B5E3B] text-white py-2.5 rounded-xl text-sm font-semibold hover:bg-[#143D2B]">
               <Printer className="w-4 h-4" /> Cetak Struk PDF
             </button>
+          </div>
+        </div>
+      )}
+
+      {edit && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/50" onClick={() => setEdit(null)} />
+          <div className="relative bg-white rounded-2xl w-full max-w-lg p-6 max-h-[90vh] overflow-y-auto" data-testid="riwayat-edit-modal">
+            <div className="flex items-center justify-between mb-1">
+              <h3 className="font-heading font-bold text-lg">Edit Transaksi</h3>
+              <button onClick={() => setEdit(null)} data-testid="riwayat-edit-close"><X className="w-5 h-5" /></button>
+            </div>
+            <p className="font-mono text-sm text-muted-foreground mb-3">{edit.invoice_no}</p>
+
+            <div className="space-y-2">
+              {edit.items.map((i, idx) => (
+                <div key={idx} className="flex items-center gap-2" data-testid={`edit-item-${idx}`}>
+                  <span className="flex-1 min-w-0 truncate text-sm">{i.name}</span>
+                  <input type="number" min="1" value={i.qty} onChange={(e) => setItem(idx, { qty: e.target.value })} data-testid={`edit-item-qty-${idx}`}
+                    className="w-16 px-2 py-1.5 rounded-lg border border-input text-sm text-center" />
+                  <span className="text-xs text-muted-foreground">x</span>
+                  <input type="number" min="0" value={i.harga} onChange={(e) => setItem(idx, { harga: e.target.value })} data-testid={`edit-item-harga-${idx}`}
+                    className="w-28 px-2 py-1.5 rounded-lg border border-input text-sm text-right font-mono" />
+                  <button onClick={() => removeItem(idx)} data-testid={`edit-item-remove-${idx}`} className="text-destructive shrink-0"><Trash2 className="w-4 h-4" /></button>
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-3 flex items-center gap-2">
+              <Plus className="w-4 h-4 text-muted-foreground" />
+              <select onChange={(e) => { if (e.target.value) { addItem(e.target.value); e.target.value = ""; } }} data-testid="edit-add-item-select"
+                className="flex-1 px-3 py-2 rounded-lg border border-input text-sm bg-white">
+                <option value="">+ Tambah produk...</option>
+                {products.map((p) => <option key={p.id} value={p.id}>{p.name} ({rupiah(p.harga_jual)})</option>)}
+              </select>
+            </div>
+
+            <div className="mt-4 grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-sm font-medium">Pelanggan</label>
+                <input value={edit.customer_name} onChange={(e) => setEdit({ ...edit, customer_name: e.target.value })} data-testid="edit-customer-input"
+                  className="mt-1 w-full px-3 py-2 rounded-lg border border-input text-sm" />
+              </div>
+              <div>
+                <label className="text-sm font-medium">Metode Bayar</label>
+                <select value={edit.payment_method} onChange={(e) => setEdit({ ...edit, payment_method: e.target.value })} data-testid="edit-payment-select"
+                  className="mt-1 w-full px-3 py-2 rounded-lg border border-input text-sm bg-white">
+                  {["Tunai", "Transfer", "QRIS", "Hutang"].map((m) => <option key={m}>{m}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="text-sm font-medium">Diskon (Rp)</label>
+                <input type="number" min="0" value={edit.discount} onChange={(e) => setEdit({ ...edit, discount: e.target.value })} data-testid="edit-discount-input"
+                  className="mt-1 w-full px-3 py-2 rounded-lg border border-input text-sm font-mono" />
+              </div>
+              <div>
+                <label className="text-sm font-medium">Jumlah Dibayar (Rp)</label>
+                <input type="number" min="0" value={edit.amount_paid} onChange={(e) => setEdit({ ...edit, amount_paid: e.target.value })} data-testid="edit-amount-paid-input"
+                  className="mt-1 w-full px-3 py-2 rounded-lg border border-input text-sm font-mono" />
+              </div>
+            </div>
+
+            <div className="mt-4 pt-3 border-t border-slate-200 space-y-1 text-sm">
+              <div className="flex justify-between"><span className="text-muted-foreground">Subtotal</span><span className="font-mono">{rupiah(editSubtotal)}</span></div>
+              <div className="flex justify-between"><span className="text-muted-foreground">Diskon</span><span className="font-mono text-destructive">({rupiah(Number(edit.discount) || 0)})</span></div>
+              <div className="flex justify-between font-semibold"><span>Total</span><span className="font-mono text-[#1B5E3B]" data-testid="edit-total">{rupiah(editTotal)}</span></div>
+            </div>
+
+            <button onClick={saveEdit} data-testid="riwayat-edit-save"
+              className="mt-4 w-full bg-[#1B5E3B] text-white py-2.5 rounded-xl text-sm font-semibold hover:bg-[#143D2B]">Simpan Perubahan</button>
           </div>
         </div>
       )}

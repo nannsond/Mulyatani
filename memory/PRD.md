@@ -93,6 +93,12 @@ Aplikasi laporan penjualan sederhana untuk bisnis toko pertanian: laporan harian
 - Kartu "Kas Saat Ini (Uang Fisik)" di halaman Laba Rugi: Kas = Saldo Awal + Omzet Diterima (kas) − Pembelian Dibayar − Pengeluaran − Biaya Marketplace. Semua basis kas & akumulasi seluruh periode (hutang pembelian/piutang belum dihitung sampai benar-benar dibayar).
 - Input "Saldo Awal Kas" ditambah di Pengaturan (admin). Backend: GET /reports/cash + POST /settings/saldo-awal; `saldo_awal_kas` disimpan di settings & dikembalikan di GET /settings. Diverifikasi via curl (math benar) + screenshot kartu Kas & Pengaturan.
 
+## Implemented (2026-10-08) — Edit Transaksi & Pembelian (admin), Kas Periode, fix modal
+- **Riwayat Transaksi**: admin bisa Edit (item/qty/harga, diskon, pelanggan, metode bayar, jumlah bayar) & Hapus transaksi; stok otomatis disesuaikan (reverse lama, apply baru). Backend: PUT/DELETE /transactions/{id} (admin-only). Diverifikasi curl (stok 25→23→20→25) + screenshot.
+- **Pembelian**: admin bisa Edit pembelian (supplier, item/qty/harga beli, catatan, jumlah dibayar); stok & harga_beli disesuaikan otomatis. Backend: PUT /purchases/{id} (admin-only). Diverifikasi curl (stok 25→35→29) + screenshot.
+- **Kas Periode**: kartu Kas di Laba Rugi punya toggle "Total vs Periode Ini"; mode periode mengikuti Bulanan/Tahunan + bulan/tahun aktif, tanpa saldo awal (arus kas basis kas periode). Backend: GET /reports/cash?period=YYYY[-MM] + flag is_period.
+- **Fix global modal**: keyframe `fade-up` di index.css diubah jadi opacity-only (hapus translateY). Sebelumnya `<main>` menyimpan transform identity (animation-fill both) yang membuat `position:fixed` modal mengacu ke <main> (halaman panjang → modal muncul jauh di bawah). Kini semua modal (Riwayat, Pembelian, Daftar Harga, Kehadiran) center di viewport.
+
 ## Backlog (P1/P2)
 - P1: Cetak struk/nota transaksi POS
 - P1: Manajemen user (tambah kasir dari UI)

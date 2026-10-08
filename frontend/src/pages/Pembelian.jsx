@@ -2,7 +2,8 @@ import { useEffect, useState } from "react";
 import { api, apiError } from "@/lib/api";
 import { rupiah, fmtDateTime, todayStr } from "@/lib/format";
 import { exportPDF, exportExcel } from "@/lib/exporter";
-import { Plus, Trash2, Truck, FileDown, FileSpreadsheet } from "lucide-react";
+import { useAuth } from "@/context/AuthContext";
+import { Plus, Trash2, Truck, FileDown, FileSpreadsheet, Pencil, X } from "lucide-react";
 import { toast } from "sonner";
 
 export default function Pembelian() {
@@ -15,6 +16,9 @@ export default function Pembelian() {
   const [hutang, setHutang] = useState(false);
   const [amountPaid, setAmountPaid] = useState("");
   const [pick, setPick] = useState("");
+  const { user } = useAuth();
+  const isAdmin = user?.role === "admin";
+  const [edit, setEdit] = useState(null);
 
   const loadProducts = () => api.get("/products").then((r) => setProducts(r.data));
   const loadPurchases = () => api.get(`/purchases?month=${month}`).then((r) => setPurchases(r.data));
@@ -29,6 +33,34 @@ export default function Pembelian() {
   };
   const upd = (pid, k, v) => setLines(lines.map((l) => l.product_id === pid ? { ...l, [k]: v } : l));
   const total = lines.reduce((s, l) => s + Number(l.qty) * Number(l.harga_beli), 0);
+
+  const openEdit = (p) => setEdit({
+    id: p.id, po_no: p.po_no, supplier: p.supplier,
+    items: p.items.map((i) => ({ product_id: i.product_id, name: i.name, qty: i.qty, harga_beli: i.harga_beli })),
+    note: p.note || "", amount_paid: p.amount_paid ?? p.total,
+  });
+  const eTotal = edit ? edit.items.reduce((s, l) => s + (Number(l.qty) || 0) * (Number(l.harga_beli) || 0), 0) : 0;
+  const eSet = (idx, patch) => setEdit((e) => ({ ...e, items: e.items.map((it, k) => (k === idx ? { ...it, ...patch } : it)) }));
+  const eRemove = (idx) => setEdit((e) => ({ ...e, items: e.items.filter((_, k) => k !== idx) }));
+  const eAdd = (pid) => {
+    const p = products.find((x) => x.id === pid);
+    if (!p) return;
+    setEdit((e) => (e.items.some((i) => i.product_id === pid)
+      ? { ...e, items: e.items.map((i) => (i.product_id === pid ? { ...i, qty: Number(i.qty) + 1 } : i)) }
+      : { ...e, items: [...e.items, { product_id: p.id, name: p.name, qty: 1, harga_beli: p.harga_beli }] }));
+  };
+  const saveEdit = async () => {
+    if (!edit.supplier || edit.items.length === 0) { toast.error("Lengkapi supplier & item"); return; }
+    try {
+      await api.put(`/purchases/${edit.id}`, {
+        supplier: edit.supplier,
+        items: edit.items.map((l) => ({ product_id: l.product_id, name: l.name, qty: Number(l.qty), harga_beli: Number(l.harga_beli) })),
+        amount_paid: Number(edit.amount_paid),
+        note: edit.note,
+      });
+      toast.success("Pembelian diperbarui & stok disesuaikan"); setEdit(null); loadProducts(); loadPurchases();
+    } catch (err) { toast.error(apiError(err.response?.data?.detail)); }
+  };
 
   const submit = async () => {
     if (!supplier || !lines.length) { toast.error("Lengkapi supplier & item"); return; }
@@ -99,9 +131,10 @@ export default function Pembelian() {
           <table className="w-full text-sm">
             <thead><tr className="border-b border-slate-200 bg-secondary/50 text-left">
               <th className="px-4 py-2.5 font-semibold">No PO</th><th className="px-4 py-2.5 font-semibold">Tanggal</th><th className="px-4 py-2.5 font-semibold">Supplier</th><th className="px-4 py-2.5 font-semibold text-center">Item</th><th className="px-4 py-2.5 font-semibold text-right">Total</th><th className="px-4 py-2.5 font-semibold text-center">Status</th>
+              {isAdmin && <th className="px-4 py-2.5 font-semibold text-center">Aksi</th>}
             </tr></thead>
             <tbody>
-              {purchases.length === 0 && <tr><td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">Belum ada pembelian.</td></tr>}
+              {purchases.length === 0 && <tr><td colSpan={isAdmin ? 7 : 6} className="px-4 py-8 text-center text-muted-foreground">Belum ada pembelian.</td></tr>}
               {purchases.map((p) => (
                 <tr key={p.id} className="border-b border-slate-100" data-testid={`purchase-row-${p.id}`}>
                   <td className="px-4 py-2.5 font-mono text-xs">{p.po_no}</td>
@@ -110,12 +143,74 @@ export default function Pembelian() {
                   <td className="px-4 py-2.5 text-center font-mono">{p.items.length}</td>
                   <td className="px-4 py-2.5 text-right font-mono font-semibold">{rupiah(p.total)}</td>
                   <td className="px-4 py-2.5 text-center"><span className={`text-xs px-2 py-1 rounded-lg ${p.status === "lunas" ? "bg-green-100 text-green-700" : "bg-orange-100 text-orange-700"}`}>{p.status}</span></td>
+                  {isAdmin && (
+                    <td className="px-4 py-2.5 text-center">
+                      <button onClick={() => openEdit(p)} data-testid={`purchase-edit-${p.id}`}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-input text-xs hover:bg-secondary"><Pencil className="w-3.5 h-3.5" /> Edit</button>
+                    </td>
+                  )}
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
       </div>
+
+      {edit && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/50" onClick={() => setEdit(null)} />
+          <div className="relative bg-white rounded-2xl w-full max-w-lg p-6 max-h-[90vh] overflow-y-auto" data-testid="purchase-edit-modal">
+            <div className="flex items-center justify-between mb-1">
+              <h3 className="font-heading font-bold text-lg">Edit Pembelian</h3>
+              <button onClick={() => setEdit(null)} data-testid="purchase-edit-close"><X className="w-5 h-5" /></button>
+            </div>
+            <p className="font-mono text-sm text-muted-foreground mb-3">{edit.po_no}</p>
+
+            <label className="text-sm font-medium">Supplier</label>
+            <input value={edit.supplier} onChange={(e) => setEdit({ ...edit, supplier: e.target.value })} data-testid="edit-supplier-input"
+              className="mt-1 mb-3 w-full px-3 py-2 rounded-lg border border-input text-sm" />
+
+            <div className="space-y-2">
+              {edit.items.map((l, idx) => (
+                <div key={idx} className="flex items-center gap-2 text-sm" data-testid={`edit-purchase-line-${idx}`}>
+                  <span className="flex-1 min-w-0 truncate">{l.name}</span>
+                  <input type="number" min="1" value={l.qty} onChange={(e) => eSet(idx, { qty: e.target.value })} data-testid={`edit-purchase-qty-${idx}`}
+                    className="w-16 px-2 py-1.5 rounded-lg border border-input text-sm text-center" />
+                  <span className="text-xs text-muted-foreground">x</span>
+                  <input type="number" min="0" value={l.harga_beli} onChange={(e) => eSet(idx, { harga_beli: e.target.value })} data-testid={`edit-purchase-harga-${idx}`}
+                    className="w-28 px-2 py-1.5 rounded-lg border border-input text-sm text-right font-mono" />
+                  <button onClick={() => eRemove(idx)} data-testid={`edit-purchase-remove-${idx}`} className="text-destructive shrink-0"><Trash2 className="w-4 h-4" /></button>
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-3 flex items-center gap-2">
+              <Plus className="w-4 h-4 text-muted-foreground" />
+              <select onChange={(e) => { if (e.target.value) { eAdd(e.target.value); e.target.value = ""; } }} data-testid="edit-purchase-add-select"
+                className="flex-1 px-3 py-2 rounded-lg border border-input text-sm bg-white">
+                <option value="">+ Tambah produk...</option>
+                {products.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+              </select>
+            </div>
+
+            <input value={edit.note} onChange={(e) => setEdit({ ...edit, note: e.target.value })} placeholder="Catatan (opsional)" data-testid="edit-purchase-note"
+              className="mt-3 w-full px-3 py-2 rounded-lg border border-input text-sm" />
+
+            <div className="mt-3">
+              <label className="text-sm font-medium">Jumlah Dibayar (Rp)</label>
+              <input type="number" min="0" value={edit.amount_paid} onChange={(e) => setEdit({ ...edit, amount_paid: e.target.value })} data-testid="edit-purchase-amount-paid"
+                className="mt-1 w-full px-3 py-2 rounded-lg border border-input text-sm font-mono" />
+            </div>
+
+            <div className="mt-4 pt-3 border-t border-slate-200 flex justify-between items-center">
+              <span className="font-semibold">Total</span>
+              <span className="font-mono font-bold text-xl text-[#1B5E3B]" data-testid="edit-purchase-total">{rupiah(eTotal)}</span>
+            </div>
+            <button onClick={saveEdit} data-testid="purchase-edit-save"
+              className="mt-4 w-full bg-[#1B5E3B] text-white py-2.5 rounded-xl text-sm font-semibold hover:bg-[#143D2B]">Simpan Perubahan</button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
