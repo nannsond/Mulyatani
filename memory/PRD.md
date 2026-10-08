@@ -52,6 +52,11 @@ Aplikasi laporan penjualan sederhana untuk bisnis toko pertanian: laporan harian
 - Rekap Gaji (/rekap-gaji, admin): Gaji Pokok + Komisi Online − Potongan Telat = Total, semua bisa diedit owner; gaji pokok disimpan & dipakai ulang tiap bulan; potongan telat global (nominal × jumlah telat); tabel semua karyawan + cetak slip gaji PDF per karyawan. Tested iter 10: 100%
 - Robustness: penjualan online kini menyimpan user_id; komisi & gaji diatribusikan per user_id (fallback nama utk data lama) agar karyawan bernama sama tidak tertukar.
 
+## Implemented (2026-10-08) — Arsip Slip Gaji & Status Kehadiran
+- Arsip Slip Gaji (/rekap-gaji, admin): tombol "Arsipkan Bulan Ini" menyimpan snapshot slip semua karyawan; kartu "Arsip Slip Gaji" menampilkan bulan terarsip (klik untuk buka & cetak ulang slip per karyawan). Tested iter 11: backend 100%
+- Kehadiran status: Hadir (clock-in) / Izin / Sakit / Alpha. Karyawan bisa self-mark Izin/Sakit; admin "Tandai Kehadiran Karyawan" untuk siapa pun & tanggal apa pun. Rekap per status (hadir/telat/izin/sakit/alpha). Tested iter 11 + fix TZ.
+- Fix: todayWIB() (UTC+7) untuk halaman kehadiran agar tanggal "hari ini" selaras dengan backend WIB (bug UTC vs WIB dekat tengah malam) — terverifikasi via UI.
+
 ## Backlog (P1/P2)
 - P1: Cetak struk/nota transaksi POS
 - P1: Manajemen user (tambah kasir dari UI)

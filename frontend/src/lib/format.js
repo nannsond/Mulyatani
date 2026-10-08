@@ -17,6 +17,8 @@ export const fmtDateTime = (iso) => {
 
 export const todayStr = () => new Date().toISOString().slice(0, 10);
 
+export const todayWIB = () => new Date(Date.now() + 7 * 3600 * 1000).toISOString().slice(0, 10);
+
 export const fmtJam = (iso) => iso ? new Date(iso).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Jakarta" }) : "-";
 
 export const fmtDurasi = (m) => {

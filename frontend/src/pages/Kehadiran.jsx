@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { api, apiError } from "@/lib/api";
-import { fmtDate, fmtJam, fmtDurasi, todayStr } from "@/lib/format";
+import { fmtDate, fmtJam, fmtDurasi, todayWIB } from "@/lib/format";
 import { Clock, LogIn, LogOut, Loader2, Save, CheckCircle2, AlarmClock, FileText, UserCheck } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/context/AuthContext";
@@ -17,12 +17,12 @@ export default function Kehadiran() {
   const [today, setToday] = useState(null);
   const [loadingToday, setLoadingToday] = useState(true);
   const [acting, setActing] = useState(false);
-  const [month, setMonth] = useState(todayStr().slice(0, 7));
+  const [month, setMonth] = useState(todayWIB().slice(0, 7));
   const [data, setData] = useState(null);
   const [startTime, setStartTime] = useState("08:00");
   const [savingStart, setSavingStart] = useState(false);
   const [employees, setEmployees] = useState([]);
-  const [mark, setMark] = useState({ user_id: "", date: todayStr(), status: "Izin" });
+  const [mark, setMark] = useState({ user_id: "", date: todayWIB(), status: "Izin" });
 
   const loadToday = () => { setLoadingToday(true); api.get("/attendance/today").then((r) => setToday(r.data.record)).finally(() => setLoadingToday(false)); };
   const loadList = () => { setData(null); api.get(`/attendance?month=${month}`).then((r) => setData(r.data)); };
@@ -42,7 +42,7 @@ export default function Kehadiran() {
   };
   const markSelf = async (status) => {
     setActing(true);
-    try { await api.post("/attendance/mark", { date: todayStr(), status }); toast.success(`Tercatat: ${status}`); loadToday(); loadList(); }
+    try { await api.post("/attendance/mark", { date: todayWIB(), status }); toast.success(`Tercatat: ${status}`); loadToday(); loadList(); }
     catch (err) { toast.error(apiError(err.response?.data?.detail)); } finally { setActing(false); }
   };
   const saveStart = async () => {
@@ -67,7 +67,7 @@ export default function Kehadiran() {
         <div className="space-y-6">
           <div className="bg-card rounded-2xl border border-slate-200 p-6 h-fit" data-testid="attendance-clock-card">
             <h3 className="font-heading font-semibold text-lg flex items-center gap-2 mb-1"><Clock className="w-5 h-5 text-[#1B5E3B]" /> Absensi Hari Ini</h3>
-            <p className="text-sm text-muted-foreground mb-5">{fmtDate(todayStr())}</p>
+            <p className="text-sm text-muted-foreground mb-5">{fmtDate(todayWIB())}</p>
             {loadingToday ? <div className="flex justify-center py-6"><Loader2 className="w-6 h-6 animate-spin text-[#1B5E3B]" /></div> : (
               <>
                 {!today && (
