@@ -57,6 +57,10 @@ Aplikasi laporan penjualan sederhana untuk bisnis toko pertanian: laporan harian
 - Kehadiran status: Hadir (clock-in) / Izin / Sakit / Alpha. Karyawan bisa self-mark Izin/Sakit; admin "Tandai Kehadiran Karyawan" untuk siapa pun & tanggal apa pun. Rekap per status (hadir/telat/izin/sakit/alpha). Tested iter 11 + fix TZ.
 - Fix: todayWIB() (UTC+7) untuk halaman kehadiran agar tanggal "hari ini" selaras dengan backend WIB (bug UTC vs WIB dekat tengah malam) — terverifikasi via UI.
 
+## Implemented (2026-10-08) — Sortir Produk
+- Daftar Harga: selektor urutan (Nama A-Z / Nama Z-A / Kategori) berlaku di tabel, cetak, & ekspor PDF/Excel.
+- Backend GET /products: diurutkan kategori lalu nama (case-insensitive) sehingga dropdown produk di POS/Stok Opname/Penjualan Online juga rapi. Diverifikasi via curl + screenshot.
+
 ## Backlog (P1/P2)
 - P1: Cetak struk/nota transaksi POS
 - P1: Manajemen user (tambah kasir dari UI)

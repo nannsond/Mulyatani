@@ -19,6 +19,7 @@ export default function DaftarHarga() {
   const [products, setProducts] = useState([]);
   const [search, setSearch] = useState("");
   const [tab, setTab] = useState("normal");
+  const [sortBy, setSortBy] = useState("name");
   const [modal, setModal] = useState(null);
 
   const load = () => api.get("/products").then((r) => setProducts(r.data));
@@ -26,6 +27,15 @@ export default function DaftarHarga() {
 
   const filtered = products.filter((p) =>
     p.name.toLowerCase().includes(search.toLowerCase()) || p.category.toLowerCase().includes(search.toLowerCase()));
+
+  const sorted = [...filtered].sort((a, b) => {
+    if (sortBy === "category") {
+      const c = a.category.localeCompare(b.category, "id");
+      return c !== 0 ? c : a.name.localeCompare(b.name, "id");
+    }
+    if (sortBy === "name_desc") return b.name.localeCompare(a.name, "id");
+    return a.name.localeCompare(b.name, "id");
+  });
 
   const save = async (e) => {
     e.preventDefault();
@@ -49,7 +59,7 @@ export default function DaftarHarga() {
   const isReseller = tab === "reseller";
   const priceLabel = isReseller ? "Harga Reseller" : "Harga Normal";
   const cols = ["SKU", "Nama Produk", "Kategori", "Satuan", priceLabel, "Stok"];
-  const rows = filtered.map((p) => [p.sku, p.name, p.category, p.unit, isReseller ? (p.harga_reseller || 0) : p.harga_jual, p.stok]);
+  const rows = sorted.map((p) => [p.sku, p.name, p.category, p.unit, isReseller ? (p.harga_reseller || 0) : p.harga_jual, p.stok]);
   const exportTitle = `Daftar ${priceLabel}`;
 
   return (
@@ -71,8 +81,14 @@ export default function DaftarHarga() {
           <input value={search} onChange={(e) => setSearch(e.target.value)} data-testid="product-search-input"
             placeholder="Cari produk..." className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-input bg-card text-sm focus:outline-none focus:ring-2 focus:ring-[#1B5E3B]" />
         </div>
+        <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} data-testid="product-sort-select"
+          className="px-3 py-2.5 rounded-xl border border-input bg-card text-sm focus:outline-none focus:ring-2 focus:ring-[#1B5E3B]">
+          <option value="name">Urutkan: Nama A-Z</option>
+          <option value="name_desc">Urutkan: Nama Z-A</option>
+          <option value="category">Urutkan: Kategori</option>
+        </select>
         <div className="flex gap-2">
-          <button onClick={() => printPriceList({ products: filtered, mode: tab, logoUrl, info: storeInfo })} data-testid="print-pricelist-button"
+          <button onClick={() => printPriceList({ products: sorted, mode: tab, logoUrl, info: storeInfo })} data-testid="print-pricelist-button"
             className="flex items-center gap-2 px-3 py-2.5 rounded-xl border border-input text-sm hover:bg-secondary"><Printer className="w-4 h-4" /> Cetak</button>
           <button onClick={() => exportPDF({ title: exportTitle, columns: cols, rows })} data-testid="export-pdf-button"
             className="flex items-center gap-2 px-3 py-2.5 rounded-xl border border-input text-sm hover:bg-secondary"><FileDown className="w-4 h-4" /> PDF</button>
@@ -100,7 +116,7 @@ export default function DaftarHarga() {
             </tr>
           </thead>
           <tbody>
-            {filtered.map((p) => (
+            {sorted.map((p) => (
               <tr key={p.id} className="border-b border-slate-100 hover:bg-secondary/30" data-testid={`product-row-${p.id}`}>
                 <td className="px-4 py-3 font-mono text-xs text-muted-foreground">{p.sku}</td>
                 <td className="px-4 py-3 font-medium">{p.name}</td>

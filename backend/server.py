@@ -263,7 +263,7 @@ async def me(user: dict = Depends(get_current_user)):
 # ---------------- Product routes ----------------
 @api_router.get("/products")
 async def list_products(user: dict = Depends(get_current_user)):
-    docs = await db.products.find().sort("name", 1).to_list(1000)
+    docs = await db.products.find().collation({"locale": "en", "strength": 2}).sort([("category", 1), ("name", 1)]).to_list(1000)
     return [Product(**d).model_dump() for d in docs]
 
 @api_router.post("/products")
