@@ -3,7 +3,7 @@ import { api, apiError } from "@/lib/api";
 import { rupiah } from "@/lib/format";
 import { useAuth } from "@/context/AuthContext";
 import { useSettings } from "@/context/SettingsContext";
-import { Plus, Pencil, Trash2, FileDown, FileSpreadsheet, X, Search, User, Users, Printer } from "lucide-react";
+import { Plus, Pencil, Trash2, FileDown, FileSpreadsheet, X, Search, User, Users, Printer, AlertTriangle } from "lucide-react";
 import { exportPDF, exportExcel, printPriceList } from "@/lib/exporter";
 import { toast } from "sonner";
 
@@ -20,15 +20,22 @@ export default function DaftarHarga() {
   const [search, setSearch] = useState("");
   const [tab, setTab] = useState("normal");
   const [sortBy, setSortBy] = useState("name");
+  const [lowOnly, setLowOnly] = useState(false);
   const [modal, setModal] = useState(null);
 
   const load = () => api.get("/products").then((r) => setProducts(r.data));
   useEffect(() => { load(); }, []);
 
+  const stockLevel = (p) => (p.stok <= 0 ? 2 : p.stok <= p.stok_minimal ? 1 : 0);
+  const lowCount = products.filter((p) => stockLevel(p) > 0).length;
+
   const filtered = products.filter((p) =>
-    p.name.toLowerCase().includes(search.toLowerCase()) || p.category.toLowerCase().includes(search.toLowerCase()));
+    (p.name.toLowerCase().includes(search.toLowerCase()) || p.category.toLowerCase().includes(search.toLowerCase()))
+    && (!lowOnly || stockLevel(p) > 0));
 
   const sorted = [...filtered].sort((a, b) => {
+    const la = stockLevel(a), lb = stockLevel(b);
+    if (la !== lb) return lb - la;
     if (sortBy === "category") {
       const c = a.category.localeCompare(b.category, "id");
       return c !== 0 ? c : a.name.localeCompare(b.name, "id");
@@ -87,6 +94,13 @@ export default function DaftarHarga() {
           <option value="name_desc">Urutkan: Nama Z-A</option>
           <option value="category">Urutkan: Kategori</option>
         </select>
+        <button onClick={() => setLowOnly((v) => !v)} data-testid="low-stock-filter-toggle"
+          className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border text-sm font-semibold transition-colors ${lowOnly ? "bg-destructive text-white border-destructive" : "border-input bg-card hover:bg-secondary"}`}>
+          <AlertTriangle className="w-4 h-4" /> Stok Menipis
+          {lowCount > 0 && (
+            <span data-testid="low-stock-count" className={`min-w-5 px-1.5 py-0.5 rounded-full text-xs font-bold ${lowOnly ? "bg-white text-destructive" : "bg-destructive text-white"}`}>{lowCount}</span>
+          )}
+        </button>
         <div className="flex gap-2">
           <button onClick={() => printPriceList({ products: sorted, mode: tab, logoUrl, info: storeInfo })} data-testid="print-pricelist-button"
             className="flex items-center gap-2 px-3 py-2.5 rounded-xl border border-input text-sm hover:bg-secondary"><Printer className="w-4 h-4" /> Cetak</button>
@@ -119,7 +133,20 @@ export default function DaftarHarga() {
             {sorted.map((p) => (
               <tr key={p.id} className="border-b border-slate-100 hover:bg-secondary/30" data-testid={`product-row-${p.id}`}>
                 <td className="px-4 py-3 font-mono text-xs text-muted-foreground">{p.sku}</td>
-                <td className="px-4 py-3 font-medium">{p.name}</td>
+                <td className="px-4 py-3 font-medium">
+                  <div className="flex items-center gap-2">
+                    <span>{p.name}</span>
+                    {p.stok <= 0 ? (
+                      <span data-testid={`stock-badge-${p.id}`} className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-destructive text-white">
+                        <AlertTriangle className="w-3 h-3" /> Habis
+                      </span>
+                    ) : p.stok <= p.stok_minimal ? (
+                      <span data-testid={`stock-badge-${p.id}`} className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 border border-amber-300">
+                        <AlertTriangle className="w-3 h-3" /> Stok Menipis
+                      </span>
+                    ) : null}
+                  </div>
+                </td>
                 <td className="px-4 py-3"><span className="text-xs px-2 py-1 rounded-lg bg-secondary">{p.category}</span></td>
                 <td className="px-4 py-3 text-right font-mono">{rupiah(p.harga_beli)}</td>
                 <td className={`px-4 py-3 text-right font-mono ${!isReseller ? "font-semibold text-[#1B5E3B]" : "text-muted-foreground"}`}>{rupiah(p.harga_jual)}</td>

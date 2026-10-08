@@ -61,6 +61,11 @@ Aplikasi laporan penjualan sederhana untuk bisnis toko pertanian: laporan harian
 - Daftar Harga: selektor urutan (Nama A-Z / Nama Z-A / Kategori) berlaku di tabel, cetak, & ekspor PDF/Excel.
 - Backend GET /products: diurutkan kategori lalu nama (case-insensitive) sehingga dropdown produk di POS/Stok Opname/Penjualan Online juga rapi. Diverifikasi via curl + screenshot.
 
+## Implemented (2026-10-08) — Stok Menipis
+- Daftar Harga: produk dengan stok ≤ stok minimal diberi badge "Stok Menipis" (amber), stok = 0 diberi badge "Habis" (merah).
+- Produk stok menipis/habis otomatis diurutkan ke paling atas (habis dulu, lalu menipis) terlepas dari pilihan urutan lain.
+- Tombol filter "Hanya Stok Menipis" dengan counter jumlah; menampilkan hanya produk yang perlu di-restock. Diverifikasi via screenshot (badge, auto-sort, counter, filter).
+
 ## Backlog (P1/P2)
 - P1: Cetak struk/nota transaksi POS
 - P1: Manajemen user (tambah kasir dari UI)
