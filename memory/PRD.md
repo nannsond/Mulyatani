@@ -66,6 +66,13 @@ Aplikasi laporan penjualan sederhana untuk bisnis toko pertanian: laporan harian
 - Produk stok menipis/habis otomatis diurutkan ke paling atas (habis dulu, lalu menipis) terlepas dari pilihan urutan lain.
 - Tombol filter "Hanya Stok Menipis" dengan counter jumlah; menampilkan hanya produk yang perlu di-restock. Diverifikasi via screenshot (badge, auto-sort, counter, filter).
 
+## Implemented (2026-10-08) — Omzet Berbasis Kas (Piutang)
+- Piutang (penjualan kredit POS) TIDAK langsung dihitung penuh sebagai omzet; hanya bagian yang sudah dibayar (amount_paid/total) yang diakui sebagai omzet.
+- Pengakuan tetap di tanggal transaksi asli: saat piutang dilunasi, nilai pelunasan otomatis masuk omzet pada tanggal transaksi dibuat (bukan tanggal bayar).
+- Laba ikut proporsional dengan porsi yang sudah dibayar (konsisten dengan omzet kas).
+- Penjualan online "Selesai" tetap diakui penuh (tidak ada konsep piutang).
+- Berlaku di: Dashboard, Laporan Harian/Bulanan/Tahunan, dan Laba Rugi. Diterapkan via helper `tx_fraction()` di server.py pada summarize/compute_profit/top_products/category_breakdown/product_profit/category_profit + loop harian/bulanan + dashboard series. Diverifikasi via curl: bayar separuh → omzet +½ & laba +½; lunasi → omzet & laba naik ke penuh.
+
 ## Backlog (P1/P2)
 - P1: Cetak struk/nota transaksi POS
 - P1: Manajemen user (tambah kasir dari UI)

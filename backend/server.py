@@ -122,11 +122,24 @@ async def product_cost_map() -> dict:
     prods = await db.products.find().to_list(1000)
     return {str(p["_id"]): p.get("harga_beli", 0) for p in prods}
 
+def tx_fraction(t: dict) -> float:
+    """Portion of a transaction recognized as omzet/laba (cash basis).
+    Online 'Selesai' sales are fully recognized; POS credit sales recognize
+    only the paid portion (amount_paid/total), attributed to the sale's date."""
+    if t.get("_online"):
+        return 1.0
+    total = t.get("total", 0) or 0
+    if total <= 0:
+        return 1.0
+    paid = t.get("amount_paid", total)
+    return max(0.0, min(paid / total, 1.0))
+
 def compute_profit(txs: List[dict], cost: dict) -> float:
     laba = 0.0
     for t in txs:
+        f = tx_fraction(t)
         for i in t["items"]:
-            laba += i["qty"] * (i["harga"] - cost.get(i["product_id"], 0))
+            laba += f * i["qty"] * (i["harga"] - cost.get(i["product_id"], 0))
     return laba
 
 # ---------------- Online channels & merge helpers ----------------
@@ -334,41 +347,48 @@ async def list_transactions(date: Optional[str] = None, q: Optional[str] = None,
 
 # ---------------- Reports ----------------
 def summarize(txs: List[dict]) -> dict:
-    total = sum(t["total"] for t in txs)
-    count = len(txs)
-    qty = sum(i["qty"] for t in txs for i in t["items"])
+    total = 0.0
+    qty = 0
     pay = {}
     for t in txs:
-        pay[t["payment_method"]] = pay.get(t["payment_method"], 0) + t["total"]
+        f = tx_fraction(t)
+        rec = t["total"] * f
+        total += rec
+        qty += sum(i["qty"] for i in t["items"])
+        pay[t["payment_method"]] = pay.get(t["payment_method"], 0) + rec
+    count = len(txs)
     return {"total_omzet": total, "jumlah_transaksi": count, "total_item": qty,
             "rata_rata": total / count if count else 0, "pembayaran": pay}
 
 async def top_products(txs: List[dict], limit: int = 5):
     agg = {}
     for t in txs:
+        f = tx_fraction(t)
         for i in t["items"]:
             e = agg.setdefault(i["name"], {"name": i["name"], "qty": 0, "omzet": 0})
             e["qty"] += i["qty"]
-            e["omzet"] += i["subtotal"]
+            e["omzet"] += i["subtotal"] * f
     return sorted(agg.values(), key=lambda x: x["omzet"], reverse=True)[:limit]
 
 async def category_breakdown(txs: List[dict]):
     prods = {str(p["_id"]): p for p in await db.products.find().to_list(1000)}
     agg = {}
     for t in txs:
+        f = tx_fraction(t)
         for i in t["items"]:
             cat = prods.get(i["product_id"], {}).get("category", "Lainnya")
-            agg[cat] = agg.get(cat, 0) + i["subtotal"]
+            agg[cat] = agg.get(cat, 0) + i["subtotal"] * f
     return [{"category": k, "omzet": v} for k, v in sorted(agg.items(), key=lambda x: -x[1])]
 
 async def product_profit(txs: List[dict], cost: dict, limit: int = 5):
     agg = {}
     for t in txs:
+        f = tx_fraction(t)
         for i in t["items"]:
             hb = cost.get(i["product_id"], 0)
             e = agg.setdefault(i["name"], {"name": i["name"], "qty": 0, "omzet": 0, "laba": 0})
-            e["qty"] += i["qty"]; e["omzet"] += i["subtotal"]
-            e["laba"] += i["qty"] * (i["harga"] - hb)
+            e["qty"] += i["qty"]; e["omzet"] += i["subtotal"] * f
+            e["laba"] += f * i["qty"] * (i["harga"] - hb)
     arr = sorted(agg.values(), key=lambda x: x["laba"], reverse=True)
     terendah = list(reversed(arr[-limit:])) if len(arr) > limit else list(reversed(arr))
     return {"tertinggi": arr[:limit], "terendah": terendah}
@@ -377,11 +397,12 @@ async def category_profit(txs: List[dict], cost: dict):
     prods = {str(p["_id"]): p for p in await db.products.find().to_list(1000)}
     agg = {}
     for t in txs:
+        f = tx_fraction(t)
         for i in t["items"]:
             cat = prods.get(i["product_id"], {}).get("category", "Lainnya")
             e = agg.setdefault(cat, {"category": cat, "omzet": 0, "laba": 0})
-            e["omzet"] += i["subtotal"]
-            e["laba"] += i["qty"] * (i["harga"] - cost.get(i["product_id"], 0))
+            e["omzet"] += i["subtotal"] * f
+            e["laba"] += f * i["qty"] * (i["harga"] - cost.get(i["product_id"], 0))
     return sorted(agg.values(), key=lambda x: x["laba"], reverse=True)
 
 @api_router.get("/reports/daily")
@@ -406,9 +427,10 @@ async def report_monthly(year: int, month: int, user: dict = Depends(get_current
     cost = await product_cost_map()
     daily = {}
     for t in all_txs:
+        f = tx_fraction(t)
         day = t["created_at"][:10]
         d = daily.setdefault(day, {"date": day, "omzet": 0, "transaksi": 0, "laba": 0})
-        d["omzet"] += t["total"]; d["transaksi"] += 1
+        d["omzet"] += t["total"] * f; d["transaksi"] += 1
         d["laba"] += compute_profit([t], cost)
     s = summarize(all_txs); s["total_laba"] = compute_profit(all_txs, cost)
     peng = await db.expenses.find({"created_at": {"$regex": f"^{prefix}"}}).to_list(2000)
@@ -432,8 +454,9 @@ async def report_yearly(year: int, user: dict = Depends(get_current_user)):
     cost = await product_cost_map()
     monthly = {m: {"month": m, "omzet": 0, "transaksi": 0, "laba": 0} for m in range(1, 13)}
     for t in all_txs:
+        f = tx_fraction(t)
         m = int(t["created_at"][5:7])
-        monthly[m]["omzet"] += t["total"]; monthly[m]["transaksi"] += 1
+        monthly[m]["omzet"] += t["total"] * f; monthly[m]["transaksi"] += 1
         monthly[m]["laba"] += compute_profit([t], cost)
     s = summarize(all_txs); s["total_laba"] = compute_profit(all_txs, cost)
     peng = await db.expenses.find({"created_at": {"$regex": f"^{year}"}}).to_list(5000)
@@ -1011,7 +1034,7 @@ async def dashboard(user: dict = Depends(get_current_user)):
         dtx = await db.transactions.find({"created_at": {"$regex": f"^{day}"}}).to_list(2000)
         online_day, _ = await fetch_online_selesai(day)
         combined = dtx + online_day
-        series.append({"date": day, "omzet": sum(t["total"] for t in combined), "transaksi": len(combined)})
+        series.append({"date": day, "omzet": sum(t["total"] * tx_fraction(t) for t in combined), "transaksi": len(combined)})
     return {"today": summarize(today_all), "low_stock": low_stock,
             "total_produk": len(products), "series7": series,
             "top_products": await top_products(today_all)}
