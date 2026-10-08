@@ -4,8 +4,11 @@ import { rupiah } from "@/lib/format";
 import { Search, Plus, Minus, Trash2, ShoppingCart, Loader2, CheckCircle2, Printer } from "lucide-react";
 import { toast } from "sonner";
 import { printReceipt } from "@/lib/exporter";
+import { useSettings } from "@/context/SettingsContext";
 
 export default function POS() {
+  const { settings } = useSettings();
+  const logoUrl = settings?.has_logo ? `${process.env.REACT_APP_BACKEND_URL}/api/settings/logo?v=${encodeURIComponent(settings.logo_updated || "")}` : undefined;
   const [products, setProducts] = useState([]);
   const [search, setSearch] = useState("");
   const [cart, setCart] = useState([]);
@@ -49,7 +52,7 @@ export default function POS() {
       });
       setLastInvoice(data);
       toast.success(`Transaksi ${data.invoice_no} berhasil!`);
-      printReceipt(data);
+      printReceipt(data, logoUrl);
       setCart([]);
       load();
     } catch (err) {
@@ -141,7 +144,7 @@ export default function POS() {
           <div className="mt-4 p-3 rounded-xl bg-green-50 border border-green-200 text-sm" data-testid="pos-last-invoice">
             <p className="font-semibold text-green-800">Transaksi terakhir: {lastInvoice.invoice_no}</p>
             <p className="font-mono text-green-700">{rupiah(lastInvoice.total)} • {lastInvoice.payment_method}</p>
-            <button onClick={() => printReceipt(lastInvoice)} data-testid="pos-print-receipt-button"
+            <button onClick={() => printReceipt(lastInvoice, logoUrl)} data-testid="pos-print-receipt-button"
               className="mt-2 w-full flex items-center justify-center gap-2 border border-green-300 text-green-800 py-2 rounded-lg text-sm font-semibold hover:bg-green-100">
               <Printer className="w-4 h-4" /> Cetak Struk PDF
             </button>

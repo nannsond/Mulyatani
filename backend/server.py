@@ -5,7 +5,7 @@ import os
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
 
-from fastapi import FastAPI, APIRouter, HTTPException, Request, Depends, Response
+from fastapi import FastAPI, APIRouter, HTTPException, Request, Depends, Response, UploadFile, File, Query
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 from pydantic import BaseModel, Field, EmailStr, BeforeValidator, ConfigDict
@@ -16,6 +16,8 @@ import logging
 import jwt
 import bcrypt
 import random
+import uuid
+import requests
 
 # ---------------- DB ----------------
 mongo_url = os.environ['MONGO_URL']
@@ -24,6 +26,40 @@ db = client[os.environ['DB_NAME']]
 
 JWT_SECRET = os.environ['JWT_SECRET']
 JWT_ALGORITHM = "HS256"
+
+# ---------------- Object Storage ----------------
+STORAGE_BASE = (os.environ.get("INTEGRATION_PROXY_URL") or "").strip() or "https://integrations.emergentagent.com"
+STORAGE_URL = STORAGE_BASE.rstrip("/") + "/objstore/api/v1/storage"
+EMERGENT_KEY = os.environ.get("EMERGENT_LLM_KEY")
+APP_NAME = "tokotani"
+storage_key = None
+
+def init_storage(force=False):
+    global storage_key
+    if storage_key and not force:
+        return storage_key
+    resp = requests.post(f"{STORAGE_URL}/init", json={"emergent_key": EMERGENT_KEY}, timeout=30)
+    resp.raise_for_status()
+    storage_key = resp.json()["storage_key"]
+    return storage_key
+
+def put_object(path, data, content_type):
+    key = init_storage()
+    resp = requests.put(f"{STORAGE_URL}/objects/{path}", headers={"X-Storage-Key": key, "Content-Type": content_type}, data=data, timeout=120)
+    if resp.status_code == 404:
+        key = init_storage(force=True)
+        resp = requests.put(f"{STORAGE_URL}/objects/{path}", headers={"X-Storage-Key": key, "Content-Type": content_type}, data=data, timeout=120)
+    resp.raise_for_status()
+    return resp.json()
+
+def get_object(path):
+    key = init_storage()
+    resp = requests.get(f"{STORAGE_URL}/objects/{path}", headers={"X-Storage-Key": key}, timeout=60)
+    if resp.status_code == 404:
+        key = init_storage(force=True)
+        resp = requests.get(f"{STORAGE_URL}/objects/{path}", headers={"X-Storage-Key": key}, timeout=60)
+    resp.raise_for_status()
+    return resp.content, resp.headers.get("Content-Type", "application/octet-stream")
 
 app = FastAPI()
 api_router = APIRouter(prefix="/api")
@@ -216,11 +252,13 @@ async def create_transaction(data: TransactionInput, user: dict = Depends(get_cu
     return doc
 
 @api_router.get("/transactions")
-async def list_transactions(date: Optional[str] = None, user: dict = Depends(get_current_user)):
-    q = {}
+async def list_transactions(date: Optional[str] = None, q: Optional[str] = None, limit: int = 50, user: dict = Depends(get_current_user)):
+    query = {}
     if date:
-        q = {"created_at": {"$regex": f"^{date}"}}
-    docs = await db.transactions.find(q).sort("created_at", -1).to_list(2000)
+        query["created_at"] = {"$regex": f"^{date}"}
+    if q:
+        query["invoice_no"] = {"$regex": q, "$options": "i"}
+    docs = await db.transactions.find(query).sort("created_at", -1).to_list(min(limit, 500))
     for d in docs:
         d["id"] = str(d["_id"])
         d.pop("_id", None)
@@ -255,6 +293,18 @@ async def category_breakdown(txs: List[dict]):
             agg[cat] = agg.get(cat, 0) + i["subtotal"]
     return [{"category": k, "omzet": v} for k, v in sorted(agg.items(), key=lambda x: -x[1])]
 
+async def product_profit(txs: List[dict], cost: dict, limit: int = 5):
+    agg = {}
+    for t in txs:
+        for i in t["items"]:
+            hb = cost.get(i["product_id"], 0)
+            e = agg.setdefault(i["name"], {"name": i["name"], "qty": 0, "omzet": 0, "laba": 0})
+            e["qty"] += i["qty"]; e["omzet"] += i["subtotal"]
+            e["laba"] += i["qty"] * (i["harga"] - hb)
+    arr = sorted(agg.values(), key=lambda x: x["laba"], reverse=True)
+    terendah = list(reversed(arr[-limit:])) if len(arr) > limit else list(reversed(arr))
+    return {"tertinggi": arr[:limit], "terendah": terendah}
+
 @api_router.get("/reports/daily")
 async def report_daily(date: str, user: dict = Depends(get_current_user)):
     txs = await db.transactions.find({"created_at": {"$regex": f"^{date}"}}).sort("created_at", 1).to_list(2000)
@@ -281,6 +331,7 @@ async def report_monthly(year: int, month: int, user: dict = Depends(get_current
     return {"year": year, "month": month, "summary": s,
             "target_omzet": target["target_omzet"] if target else 0,
             "daily": sorted(daily.values(), key=lambda x: x["date"]),
+            "product_laba": await product_profit(txs, cost),
             "top_products": await top_products(txs), "categories": await category_breakdown(txs)}
 
 @api_router.get("/reports/yearly")
@@ -293,8 +344,11 @@ async def report_yearly(year: int, user: dict = Depends(get_current_user)):
         monthly[m]["omzet"] += t["total"]; monthly[m]["transaksi"] += 1
         monthly[m]["laba"] += compute_profit([t], cost)
     s = summarize(txs); s["total_laba"] = compute_profit(txs, cost)
+    target = await db.targets.find_one({"year": year, "month": 0})
     return {"year": year, "summary": s,
+            "target_omzet": target["target_omzet"] if target else 0,
             "monthly": list(monthly.values()),
+            "product_laba": await product_profit(txs, cost),
             "top_products": await top_products(txs, 8), "categories": await category_breakdown(txs)}
 
 # ---------------- Users (admin) ----------------
@@ -351,6 +405,35 @@ async def set_target(data: TargetInput, admin: dict = Depends(require_admin)):
     await db.targets.update_one({"year": data.year, "month": data.month},
                                 {"$set": {"target_omzet": data.target_omzet}}, upsert=True)
     return {"ok": True}
+
+# ---------------- Settings / Logo ----------------
+@api_router.get("/settings")
+async def get_settings(user: dict = Depends(get_current_user)):
+    s = await db.settings.find_one({"key": "store"})
+    return {"has_logo": bool(s and s.get("logo_path")),
+            "logo_updated": s.get("updated_at") if s else None}
+
+@api_router.post("/settings/logo")
+async def upload_logo(file: UploadFile = File(...), admin: dict = Depends(require_admin)):
+    ext = file.filename.split(".")[-1].lower() if "." in file.filename else "png"
+    if ext not in ("png", "jpg", "jpeg", "webp"):
+        raise HTTPException(status_code=400, detail="Format harus PNG/JPG/WEBP")
+    data = await file.read()
+    if len(data) > 2 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="Ukuran maksimal 2MB")
+    path = f"{APP_NAME}/logo/{uuid.uuid4()}.{ext}"
+    put_object(path, data, file.content_type or "image/png")
+    await db.settings.update_one({"key": "store"},
+        {"$set": {"logo_path": path, "content_type": file.content_type or "image/png", "updated_at": now_iso()}}, upsert=True)
+    return {"ok": True, "updated_at": now_iso()}
+
+@api_router.get("/settings/logo")
+async def get_logo():
+    s = await db.settings.find_one({"key": "store"})
+    if not s or not s.get("logo_path"):
+        raise HTTPException(status_code=404, detail="Logo belum diset")
+    data, ct = get_object(s["logo_path"])
+    return Response(content=data, media_type=s.get("content_type", ct))
 
 # ---------------- Stok Opname ----------------
 @api_router.get("/stok-opname")
@@ -481,6 +564,11 @@ async def seed():
 @app.on_event("startup")
 async def startup():
     await db.users.create_index("email", unique=True)
+    try:
+        init_storage()
+        logger.info("Storage initialized")
+    except Exception as e:
+        logger.error(f"Storage init failed: {e}")
     await seed()
 
 @app.on_event("shutdown")

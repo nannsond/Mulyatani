@@ -9,6 +9,9 @@ import POS from "@/pages/POS";
 import DaftarHarga from "@/pages/DaftarHarga";
 import StokOpname from "@/pages/StokOpname";
 import KelolaKasir from "@/pages/KelolaKasir";
+import RiwayatTransaksi from "@/pages/RiwayatTransaksi";
+import Pengaturan from "@/pages/Pengaturan";
+import { SettingsProvider } from "@/context/SettingsContext";
 import LaporanHarian from "@/pages/LaporanHarian";
 import LaporanBulanan from "@/pages/LaporanBulanan";
 import LaporanTahunan from "@/pages/LaporanTahunan";
@@ -33,6 +36,8 @@ function AppRoutes() {
       <Route path="/laporan/bulanan" element={<Protected><LaporanBulanan /></Protected>} />
       <Route path="/laporan/tahunan" element={<Protected><LaporanTahunan /></Protected>} />
       <Route path="/kelola-kasir" element={<Protected><KelolaKasir /></Protected>} />
+      <Route path="/riwayat" element={<Protected><RiwayatTransaksi /></Protected>} />
+      <Route path="/pengaturan" element={<Protected><Pengaturan /></Protected>} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
@@ -41,10 +46,12 @@ function AppRoutes() {
 function App() {
   return (
     <AuthProvider>
-      <BrowserRouter>
-        <AppRoutes />
-        <Toaster position="top-right" richColors />
-      </BrowserRouter>
+      <SettingsProvider>
+        <BrowserRouter>
+          <AppRoutes />
+          <Toaster position="top-right" richColors />
+        </BrowserRouter>
+      </SettingsProvider>
     </AuthProvider>
   );
 }

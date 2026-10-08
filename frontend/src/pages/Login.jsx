@@ -64,7 +64,7 @@ export default function Login() {
                 type="email" value={email} onChange={(e) => setEmail(e.target.value)} required
                 data-testid="login-email-input"
                 className="mt-1 w-full px-4 py-3 rounded-xl border border-input bg-white focus:outline-none focus:ring-2 focus:ring-[#1B5E3B] text-sm"
-                placeholder="email@contoh.com"
+                placeholder="kasir@mulyatani.com"
               />
             </div>
             <div>
@@ -73,7 +73,7 @@ export default function Login() {
                 type="password" value={password} onChange={(e) => setPassword(e.target.value)} required
                 data-testid="login-password-input"
                 className="mt-1 w-full px-4 py-3 rounded-xl border border-input bg-white focus:outline-none focus:ring-2 focus:ring-[#1B5E3B] text-sm"
-                placeholder="••••••••"
+                placeholder="admin123"
               />
             </div>
             {error && <p className="text-sm text-destructive" data-testid="login-error">{error}</p>}

@@ -1,38 +1,43 @@
 import { useState } from "react";
 import { NavLink, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
-import { LayoutDashboard, ShoppingCart, Tag, Boxes, Calendar, BarChart3, TrendingUp, LogOut, Menu, X, Sprout, Users } from "lucide-react";
+import { useSettings } from "@/context/SettingsContext";
+import { LayoutDashboard, ShoppingCart, Tag, Boxes, Calendar, BarChart3, TrendingUp, LogOut, Menu, X, Sprout, Users, ReceiptText, Settings } from "lucide-react";
 
 const LINKS = [
   { label: "Dashboard", icon: LayoutDashboard, path: "/" },
   { label: "Kasir Penjualan", icon: ShoppingCart, path: "/pos" },
+  { label: "Riwayat Transaksi", icon: ReceiptText, path: "/riwayat" },
   { label: "Daftar Harga", icon: Tag, path: "/daftar-harga" },
   { label: "Stok Opname", icon: Boxes, path: "/stok-opname" },
   { label: "Laporan Harian", icon: Calendar, path: "/laporan/harian" },
   { label: "Laporan Bulanan", icon: BarChart3, path: "/laporan/bulanan" },
   { label: "Laporan Tahunan", icon: TrendingUp, path: "/laporan/tahunan" },
   { label: "Kelola Kasir", icon: Users, path: "/kelola-kasir", adminOnly: true },
+  { label: "Pengaturan", icon: Settings, path: "/pengaturan", adminOnly: true },
 ];
 
 export function Layout({ children }) {
   const { user, logout } = useAuth();
+  const { settings } = useSettings();
   const navigate = useNavigate();
   const location = useLocation();
   const [open, setOpen] = useState(false);
 
   const current = LINKS.find((l) => l.path === location.pathname)?.label || "Dashboard";
   const links = LINKS.filter((l) => !l.adminOnly || user?.role === "admin");
+  const logoSrc = settings?.has_logo ? `${process.env.REACT_APP_BACKEND_URL}/api/settings/logo?v=${encodeURIComponent(settings.logo_updated || "")}` : null;
 
   const handleLogout = () => { logout(); navigate("/login"); };
 
   const SidebarContent = () => (
     <>
       <div className="flex items-center gap-3 px-6 h-20 border-b border-[#1A3A2D]">
-        <div className="w-10 h-10 rounded-xl bg-[#2D8A56] flex items-center justify-center">
-          <Sprout className="w-6 h-6 text-white" />
+        <div className="w-10 h-10 rounded-xl bg-[#2D8A56] flex items-center justify-center overflow-hidden">
+          {logoSrc ? <img src={logoSrc} alt="Logo" className="w-full h-full object-cover" data-testid="sidebar-logo" /> : <Sprout className="w-6 h-6 text-white" />}
         </div>
         <div>
-          <h1 className="text-white font-heading font-bold text-base leading-tight">Toko Tani Makmur</h1>
+          <h1 className="text-white font-heading font-bold text-base leading-tight">Toko Pe-i Mulya Tani Caruban</h1>
           <p className="text-[11px] text-emerald-300/70">Sistem Laporan Penjualan</p>
         </div>
       </div>

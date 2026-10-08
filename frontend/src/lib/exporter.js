@@ -37,12 +37,33 @@ export function exportExcel({ filename, sheetName, columns, rows }) {
 
 const rp = (n) => "Rp " + Math.round(n || 0).toLocaleString("id-ID");
 
-export function printReceipt(tx) {
+function loadImageData(url) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => {
+      const canvas = document.createElement("canvas");
+      canvas.width = img.width; canvas.height = img.height;
+      canvas.getContext("2d").drawImage(img, 0, 0);
+      resolve(canvas.toDataURL("image/png"));
+    };
+    img.onerror = reject;
+    img.src = url;
+  });
+}
+
+export async function printReceipt(tx, logoUrl) {
   const lineH = 5;
   const itemsCount = tx.items.length;
-  const height = 70 + itemsCount * 8;
+  const height = 95 + itemsCount * 8;
   const doc = new jsPDF({ unit: "mm", format: [80, height] });
   let y = 8;
+  if (logoUrl) {
+    try {
+      const dataUrl = await loadImageData(logoUrl);
+      doc.addImage(dataUrl, "PNG", 30, y, 20, 20); y += 23;
+    } catch (e) { /* abaikan error muat logo */ }
+  }
   doc.setFont("courier", "bold");
   doc.setFontSize(12);
   doc.text("TOKO TANI MAKMUR", 40, y, { align: "center" }); y += 5;
