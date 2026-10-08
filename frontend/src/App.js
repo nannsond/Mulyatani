@@ -20,10 +20,11 @@ import LaporanBulanan from "@/pages/LaporanBulanan";
 import LaporanTahunan from "@/pages/LaporanTahunan";
 import { Loader2 } from "lucide-react";
 
-function Protected({ children }) {
+function Protected({ children, adminOnly }) {
   const { user, loading } = useAuth();
   if (loading) return <div className="min-h-screen flex items-center justify-center"><Loader2 className="w-8 h-8 animate-spin text-[#1B5E3B]" /></div>;
   if (!user) return <Navigate to="/login" replace />;
+  if (adminOnly && user.role !== "admin") return <Navigate to="/" replace />;
   return <Layout>{children}</Layout>;
 }
 
@@ -38,12 +39,12 @@ function AppRoutes() {
       <Route path="/laporan/harian" element={<Protected><LaporanHarian /></Protected>} />
       <Route path="/laporan/bulanan" element={<Protected><LaporanBulanan /></Protected>} />
       <Route path="/laporan/tahunan" element={<Protected><LaporanTahunan /></Protected>} />
-      <Route path="/kelola-kasir" element={<Protected><KelolaKasir /></Protected>} />
       <Route path="/riwayat" element={<Protected><RiwayatTransaksi /></Protected>} />
-      <Route path="/pengaturan" element={<Protected><Pengaturan /></Protected>} />
-      <Route path="/pembelian" element={<Protected><Pembelian /></Protected>} />
+      <Route path="/kelola-kasir" element={<Protected adminOnly><KelolaKasir /></Protected>} />
+      <Route path="/pengaturan" element={<Protected adminOnly><Pengaturan /></Protected>} />
+      <Route path="/pembelian" element={<Protected adminOnly><Pembelian /></Protected>} />
       <Route path="/hutang-piutang" element={<Protected><HutangPiutang /></Protected>} />
-      <Route path="/pengeluaran" element={<Protected><Pengeluaran /></Protected>} />
+      <Route path="/pengeluaran" element={<Protected adminOnly><Pengeluaran /></Protected>} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
