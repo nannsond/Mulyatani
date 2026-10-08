@@ -142,6 +142,7 @@ class Product(BaseModel):
     unit: str = "pcs"
     harga_beli: float = 0
     harga_jual: float = 0
+    harga_reseller: float = 0
     stok: int = 0
     stok_minimal: int = 5
 
@@ -152,6 +153,7 @@ class ProductInput(BaseModel):
     unit: str = "pcs"
     harga_beli: float = 0
     harga_jual: float = 0
+    harga_reseller: float = 0
     stok: int = 0
     stok_minimal: int = 5
 
@@ -305,6 +307,17 @@ async def product_profit(txs: List[dict], cost: dict, limit: int = 5):
     terendah = list(reversed(arr[-limit:])) if len(arr) > limit else list(reversed(arr))
     return {"tertinggi": arr[:limit], "terendah": terendah}
 
+async def category_profit(txs: List[dict], cost: dict):
+    prods = {str(p["_id"]): p for p in await db.products.find().to_list(1000)}
+    agg = {}
+    for t in txs:
+        for i in t["items"]:
+            cat = prods.get(i["product_id"], {}).get("category", "Lainnya")
+            e = agg.setdefault(cat, {"category": cat, "omzet": 0, "laba": 0})
+            e["omzet"] += i["subtotal"]
+            e["laba"] += i["qty"] * (i["harga"] - cost.get(i["product_id"], 0))
+    return sorted(agg.values(), key=lambda x: x["laba"], reverse=True)
+
 @api_router.get("/reports/daily")
 async def report_daily(date: str, user: dict = Depends(get_current_user)):
     txs = await db.transactions.find({"created_at": {"$regex": f"^{date}"}}).sort("created_at", 1).to_list(2000)
@@ -332,6 +345,7 @@ async def report_monthly(year: int, month: int, user: dict = Depends(get_current
             "target_omzet": target["target_omzet"] if target else 0,
             "daily": sorted(daily.values(), key=lambda x: x["date"]),
             "product_laba": await product_profit(txs, cost),
+            "category_laba": await category_profit(txs, cost),
             "top_products": await top_products(txs), "categories": await category_breakdown(txs)}
 
 @api_router.get("/reports/yearly")
@@ -349,6 +363,7 @@ async def report_yearly(year: int, user: dict = Depends(get_current_user)):
             "target_omzet": target["target_omzet"] if target else 0,
             "monthly": list(monthly.values()),
             "product_laba": await product_profit(txs, cost),
+            "category_laba": await category_profit(txs, cost),
             "top_products": await top_products(txs, 8), "categories": await category_breakdown(txs)}
 
 # ---------------- Users (admin) ----------------
@@ -407,11 +422,25 @@ async def set_target(data: TargetInput, admin: dict = Depends(require_admin)):
     return {"ok": True}
 
 # ---------------- Settings / Logo ----------------
+class StoreInfo(BaseModel):
+    store_name: str = ""
+    address: str = ""
+    phone: str = ""
+
 @api_router.get("/settings")
 async def get_settings(user: dict = Depends(get_current_user)):
-    s = await db.settings.find_one({"key": "store"})
-    return {"has_logo": bool(s and s.get("logo_path")),
-            "logo_updated": s.get("updated_at") if s else None}
+    s = await db.settings.find_one({"key": "store"}) or {}
+    return {"has_logo": bool(s.get("logo_path")),
+            "logo_updated": s.get("updated_at"),
+            "store_name": s.get("store_name", ""),
+            "address": s.get("address", ""),
+            "phone": s.get("phone", "")}
+
+@api_router.post("/settings/info")
+async def set_store_info(data: StoreInfo, admin: dict = Depends(require_admin)):
+    await db.settings.update_one({"key": "store"},
+        {"$set": {"store_name": data.store_name, "address": data.address, "phone": data.phone}}, upsert=True)
+    return {"ok": True}
 
 @api_router.post("/settings/logo")
 async def upload_logo(file: UploadFile = File(...), admin: dict = Depends(require_admin)):
@@ -526,6 +555,9 @@ async def seed():
                     "unit": unit, "harga_beli": beli, "harga_jual": jual,
                     "stok": stok, "stok_minimal": 10})
                 sku_n += 1
+
+    async for p in db.products.find({"harga_reseller": {"$exists": False}}):
+        await db.products.update_one({"_id": p["_id"]}, {"$set": {"harga_reseller": round(p["harga_jual"] * 0.9)}})
 
     if await db.transactions.count_documents({}) == 0:
         products = await db.products.find().to_list(1000)

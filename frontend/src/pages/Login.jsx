@@ -52,7 +52,7 @@ export default function Login() {
               <Sprout className="w-7 h-7 text-white" />
             </div>
             <div>
-              <h2 className="font-heading font-bold text-xl text-[#0F281E]">Toko Tani Makmur</h2>
+              <h2 className="font-heading font-bold text-xl text-[#0F281E]">Toko Pe-i Mulya Tani Caruban</h2>
               <p className="text-xs text-muted-foreground">Masuk ke akun Anda</p>
             </div>
           </div>

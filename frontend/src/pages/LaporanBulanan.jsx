@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { api, apiError } from "@/lib/api";
 import { rupiah, MONTHS } from "@/lib/format";
 import { exportPDF, exportExcel } from "@/lib/exporter";
-import { ProductLaba } from "@/components/ProductLaba";
+import { ProductLaba, CategoryLaba } from "@/components/ProductLaba";
 import { useAuth } from "@/context/AuthContext";
 import { FileDown, FileSpreadsheet, Loader2, Wallet, Receipt, Target } from "lucide-react";
 import { toast } from "sonner";
@@ -135,6 +135,8 @@ export default function LaporanBulanan() {
           </div>
 
           <ProductLaba data={data.product_laba} />
+
+          <CategoryLaba data={data.category_laba} />
 
           <div className="bg-card rounded-2xl border border-slate-200 p-6">
             <h3 className="font-heading font-semibold text-lg mb-4">Produk Terlaris</h3>

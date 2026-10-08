@@ -3,7 +3,7 @@ import { api, apiError } from "@/lib/api";
 import { rupiah, MONTHS } from "@/lib/format";
 import { exportPDF, exportExcel } from "@/lib/exporter";
 import { useAuth } from "@/context/AuthContext";
-import { ProductLaba } from "@/components/ProductLaba";
+import { ProductLaba, CategoryLaba } from "@/components/ProductLaba";
 import { FileDown, FileSpreadsheet, Loader2, Wallet, Receipt, TrendingUp, Target } from "lucide-react";
 import { toast } from "sonner";
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
@@ -137,6 +137,8 @@ export default function LaporanTahunan() {
           </div>
 
           <ProductLaba data={data.product_laba} />
+
+          <CategoryLaba data={data.category_laba} />
 
           <div className="grid lg:grid-cols-2 gap-6">
             <div className="bg-card rounded-2xl border border-slate-200 p-6">

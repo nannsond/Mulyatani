@@ -3,10 +3,10 @@ import { api, apiError } from "@/lib/api";
 import { rupiah } from "@/lib/format";
 import { exportPDF, exportExcel } from "@/lib/exporter";
 import { useAuth } from "@/context/AuthContext";
-import { Plus, Pencil, Trash2, FileDown, FileSpreadsheet, X, Search } from "lucide-react";
+import { Plus, Pencil, Trash2, FileDown, FileSpreadsheet, X, Search, User, Users } from "lucide-react";
 import { toast } from "sonner";
 
-const EMPTY = { sku: "", name: "", category: "Pupuk", unit: "pcs", harga_beli: 0, harga_jual: 0, stok: 0, stok_minimal: 10 };
+const EMPTY = { sku: "", name: "", category: "Pupuk", unit: "pcs", harga_beli: 0, harga_jual: 0, harga_reseller: 0, stok: 0, stok_minimal: 10 };
 const CATS = ["Pupuk", "Benih", "Pestisida", "Alat Tani", "Lainnya"];
 
 export default function DaftarHarga() {
@@ -14,6 +14,7 @@ export default function DaftarHarga() {
   const isAdmin = user?.role === "admin";
   const [products, setProducts] = useState([]);
   const [search, setSearch] = useState("");
+  const [tab, setTab] = useState("normal");
   const [modal, setModal] = useState(null);
 
   const load = () => api.get("/products").then((r) => setProducts(r.data));
@@ -26,7 +27,7 @@ export default function DaftarHarga() {
     e.preventDefault();
     const body = { ...modal };
     delete body.id;
-    ["harga_beli", "harga_jual", "stok", "stok_minimal"].forEach((k) => (body[k] = Number(body[k])));
+    ["harga_beli", "harga_jual", "harga_reseller", "stok", "stok_minimal"].forEach((k) => (body[k] = Number(body[k])));
     try {
       if (modal.id) await api.put(`/products/${modal.id}`, body);
       else await api.post("/products", body);
@@ -41,11 +42,25 @@ export default function DaftarHarga() {
     toast.success("Produk dihapus"); load();
   };
 
-  const cols = ["SKU", "Nama Produk", "Kategori", "Satuan", "Harga Beli", "Harga Jual", "Stok", "Min"];
-  const rows = filtered.map((p) => [p.sku, p.name, p.category, p.unit, p.harga_beli, p.harga_jual, p.stok, p.stok_minimal]);
+  const isReseller = tab === "reseller";
+  const priceLabel = isReseller ? "Harga Reseller" : "Harga Normal";
+  const cols = ["SKU", "Nama Produk", "Kategori", "Satuan", priceLabel, "Stok"];
+  const rows = filtered.map((p) => [p.sku, p.name, p.category, p.unit, isReseller ? (p.harga_reseller || 0) : p.harga_jual, p.stok]);
+  const exportTitle = `Daftar ${priceLabel}`;
 
   return (
     <div className="space-y-5">
+      <div className="flex rounded-xl border border-input overflow-hidden w-fit" data-testid="price-tab">
+        <button onClick={() => setTab("normal")} data-testid="price-tab-normal"
+          className={`flex items-center gap-2 px-5 py-2.5 text-sm font-semibold transition-colors ${!isReseller ? "bg-[#1B5E3B] text-white" : "bg-card hover:bg-secondary"}`}>
+          <User className="w-4 h-4" /> Harga Normal
+        </button>
+        <button onClick={() => setTab("reseller")} data-testid="price-tab-reseller"
+          className={`flex items-center gap-2 px-5 py-2.5 text-sm font-semibold transition-colors ${isReseller ? "bg-[#C85A32] text-white" : "bg-card hover:bg-secondary"}`}>
+          <Users className="w-4 h-4" /> Harga Reseller
+        </button>
+      </div>
+
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="relative flex-1 min-w-[200px] max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -53,9 +68,9 @@ export default function DaftarHarga() {
             placeholder="Cari produk..." className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-input bg-card text-sm focus:outline-none focus:ring-2 focus:ring-[#1B5E3B]" />
         </div>
         <div className="flex gap-2">
-          <button onClick={() => exportPDF({ title: "Daftar Harga Produk", columns: cols, rows })} data-testid="export-pdf-button"
+          <button onClick={() => exportPDF({ title: exportTitle, columns: cols, rows })} data-testid="export-pdf-button"
             className="flex items-center gap-2 px-3 py-2.5 rounded-xl border border-input text-sm hover:bg-secondary"><FileDown className="w-4 h-4" /> PDF</button>
-          <button onClick={() => exportExcel({ filename: "Daftar_Harga", sheetName: "Produk", columns: cols, rows })} data-testid="export-excel-button"
+          <button onClick={() => exportExcel({ filename: exportTitle.replace(/\s+/g, "_"), sheetName: "Produk", columns: cols, rows })} data-testid="export-excel-button"
             className="flex items-center gap-2 px-3 py-2.5 rounded-xl border border-input text-sm hover:bg-secondary"><FileSpreadsheet className="w-4 h-4" /> Excel</button>
           {isAdmin && (
             <button onClick={() => setModal({ ...EMPTY })} data-testid="product-add-modal-trigger"
@@ -72,7 +87,8 @@ export default function DaftarHarga() {
               <th className="px-4 py-3 font-semibold">Nama Produk</th>
               <th className="px-4 py-3 font-semibold">Kategori</th>
               <th className="px-4 py-3 font-semibold text-right">Harga Beli</th>
-              <th className="px-4 py-3 font-semibold text-right">Harga Jual</th>
+              <th className={`px-4 py-3 font-semibold text-right ${!isReseller ? "text-[#1B5E3B]" : ""}`}>Harga Normal</th>
+              <th className={`px-4 py-3 font-semibold text-right ${isReseller ? "text-[#C85A32]" : ""}`}>Harga Reseller</th>
               <th className="px-4 py-3 font-semibold text-right">Stok</th>
               {isAdmin && <th className="px-4 py-3 font-semibold text-center">Aksi</th>}
             </tr>
@@ -84,7 +100,8 @@ export default function DaftarHarga() {
                 <td className="px-4 py-3 font-medium">{p.name}</td>
                 <td className="px-4 py-3"><span className="text-xs px-2 py-1 rounded-lg bg-secondary">{p.category}</span></td>
                 <td className="px-4 py-3 text-right font-mono">{rupiah(p.harga_beli)}</td>
-                <td className="px-4 py-3 text-right font-mono font-semibold text-[#1B5E3B]">{rupiah(p.harga_jual)}</td>
+                <td className={`px-4 py-3 text-right font-mono ${!isReseller ? "font-semibold text-[#1B5E3B]" : "text-muted-foreground"}`}>{rupiah(p.harga_jual)}</td>
+                <td className={`px-4 py-3 text-right font-mono ${isReseller ? "font-semibold text-[#C85A32]" : "text-muted-foreground"}`}>{rupiah(p.harga_reseller || 0)}</td>
                 <td className="px-4 py-3 text-right font-mono"><span className={p.stok <= p.stok_minimal ? "text-destructive font-semibold" : ""}>{p.stok} {p.unit}</span></td>
                 {isAdmin && (
                   <td className="px-4 py-3">
@@ -120,7 +137,8 @@ export default function DaftarHarga() {
               <div className="col-span-2"><Field label="Nama Produk" testid="product-name-input" value={modal.name} onChange={(v) => setModal({ ...modal, name: v })} /></div>
               <Field label="Satuan" testid="product-unit-input" value={modal.unit} onChange={(v) => setModal({ ...modal, unit: v })} />
               <Field label="Harga Beli" type="number" testid="product-harga-beli-input" value={modal.harga_beli} onChange={(v) => setModal({ ...modal, harga_beli: v })} />
-              <Field label="Harga Jual" type="number" testid="product-harga-jual-input" value={modal.harga_jual} onChange={(v) => setModal({ ...modal, harga_jual: v })} />
+              <Field label="Harga Normal" type="number" testid="product-harga-jual-input" value={modal.harga_jual} onChange={(v) => setModal({ ...modal, harga_jual: v })} />
+              <Field label="Harga Reseller" type="number" testid="product-harga-reseller-input" value={modal.harga_reseller} onChange={(v) => setModal({ ...modal, harga_reseller: v })} />
               <Field label="Stok" type="number" testid="product-stok-input" value={modal.stok} onChange={(v) => setModal({ ...modal, stok: v })} />
               <Field label="Stok Minimal" type="number" testid="product-stok-min-input" value={modal.stok_minimal} onChange={(v) => setModal({ ...modal, stok_minimal: v })} />
             </div>

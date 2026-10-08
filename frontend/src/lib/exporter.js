@@ -52,10 +52,10 @@ function loadImageData(url) {
   });
 }
 
-export async function printReceipt(tx, logoUrl) {
+export async function printReceipt(tx, logoUrl, info = {}) {
   const lineH = 5;
   const itemsCount = tx.items.length;
-  const height = 95 + itemsCount * 8;
+  const height = 115 + itemsCount * 8;
   const doc = new jsPDF({ unit: "mm", format: [80, height] });
   let y = 8;
   if (logoUrl) {
@@ -66,10 +66,15 @@ export async function printReceipt(tx, logoUrl) {
   }
   doc.setFont("courier", "bold");
   doc.setFontSize(12);
-  doc.text("TOKO TANI MAKMUR", 40, y, { align: "center" }); y += 5;
+  doc.text((info.store_name || "TOKO TANI MAKMUR").toUpperCase(), 40, y, { align: "center" }); y += 5;
   doc.setFont("courier", "normal");
   doc.setFontSize(7);
-  doc.text("Sistem Laporan Penjualan Pertanian", 40, y, { align: "center" }); y += 5;
+  if (info.address) {
+    const lines = doc.splitTextToSize(info.address, 68);
+    doc.text(lines, 40, y, { align: "center" }); y += 3.5 * lines.length;
+  }
+  if (info.phone) { doc.text(`Telp: ${info.phone}`, 40, y, { align: "center" }); y += 4; }
+  y += 1;
   doc.setFontSize(8);
   doc.text(`No: ${tx.invoice_no}`, 5, y); y += lineH - 1;
   const d = new Date(tx.created_at);

@@ -33,3 +33,34 @@ export function ProductLaba({ data }) {
     </div>
   );
 }
+
+export function CategoryLaba({ data }) {
+  if (!data || data.length === 0) return null;
+  return (
+    <div className="bg-card rounded-2xl border border-slate-200 p-6" data-testid="category-laba">
+      <h3 className="font-heading font-semibold text-lg mb-4">Laba Kotor per Kategori</h3>
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-slate-200 bg-secondary/50 text-left">
+              <th className="px-4 py-2.5 font-semibold">Kategori</th>
+              <th className="px-4 py-2.5 font-semibold text-right">Omzet</th>
+              <th className="px-4 py-2.5 font-semibold text-right">Laba Kotor</th>
+              <th className="px-4 py-2.5 font-semibold text-right">Margin</th>
+            </tr>
+          </thead>
+          <tbody>
+            {data.map((c, i) => (
+              <tr key={i} className="border-b border-slate-100" data-testid={`category-laba-row-${c.category}`}>
+                <td className="px-4 py-2.5 font-medium">{c.category}</td>
+                <td className="px-4 py-2.5 text-right font-mono">{rupiah(c.omzet)}</td>
+                <td className="px-4 py-2.5 text-right font-mono font-semibold text-[#1B5E3B]">{rupiah(c.laba)}</td>
+                <td className="px-4 py-2.5 text-right font-mono text-muted-foreground">{c.omzet ? ((c.laba / c.omzet) * 100).toFixed(1) : 0}%</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}

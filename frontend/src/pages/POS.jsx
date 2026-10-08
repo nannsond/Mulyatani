@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { api, apiError } from "@/lib/api";
 import { rupiah } from "@/lib/format";
-import { Search, Plus, Minus, Trash2, ShoppingCart, Loader2, CheckCircle2, Printer } from "lucide-react";
+import { Search, Plus, Minus, Trash2, ShoppingCart, Loader2, CheckCircle2, Printer, Users, User } from "lucide-react";
 import { toast } from "sonner";
 import { printReceipt } from "@/lib/exporter";
 import { useSettings } from "@/context/SettingsContext";
@@ -9,15 +9,28 @@ import { useSettings } from "@/context/SettingsContext";
 export default function POS() {
   const { settings } = useSettings();
   const logoUrl = settings?.has_logo ? `${process.env.REACT_APP_BACKEND_URL}/api/settings/logo?v=${encodeURIComponent(settings.logo_updated || "")}` : undefined;
+  const storeInfo = { store_name: settings?.store_name, address: settings?.address, phone: settings?.phone };
   const [products, setProducts] = useState([]);
   const [search, setSearch] = useState("");
   const [cart, setCart] = useState([]);
   const [payment, setPayment] = useState("Tunai");
+  const [priceMode, setPriceMode] = useState("normal");
   const [saving, setSaving] = useState(false);
   const [lastInvoice, setLastInvoice] = useState(null);
 
+  const priceOf = (p) => (priceMode === "reseller" ? (p.harga_reseller || p.harga_jual) : p.harga_jual);
+
   const load = () => api.get("/products").then((r) => setProducts(r.data));
   useEffect(() => { load(); }, []);
+
+  // Sync cart prices when switching price mode
+  useEffect(() => {
+    setCart((c) => c.map((i) => {
+      const p = products.find((pr) => pr.id === i.product_id);
+      return p ? { ...i, harga: priceOf(p) } : i;
+    }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [priceMode]);
 
   const filtered = products.filter((p) =>
     p.name.toLowerCase().includes(search.toLowerCase()) || p.sku.toLowerCase().includes(search.toLowerCase())
@@ -31,7 +44,7 @@ export default function POS() {
         if (ex.qty >= p.stok) { toast.error("Melebihi stok"); return c; }
         return c.map((i) => i.product_id === p.id ? { ...i, qty: i.qty + 1 } : i);
       }
-      return [...c, { product_id: p.id, name: p.name, harga: p.harga_jual, qty: 1, stok: p.stok }];
+      return [...c, { product_id: p.id, name: p.name, harga: priceOf(p), qty: 1, stok: p.stok }];
     });
   };
 
@@ -52,7 +65,7 @@ export default function POS() {
       });
       setLastInvoice(data);
       toast.success(`Transaksi ${data.invoice_no} berhasil!`);
-      printReceipt(data, logoUrl);
+      printReceipt(data, logoUrl, storeInfo);
       setCart([]);
       load();
     } catch (err) {
@@ -65,14 +78,26 @@ export default function POS() {
   return (
     <div className="grid lg:grid-cols-3 gap-6">
       <div className="lg:col-span-2 space-y-4">
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <input
-            value={search} onChange={(e) => setSearch(e.target.value)}
-            data-testid="pos-search-product-input"
-            placeholder="Cari produk / SKU..."
-            className="w-full pl-10 pr-4 py-3 rounded-xl border border-input bg-card focus:outline-none focus:ring-2 focus:ring-[#1B5E3B] text-sm"
-          />
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="relative flex-1 min-w-[200px]">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <input
+              value={search} onChange={(e) => setSearch(e.target.value)}
+              data-testid="pos-search-product-input"
+              placeholder="Cari produk / SKU..."
+              className="w-full pl-10 pr-4 py-3 rounded-xl border border-input bg-card focus:outline-none focus:ring-2 focus:ring-[#1B5E3B] text-sm"
+            />
+          </div>
+          <div className="flex rounded-xl border border-input overflow-hidden" data-testid="pos-price-mode">
+            <button onClick={() => setPriceMode("normal")} data-testid="pos-price-normal"
+              className={`flex items-center gap-1.5 px-3 py-2.5 text-xs font-semibold transition-colors ${priceMode === "normal" ? "bg-[#1B5E3B] text-white" : "bg-card hover:bg-secondary"}`}>
+              <User className="w-3.5 h-3.5" /> Normal
+            </button>
+            <button onClick={() => setPriceMode("reseller")} data-testid="pos-price-reseller"
+              className={`flex items-center gap-1.5 px-3 py-2.5 text-xs font-semibold transition-colors ${priceMode === "reseller" ? "bg-[#C85A32] text-white" : "bg-card hover:bg-secondary"}`}>
+              <Users className="w-3.5 h-3.5" /> Reseller
+            </button>
+          </div>
         </div>
         <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-3">
           {filtered.map((p) => (
@@ -84,7 +109,7 @@ export default function POS() {
               <span className="text-[10px] uppercase tracking-wider font-semibold text-[#C85A32]">{p.category}</span>
               <p className="font-medium text-sm text-[#0F281E] mt-1 line-clamp-2 min-h-[2.5rem]">{p.name}</p>
               <div className="flex items-center justify-between mt-2">
-                <span className="font-mono font-bold text-[#1B5E3B]">{rupiah(p.harga_jual)}</span>
+                <span className={`font-mono font-bold ${priceMode === "reseller" ? "text-[#C85A32]" : "text-[#1B5E3B]"}`}>{rupiah(priceOf(p))}</span>
                 <span className={`text-xs ${p.stok <= p.stok_minimal ? "text-destructive" : "text-muted-foreground"}`}>Stok: {p.stok}</span>
               </div>
             </button>
@@ -93,9 +118,14 @@ export default function POS() {
       </div>
 
       <div className="bg-card rounded-2xl border border-slate-200 p-5 h-fit lg:sticky lg:top-24">
-        <h3 className="font-heading font-semibold text-lg text-[#0F281E] mb-4 flex items-center gap-2">
-          <ShoppingCart className="w-5 h-5" /> Keranjang
-        </h3>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="font-heading font-semibold text-lg text-[#0F281E] flex items-center gap-2">
+            <ShoppingCart className="w-5 h-5" /> Keranjang
+          </h3>
+          <span className={`text-[10px] uppercase tracking-wider font-bold px-2 py-1 rounded-lg ${priceMode === "reseller" ? "bg-orange-100 text-[#C85A32]" : "bg-green-100 text-[#1B5E3B]"}`}>
+            Harga {priceMode === "reseller" ? "Reseller" : "Normal"}
+          </span>
+        </div>
         {cart.length === 0 ? (
           <p className="text-sm text-muted-foreground py-8 text-center">Belum ada item.</p>
         ) : (
@@ -144,7 +174,7 @@ export default function POS() {
           <div className="mt-4 p-3 rounded-xl bg-green-50 border border-green-200 text-sm" data-testid="pos-last-invoice">
             <p className="font-semibold text-green-800">Transaksi terakhir: {lastInvoice.invoice_no}</p>
             <p className="font-mono text-green-700">{rupiah(lastInvoice.total)} • {lastInvoice.payment_method}</p>
-            <button onClick={() => printReceipt(lastInvoice, logoUrl)} data-testid="pos-print-receipt-button"
+            <button onClick={() => printReceipt(lastInvoice, logoUrl, storeInfo)} data-testid="pos-print-receipt-button"
               className="mt-2 w-full flex items-center justify-center gap-2 border border-green-300 text-green-800 py-2 rounded-lg text-sm font-semibold hover:bg-green-100">
               <Printer className="w-4 h-4" /> Cetak Struk PDF
             </button>
