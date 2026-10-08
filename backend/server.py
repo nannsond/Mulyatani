@@ -154,6 +154,26 @@ async def fetch_online_selesai(prefix: str):
     docs = await db.ecommerce_sales.find({"status": "Selesai", "created_at": {"$regex": rx}}).to_list(20000)
     return [normalize_online(s) for s in docs], sum(s.get("total_fee", 0) for s in docs)
 
+def laba_by_user(sales: List[dict], users: List[dict]) -> dict:
+    """Attribute 'Selesai' sales to each user by user_id (legacy sales fall back to user_name)."""
+    uid_name = {str(u["_id"]): u["name"] for u in users}
+    name_uid = {}
+    for u in users:
+        name_uid.setdefault(u["name"], str(u["_id"]))
+    out = {}
+    for sl in sales:
+        uid = sl.get("user_id")
+        if not uid or uid not in uid_name:
+            uid = name_uid.get(sl.get("user_name", ""))
+        if not uid:
+            continue
+        e = out.setdefault(uid, {"user_id": uid, "user_name": uid_name.get(uid, sl.get("user_name", "-")),
+                                 "transaksi": 0, "omzet": 0, "laba_kotor": 0})
+        e["transaksi"] += 1
+        e["omzet"] += sl.get("omzet", 0)
+        e["laba_kotor"] += sl.get("laba_kotor", 0)
+    return out
+
 # ---------------- Models ----------------
 class LoginInput(BaseModel):
     email: EmailStr
@@ -750,7 +770,7 @@ async def create_ecom_sale(data: EcomSaleInput, user: dict = Depends(get_current
            "total_fee": total_fee, "laba_bersih": laba_bersih,
            "customer_name": data.customer_name, "order_no": data.order_no,
            "status": "Diproses",
-           "user_name": user["name"], "created_at": created}
+           "user_id": user["id"], "user_name": user["name"], "created_at": created}
     res = await db.ecommerce_sales.insert_one(doc)
     doc["id"] = str(res.inserted_id); doc.pop("_id", None)
     return doc
@@ -838,7 +858,7 @@ async def bulk_ecom_sales(data: EcomBulkInput, admin: dict = Depends(require_adm
                "admin_fee": max(0.0, r.admin_fee), "ongkir": max(0.0, r.ongkir), "biaya_lain": max(0.0, r.biaya_lain),
                "total_fee": total_fee, "laba_bersih": laba_kotor - total_fee,
                "customer_name": "", "order_no": "", "status": "Diproses",
-               "user_name": admin["name"], "created_at": created_at}
+               "user_id": admin["id"], "user_name": admin["name"], "created_at": created_at}
         await db.ecommerce_sales.insert_one(doc)
         await db.products.update_one({"_id": ObjectId(pid)}, {"$inc": {"stok": -r.qty}})
         created += 1
@@ -1016,15 +1036,12 @@ async def commission_report(month: str, admin: dict = Depends(require_admin)):
     s = await db.settings.find_one({"key": "commission"})
     rate = (s or {}).get("rate", 0)
     sales = await db.ecommerce_sales.find({"status": "Selesai", "created_at": {"$regex": f"^{re.escape(month)}"}}).to_list(20000)
-    agg = {}
-    for sl in sales:
-        name = sl.get("user_name", "-")
-        e = agg.setdefault(name, {"user_name": name, "transaksi": 0, "omzet": 0, "laba_kotor": 0})
-        e["transaksi"] += 1
-        e["omzet"] += sl.get("omzet", 0)
-        e["laba_kotor"] += sl.get("laba_kotor", 0)
+    users = await db.users.find().sort("created_at", 1).to_list(500)
+    agg = laba_by_user(sales, users)
     rows = []
     for e in agg.values():
+        if e["transaksi"] == 0:
+            continue
         e["komisi"] = e["laba_kotor"] * rate / 100
         rows.append(e)
     rows.sort(key=lambda x: x["komisi"], reverse=True)
@@ -1141,10 +1158,7 @@ async def payroll_report(month: str, admin: dict = Depends(require_admin)):
     comm = (await db.settings.find_one({"key": "commission"}) or {}).get("rate", 0)
     pot_rate = (await db.settings.find_one({"key": "payroll"}) or {}).get("potongan_telat", 0)
     sales = await db.ecommerce_sales.find({"status": "Selesai", "created_at": {"$regex": f"^{re.escape(month)}"}}).to_list(20000)
-    laba_by_name = {}
-    for sl in sales:
-        n = sl.get("user_name", "-")
-        laba_by_name[n] = laba_by_name.get(n, 0) + sl.get("laba_kotor", 0)
+    komisi_agg = laba_by_user(sales, users)
     att = await db.attendance.find({"date": {"$regex": f"^{re.escape(month)}"}}).to_list(5000)
     telat_by_uid = {}; hadir_by_uid = {}
     for a in att:
@@ -1157,7 +1171,7 @@ async def payroll_report(month: str, admin: dict = Depends(require_admin)):
     for u in users:
         uid = str(u["_id"]); name = u["name"]
         telat = telat_by_uid.get(uid, 0); hadir = hadir_by_uid.get(uid, 0)
-        komisi_calc = laba_by_name.get(name, 0) * comm / 100
+        komisi_calc = komisi_agg.get(uid, {}).get("laba_kotor", 0) * comm / 100
         potongan_calc = telat * pot_rate
         base = bases.get(uid, 0)
         ov = overrides.get(uid)

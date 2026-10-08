@@ -48,6 +48,10 @@ Aplikasi laporan penjualan sederhana untuk bisnis toko pertanian: laporan harian
 - Refund: admin pilih kembalikan stok atau tidak (idempotent)
 - Channel kustom (tambah/aktif/nonaktif/hapus) di Pengaturan; target omzet bulanan per channel + progress di Laporan Online; impor Excel massal + unduh template. Tested iter 8: 100%
 
+## Implemented (2026-10-08) — Rekap Gaji (Payroll)
+- Rekap Gaji (/rekap-gaji, admin): Gaji Pokok + Komisi Online − Potongan Telat = Total, semua bisa diedit owner; gaji pokok disimpan & dipakai ulang tiap bulan; potongan telat global (nominal × jumlah telat); tabel semua karyawan + cetak slip gaji PDF per karyawan. Tested iter 10: 100%
+- Robustness: penjualan online kini menyimpan user_id; komisi & gaji diatribusikan per user_id (fallback nama utk data lama) agar karyawan bernama sama tidak tertukar.
+
 ## Backlog (P1/P2)
 - P1: Cetak struk/nota transaksi POS
 - P1: Manajemen user (tambah kasir dari UI)
