@@ -1157,6 +1157,47 @@ async def attendance_mark(data: AttendanceMark, user: dict = Depends(get_current
     await db.attendance.update_one({"user_id": target_uid, "date": data.date}, {"$set": doc}, upsert=True)
     return {"ok": True, "status": data.status}
 
+class AttendanceEdit(BaseModel):
+    status: str
+    check_in: Optional[str] = None
+    check_out: Optional[str] = None
+
+def _wib_dt(date: str, hhmm: str):
+    return datetime.fromisoformat(f"{date}T{hhmm}:00+07:00")
+
+@api_router.put("/attendance/{aid}")
+async def attendance_edit(aid: str, data: AttendanceEdit, admin: dict = Depends(require_admin)):
+    if data.status not in ["Hadir", "Izin", "Sakit", "Alpha"]:
+        raise HTTPException(status_code=400, detail="Status tidak valid")
+    doc = await db.attendance.find_one({"_id": ObjectId(aid)})
+    if not doc:
+        raise HTTPException(status_code=404, detail="Catatan tidak ditemukan")
+    upd = {"status": data.status, "check_in": None, "check_out": None, "work_minutes": 0, "late": False}
+    if data.status == "Hadir":
+        if not data.check_in:
+            raise HTTPException(status_code=400, detail="Jam masuk wajib diisi untuk status Hadir")
+        ci = _wib_dt(doc["date"], data.check_in)
+        start = await get_attendance_start()
+        sh, sm = [int(x) for x in start.split(":")]
+        upd["check_in"] = ci.isoformat()
+        upd["late"] = (ci.hour, ci.minute) > (sh, sm)
+        if data.check_out:
+            co = _wib_dt(doc["date"], data.check_out)
+            if co < ci:
+                raise HTTPException(status_code=400, detail="Jam pulang harus setelah jam masuk")
+            upd["check_out"] = co.isoformat()
+            upd["work_minutes"] = max(0, int((co - ci).total_seconds() // 60))
+    await db.attendance.update_one({"_id": ObjectId(aid)}, {"$set": upd})
+    return {"ok": True}
+
+@api_router.delete("/attendance/{aid}")
+async def attendance_delete(aid: str, admin: dict = Depends(require_admin)):
+    res = await db.attendance.delete_one({"_id": ObjectId(aid)})
+    if res.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Catatan tidak ditemukan")
+    return {"ok": True}
+
+
 @api_router.get("/attendance")
 async def list_attendance(month: str, user: dict = Depends(get_current_user)):
     q = {"date": {"$regex": f"^{re.escape(month)}"}}

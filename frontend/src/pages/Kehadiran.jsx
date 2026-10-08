@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { api, apiError } from "@/lib/api";
 import { fmtDate, fmtJam, fmtDurasi, todayWIB } from "@/lib/format";
-import { Clock, LogIn, LogOut, Loader2, Save, CheckCircle2, AlarmClock, UserCheck } from "lucide-react";
+import { Clock, LogIn, LogOut, Loader2, Save, CheckCircle2, AlarmClock, UserCheck, Pencil, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/context/AuthContext";
 
@@ -23,6 +23,9 @@ export default function Kehadiran() {
   const [savingStart, setSavingStart] = useState(false);
   const [employees, setEmployees] = useState([]);
   const [mark, setMark] = useState({ user_id: "", date: todayWIB(), status: "Izin" });
+  const [editRec, setEditRec] = useState(null);
+
+  const timeOf = (iso) => (iso ? iso.slice(11, 16) : "");
 
   const loadToday = () => { setLoadingToday(true); api.get("/attendance/today").then((r) => setToday(r.data.record)).finally(() => setLoadingToday(false)); };
   const loadList = () => { setData(null); api.get(`/attendance?month=${month}`).then((r) => setData(r.data)); };
@@ -47,6 +50,17 @@ export default function Kehadiran() {
   };
   const submitMark = async () => {
     try { await api.post("/attendance/mark", mark); toast.success("Kehadiran karyawan ditandai"); loadList(); loadToday(); }
+    catch (err) { toast.error(apiError(err.response?.data?.detail)); }
+  };
+  const openEdit = (d) => setEditRec({ id: d.id, user_name: d.user_name, date: d.date, status: d.status || "Hadir", check_in: timeOf(d.check_in), check_out: timeOf(d.check_out) });
+  const saveEdit = async () => {
+    const body = { status: editRec.status, check_in: editRec.status === "Hadir" ? editRec.check_in : null, check_out: editRec.status === "Hadir" ? (editRec.check_out || null) : null };
+    try { await api.put(`/attendance/${editRec.id}`, body); toast.success("Kehadiran diperbarui"); setEditRec(null); loadList(); loadToday(); }
+    catch (err) { toast.error(apiError(err.response?.data?.detail)); }
+  };
+  const delRec = async (d) => {
+    if (!window.confirm(`Hapus catatan kehadiran ${d.user_name} (${fmtDate(d.date)})?`)) return;
+    try { await api.delete(`/attendance/${d.id}`); toast.success("Catatan dihapus"); loadList(); loadToday(); }
     catch (err) { toast.error(apiError(err.response?.data?.detail)); }
   };
 
@@ -177,9 +191,10 @@ export default function Kehadiran() {
                     <th className="px-3 py-2.5 font-semibold">Tanggal</th>{isAdmin && <th className="px-3 py-2.5 font-semibold">Karyawan</th>}
                     <th className="px-3 py-2.5 font-semibold">Masuk</th><th className="px-3 py-2.5 font-semibold">Pulang</th>
                     <th className="px-3 py-2.5 font-semibold text-right">Durasi</th><th className="px-3 py-2.5 font-semibold text-center">Status</th>
+                    {isAdmin && <th className="px-3 py-2.5 font-semibold text-center">Aksi</th>}
                   </tr></thead>
                   <tbody>
-                    {data.records.length === 0 && <tr><td colSpan={isAdmin ? 6 : 5} className="px-3 py-6 text-center text-muted-foreground">Belum ada catatan.</td></tr>}
+                    {data.records.length === 0 && <tr><td colSpan={isAdmin ? 7 : 5} className="px-3 py-6 text-center text-muted-foreground">Belum ada catatan.</td></tr>}
                     {data.records.map((d) => (
                       <tr key={d.id} className="border-b border-slate-100" data-testid={`attendance-row-${d.id}`}>
                         <td className="px-3 py-2.5 text-xs">{fmtDate(d.date)}</td>
@@ -188,6 +203,14 @@ export default function Kehadiran() {
                         <td className="px-3 py-2.5 font-mono">{fmtJam(d.check_out)}</td>
                         <td className="px-3 py-2.5 text-right font-mono">{d.check_out ? fmtDurasi(d.work_minutes) : "-"}</td>
                         <td className="px-3 py-2.5 text-center">{statusBadge(d)}</td>
+                        {isAdmin && (
+                          <td className="px-3 py-2.5">
+                            <div className="flex items-center justify-center gap-1">
+                              <button onClick={() => openEdit(d)} data-testid={`attendance-edit-${d.id}`} className="w-8 h-8 rounded-lg hover:bg-secondary flex items-center justify-center"><Pencil className="w-4 h-4" /></button>
+                              <button onClick={() => delRec(d)} data-testid={`attendance-delete-${d.id}`} className="w-8 h-8 rounded-lg text-destructive hover:bg-red-50 flex items-center justify-center"><Trash2 className="w-4 h-4" /></button>
+                            </div>
+                          </td>
+                        )}
                       </tr>
                     ))}
                   </tbody>
@@ -197,6 +220,40 @@ export default function Kehadiran() {
           )}
         </div>
       </div>
+
+      {editRec && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/50" onClick={() => setEditRec(null)} />
+          <div className="relative bg-white rounded-2xl w-full max-w-md p-6" data-testid="attendance-edit-modal">
+            <div className="flex items-center justify-between mb-1">
+              <h3 className="font-heading font-bold text-lg">Edit Kehadiran</h3>
+              <button onClick={() => setEditRec(null)}><X className="w-5 h-5" /></button>
+            </div>
+            <p className="text-sm text-muted-foreground mb-4">{editRec.user_name} &middot; {fmtDate(editRec.date)}</p>
+            <div className="space-y-3">
+              <div>
+                <label className="text-sm font-medium">Status</label>
+                <select value={editRec.status} onChange={(e) => setEditRec({ ...editRec, status: e.target.value })} data-testid="edit-status-select" className="mt-1 w-full px-3 py-2.5 rounded-xl border border-input text-sm bg-white">
+                  {["Hadir", "Izin", "Sakit", "Alpha"].map((s) => <option key={s} value={s}>{s}</option>)}
+                </select>
+              </div>
+              {editRec.status === "Hadir" && (
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-sm font-medium">Jam Masuk</label>
+                    <input type="time" value={editRec.check_in} onChange={(e) => setEditRec({ ...editRec, check_in: e.target.value })} data-testid="edit-checkin-input" className="mt-1 w-full px-3 py-2.5 rounded-xl border border-input text-sm" />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium">Jam Pulang</label>
+                    <input type="time" value={editRec.check_out} onChange={(e) => setEditRec({ ...editRec, check_out: e.target.value })} data-testid="edit-checkout-input" className="mt-1 w-full px-3 py-2.5 rounded-xl border border-input text-sm" />
+                  </div>
+                </div>
+              )}
+              <button onClick={saveEdit} data-testid="edit-save-button" className="w-full bg-[#1B5E3B] text-white py-2.5 rounded-xl font-semibold hover:bg-[#143D2B]">Simpan Perubahan</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

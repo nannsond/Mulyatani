@@ -73,6 +73,11 @@ Aplikasi laporan penjualan sederhana untuk bisnis toko pertanian: laporan harian
 - Penjualan online "Selesai" tetap diakui penuh (tidak ada konsep piutang).
 - Berlaku di: Dashboard, Laporan Harian/Bulanan/Tahunan, dan Laba Rugi. Diterapkan via helper `tx_fraction()` di server.py pada summarize/compute_profit/top_products/category_breakdown/product_profit/category_profit + loop harian/bulanan + dashboard series. Diverifikasi via curl: bayar separuh → omzet +½ & laba +½; lunasi → omzet & laba naik ke penuh.
 
+## Implemented (2026-10-08) — Edit Kehadiran oleh Admin
+- Admin bisa mengedit catatan kehadiran karyawan di tabel Detail Harian: ubah Status (Hadir/Izin/Sakit/Alpha) dan Jam Masuk/Pulang (khusus Hadir), serta hapus catatan.
+- Backend: PUT /attendance/{id} & DELETE /attendance/{id} (admin-only). Edit menghitung ulang work_minutes & late (bandingkan jam masuk vs jam standar WIB); status non-Hadir otomatis mengosongkan jam & durasi.
+- Diverifikasi via curl (edit 08:30→17:00 = 510 menit & late, ganti ke Izin mengosongkan jam, delete) + screenshot modal edit.
+
 ## Backlog (P1/P2)
 - P1: Cetak struk/nota transaksi POS
 - P1: Manajemen user (tambah kasir dari UI)
