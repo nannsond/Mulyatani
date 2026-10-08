@@ -1112,6 +1112,79 @@ async def list_attendance(month: str, user: dict = Depends(get_current_user)):
         e["total_menit"] += d.get("work_minutes", 0)
     return {"month": month, "records": docs, "recap": sorted(recap.values(), key=lambda x: -x["hadir"])}
 
+# ---------------- Rekap Gaji (payroll) ----------------
+class PayrollSetting(BaseModel):
+    potongan_telat: float
+
+class PayrollSave(BaseModel):
+    user_id: str
+    month: str
+    gaji_pokok: float
+    komisi: float
+    potongan: float
+    note: str = ""
+
+@api_router.get("/payroll/settings")
+async def get_payroll_settings(user: dict = Depends(get_current_user)):
+    s = await db.settings.find_one({"key": "payroll"})
+    return {"potongan_telat": (s or {}).get("potongan_telat", 0)}
+
+@api_router.post("/payroll/settings")
+async def set_payroll_settings(data: PayrollSetting, admin: dict = Depends(require_admin)):
+    val = max(0.0, data.potongan_telat)
+    await db.settings.update_one({"key": "payroll"}, {"$set": {"potongan_telat": val}}, upsert=True)
+    return {"ok": True, "potongan_telat": val}
+
+@api_router.get("/payroll/report")
+async def payroll_report(month: str, admin: dict = Depends(require_admin)):
+    users = await db.users.find().sort("created_at", 1).to_list(500)
+    comm = (await db.settings.find_one({"key": "commission"}) or {}).get("rate", 0)
+    pot_rate = (await db.settings.find_one({"key": "payroll"}) or {}).get("potongan_telat", 0)
+    sales = await db.ecommerce_sales.find({"status": "Selesai", "created_at": {"$regex": f"^{re.escape(month)}"}}).to_list(20000)
+    laba_by_name = {}
+    for sl in sales:
+        n = sl.get("user_name", "-")
+        laba_by_name[n] = laba_by_name.get(n, 0) + sl.get("laba_kotor", 0)
+    att = await db.attendance.find({"date": {"$regex": f"^{re.escape(month)}"}}).to_list(5000)
+    telat_by_uid = {}; hadir_by_uid = {}
+    for a in att:
+        hadir_by_uid[a["user_id"]] = hadir_by_uid.get(a["user_id"], 0) + 1
+        if a.get("late"):
+            telat_by_uid[a["user_id"]] = telat_by_uid.get(a["user_id"], 0) + 1
+    bases = {b["user_id"]: b.get("gaji_pokok", 0) for b in await db.employee_salary.find().to_list(500)}
+    overrides = {o["user_id"]: o for o in await db.payroll.find({"month": month}).to_list(500)}
+    rows = []
+    for u in users:
+        uid = str(u["_id"]); name = u["name"]
+        telat = telat_by_uid.get(uid, 0); hadir = hadir_by_uid.get(uid, 0)
+        komisi_calc = laba_by_name.get(name, 0) * comm / 100
+        potongan_calc = telat * pot_rate
+        base = bases.get(uid, 0)
+        ov = overrides.get(uid)
+        if ov:
+            gaji_pokok = ov.get("gaji_pokok", base); komisi = ov.get("komisi", komisi_calc); potongan = ov.get("potongan", potongan_calc)
+            edited = True
+        else:
+            gaji_pokok = base; komisi = komisi_calc; potongan = potongan_calc; edited = False
+        rows.append({"user_id": uid, "user_name": name, "role": u["role"], "hadir": hadir, "telat": telat,
+                     "gaji_pokok": gaji_pokok, "komisi": komisi, "potongan": potongan,
+                     "total": gaji_pokok + komisi - potongan, "komisi_calc": komisi_calc,
+                     "potongan_calc": potongan_calc, "edited": edited, "note": (ov or {}).get("note", "")})
+    return {"month": month, "commission_rate": comm, "potongan_telat": pot_rate, "rows": rows}
+
+@api_router.post("/payroll/save")
+async def payroll_save(data: PayrollSave, admin: dict = Depends(require_admin)):
+    total = data.gaji_pokok + data.komisi - data.potongan
+    await db.payroll.update_one({"user_id": data.user_id, "month": data.month},
+        {"$set": {"gaji_pokok": data.gaji_pokok, "komisi": data.komisi, "potongan": data.potongan, "note": data.note, "total": total}}, upsert=True)
+    await db.employee_salary.update_one({"user_id": data.user_id}, {"$set": {"gaji_pokok": data.gaji_pokok}}, upsert=True)
+    return {"ok": True, "total": total}
+
+@api_router.delete("/payroll/override")
+async def payroll_reset(user_id: str, month: str, admin: dict = Depends(require_admin)):
+    await db.payroll.delete_one({"user_id": user_id, "month": month})
+    return {"ok": True}
+
 app.include_router(api_router)
 
 app.add_middleware(

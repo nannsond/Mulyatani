@@ -127,6 +127,44 @@ export async function printPriceList({ products, mode, logoUrl, info }) {
   doc.save(`Daftar_Harga_${mode}.pdf`);
 }
 
+export async function printPayslip({ row, monthLabel, info, logoUrl }) {
+  const doc = new jsPDF();
+  if (logoUrl) { try { const d = await loadImageData(logoUrl); doc.addImage(d, "PNG", 14, 10, 18, 18); } catch (e) { /* skip */ } }
+  const x = logoUrl ? 36 : 14;
+  doc.setFontSize(15); doc.setTextColor(27, 94, 59);
+  doc.text(info?.store_name || "Toko Tani Makmur", x, 18);
+  let hy = 24; doc.setFontSize(9); doc.setTextColor(90, 90, 90);
+  if (info?.address) { doc.text(info.address, x, hy); hy += 5; }
+  if (info?.phone) { doc.text("Telp: " + info.phone, x, hy); hy += 5; }
+  doc.setFontSize(13); doc.setTextColor(20, 20, 20);
+  doc.text("SLIP GAJI KARYAWAN", 14, hy + 6);
+  doc.setFontSize(10); doc.setTextColor(40, 40, 40);
+  doc.text(`Nama: ${row.user_name}`, 14, hy + 14);
+  doc.text(`Periode: ${monthLabel}`, 14, hy + 20);
+  doc.text(`Hari Hadir: ${row.hadir}    Telat: ${row.telat}`, 14, hy + 26);
+  autoTable(doc, {
+    startY: hy + 32,
+    head: [["Komponen", "Jumlah"]],
+    body: [
+      ["Gaji Pokok", rp(row.gaji_pokok)],
+      ["Komisi Online", rp(row.komisi)],
+      ["Potongan Telat", "-" + rp(row.potongan)],
+    ],
+    foot: [["TOTAL GAJI", rp(row.total)]],
+    headStyles: { fillColor: [27, 94, 59] },
+    footStyles: { fillColor: [232, 240, 236], textColor: [15, 40, 30], fontStyle: "bold" },
+    columnStyles: { 1: { halign: "right" } },
+    styles: { fontSize: 10 },
+  });
+  const fy = doc.lastAutoTable.finalY + 24;
+  doc.setFontSize(9); doc.setTextColor(90, 90, 90);
+  doc.text("Diterima oleh,", 20, fy);
+  doc.text("Hormat kami,", 150, fy);
+  doc.text(`( ${row.user_name} )`, 16, fy + 24);
+  doc.text(`( ${info?.store_name || "Pemilik Toko"} )`, 140, fy + 24);
+  doc.save(`Slip_Gaji_${row.user_name.replace(/\s+/g, "_")}_${monthLabel.replace(/\s+/g, "_")}.pdf`);
+}
+
 
 export function exportEcomTemplate() {
   const cols = ["Tanggal (YYYY-MM-DD)", "Channel", "SKU", "Qty", "Harga", "Biaya Admin", "Ongkir", "Biaya Lain"];
