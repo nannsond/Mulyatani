@@ -1,0 +1,143 @@
+import { useEffect, useState } from "react";
+import { api, apiError } from "@/lib/api";
+import { rupiah } from "@/lib/format";
+import { exportPDF, exportExcel } from "@/lib/exporter";
+import { useAuth } from "@/context/AuthContext";
+import { Plus, Pencil, Trash2, FileDown, FileSpreadsheet, X, Search } from "lucide-react";
+import { toast } from "sonner";
+
+const EMPTY = { sku: "", name: "", category: "Pupuk", unit: "pcs", harga_beli: 0, harga_jual: 0, stok: 0, stok_minimal: 10 };
+const CATS = ["Pupuk", "Benih", "Pestisida", "Alat Tani", "Lainnya"];
+
+export default function DaftarHarga() {
+  const { user } = useAuth();
+  const isAdmin = user?.role === "admin";
+  const [products, setProducts] = useState([]);
+  const [search, setSearch] = useState("");
+  const [modal, setModal] = useState(null);
+
+  const load = () => api.get("/products").then((r) => setProducts(r.data));
+  useEffect(() => { load(); }, []);
+
+  const filtered = products.filter((p) =>
+    p.name.toLowerCase().includes(search.toLowerCase()) || p.category.toLowerCase().includes(search.toLowerCase()));
+
+  const save = async (e) => {
+    e.preventDefault();
+    const body = { ...modal };
+    delete body.id;
+    ["harga_beli", "harga_jual", "stok", "stok_minimal"].forEach((k) => (body[k] = Number(body[k])));
+    try {
+      if (modal.id) await api.put(`/products/${modal.id}`, body);
+      else await api.post("/products", body);
+      toast.success("Produk disimpan");
+      setModal(null); load();
+    } catch (err) { toast.error(apiError(err.response?.data?.detail)); }
+  };
+
+  const del = async (id) => {
+    if (!window.confirm("Hapus produk ini?")) return;
+    await api.delete(`/products/${id}`);
+    toast.success("Produk dihapus"); load();
+  };
+
+  const cols = ["SKU", "Nama Produk", "Kategori", "Satuan", "Harga Beli", "Harga Jual", "Stok", "Min"];
+  const rows = filtered.map((p) => [p.sku, p.name, p.category, p.unit, p.harga_beli, p.harga_jual, p.stok, p.stok_minimal]);
+
+  return (
+    <div className="space-y-5">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="relative flex-1 min-w-[200px] max-w-sm">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          <input value={search} onChange={(e) => setSearch(e.target.value)} data-testid="product-search-input"
+            placeholder="Cari produk..." className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-input bg-card text-sm focus:outline-none focus:ring-2 focus:ring-[#1B5E3B]" />
+        </div>
+        <div className="flex gap-2">
+          <button onClick={() => exportPDF({ title: "Daftar Harga Produk", columns: cols, rows })} data-testid="export-pdf-button"
+            className="flex items-center gap-2 px-3 py-2.5 rounded-xl border border-input text-sm hover:bg-secondary"><FileDown className="w-4 h-4" /> PDF</button>
+          <button onClick={() => exportExcel({ filename: "Daftar_Harga", sheetName: "Produk", columns: cols, rows })} data-testid="export-excel-button"
+            className="flex items-center gap-2 px-3 py-2.5 rounded-xl border border-input text-sm hover:bg-secondary"><FileSpreadsheet className="w-4 h-4" /> Excel</button>
+          {isAdmin && (
+            <button onClick={() => setModal({ ...EMPTY })} data-testid="product-add-modal-trigger"
+              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#1B5E3B] text-white text-sm font-semibold hover:bg-[#143D2B]"><Plus className="w-4 h-4" /> Tambah</button>
+          )}
+        </div>
+      </div>
+
+      <div className="bg-card rounded-2xl border border-slate-200 overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-slate-200 bg-secondary/50 text-left">
+              <th className="px-4 py-3 font-semibold">SKU</th>
+              <th className="px-4 py-3 font-semibold">Nama Produk</th>
+              <th className="px-4 py-3 font-semibold">Kategori</th>
+              <th className="px-4 py-3 font-semibold text-right">Harga Beli</th>
+              <th className="px-4 py-3 font-semibold text-right">Harga Jual</th>
+              <th className="px-4 py-3 font-semibold text-right">Stok</th>
+              {isAdmin && <th className="px-4 py-3 font-semibold text-center">Aksi</th>}
+            </tr>
+          </thead>
+          <tbody>
+            {filtered.map((p) => (
+              <tr key={p.id} className="border-b border-slate-100 hover:bg-secondary/30" data-testid={`product-row-${p.id}`}>
+                <td className="px-4 py-3 font-mono text-xs text-muted-foreground">{p.sku}</td>
+                <td className="px-4 py-3 font-medium">{p.name}</td>
+                <td className="px-4 py-3"><span className="text-xs px-2 py-1 rounded-lg bg-secondary">{p.category}</span></td>
+                <td className="px-4 py-3 text-right font-mono">{rupiah(p.harga_beli)}</td>
+                <td className="px-4 py-3 text-right font-mono font-semibold text-[#1B5E3B]">{rupiah(p.harga_jual)}</td>
+                <td className="px-4 py-3 text-right font-mono"><span className={p.stok <= p.stok_minimal ? "text-destructive font-semibold" : ""}>{p.stok} {p.unit}</span></td>
+                {isAdmin && (
+                  <td className="px-4 py-3">
+                    <div className="flex items-center justify-center gap-1">
+                      <button onClick={() => setModal(p)} data-testid={`product-edit-${p.id}`} className="w-8 h-8 rounded-lg hover:bg-secondary flex items-center justify-center"><Pencil className="w-4 h-4" /></button>
+                      <button onClick={() => del(p.id)} data-testid={`product-delete-${p.id}`} className="w-8 h-8 rounded-lg text-destructive hover:bg-red-50 flex items-center justify-center"><Trash2 className="w-4 h-4" /></button>
+                    </div>
+                  </td>
+                )}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {modal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/50" onClick={() => setModal(null)} />
+          <form onSubmit={save} className="relative bg-white rounded-2xl w-full max-w-lg p-6 max-h-[90vh] overflow-y-auto" data-testid="product-modal">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-heading font-bold text-lg">{modal.id ? "Edit Produk" : "Tambah Produk"}</h3>
+              <button type="button" onClick={() => setModal(null)}><X className="w-5 h-5" /></button>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="SKU" testid="product-sku-input" value={modal.sku} onChange={(v) => setModal({ ...modal, sku: v })} />
+              <div>
+                <label className="text-sm font-medium">Kategori</label>
+                <select value={modal.category} onChange={(e) => setModal({ ...modal, category: e.target.value })} data-testid="product-category-select"
+                  className="mt-1 w-full px-3 py-2.5 rounded-xl border border-input text-sm bg-white">
+                  {CATS.map((c) => <option key={c}>{c}</option>)}
+                </select>
+              </div>
+              <div className="col-span-2"><Field label="Nama Produk" testid="product-name-input" value={modal.name} onChange={(v) => setModal({ ...modal, name: v })} /></div>
+              <Field label="Satuan" testid="product-unit-input" value={modal.unit} onChange={(v) => setModal({ ...modal, unit: v })} />
+              <Field label="Harga Beli" type="number" testid="product-harga-beli-input" value={modal.harga_beli} onChange={(v) => setModal({ ...modal, harga_beli: v })} />
+              <Field label="Harga Jual" type="number" testid="product-harga-jual-input" value={modal.harga_jual} onChange={(v) => setModal({ ...modal, harga_jual: v })} />
+              <Field label="Stok" type="number" testid="product-stok-input" value={modal.stok} onChange={(v) => setModal({ ...modal, stok: v })} />
+              <Field label="Stok Minimal" type="number" testid="product-stok-min-input" value={modal.stok_minimal} onChange={(v) => setModal({ ...modal, stok_minimal: v })} />
+            </div>
+            <button type="submit" data-testid="product-save-button" className="mt-5 w-full bg-[#1B5E3B] text-white py-3 rounded-xl font-semibold hover:bg-[#143D2B]">Simpan</button>
+          </form>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function Field({ label, value, onChange, type = "text", testid }) {
+  return (
+    <div>
+      <label className="text-sm font-medium">{label}</label>
+      <input type={type} value={value} onChange={(e) => onChange(e.target.value)} required data-testid={testid}
+        className="mt-1 w-full px-3 py-2.5 rounded-xl border border-input text-sm focus:outline-none focus:ring-2 focus:ring-[#1B5E3B]" />
+    </div>
+  );
+}
