@@ -139,7 +139,7 @@ def compute_profit(txs: List[dict], cost: dict) -> float:
     for t in txs:
         f = tx_fraction(t)
         for i in t["items"]:
-            laba += f * i["qty"] * (i["harga"] - cost.get(i["product_id"], 0))
+            laba += f * i["qty"] * (i["harga"] - cost.get(i["product_id"], i.get("hpp", 0)))
     return laba
 
 # ---------------- Online channels & merge helpers ----------------
@@ -229,6 +229,7 @@ class CartItem(BaseModel):
     name: str
     qty: int
     harga: float
+    is_bundle: bool = False
 
 class TransactionInput(BaseModel):
     items: List[CartItem]
@@ -303,6 +304,118 @@ async def delete_product(pid: str, admin: dict = Depends(require_admin)):
     await db.products.delete_one({"_id": ObjectId(pid)})
     return {"ok": True}
 
+# ---------------- Bundle (Paket) routes ----------------
+class BundleComponent(BaseModel):
+    product_id: str
+    name: str = ""
+    qty: int = 1
+
+class BundleInput(BaseModel):
+    name: str
+    category: str = "Paket"
+    harga_jual: float = 0
+    components: List[BundleComponent] = []
+
+class BundleReduce(BaseModel):
+    qty: int = 1
+
+async def _bundle_view(b: dict, pmap: dict) -> dict:
+    comps = []
+    stok = None
+    hpp = 0.0
+    for c in b.get("components", []):
+        p = pmap.get(c["product_id"])
+        q = max(1, c.get("qty", 1))
+        pstok = p.get("stok", 0) if p else 0
+        hpp += q * (p.get("harga_beli", 0) if p else 0)
+        avail = pstok // q
+        stok = avail if stok is None else min(stok, avail)
+        comps.append({"product_id": c["product_id"], "name": (p or {}).get("name", c.get("name", "")),
+                      "qty": q, "stok": pstok, "unit": (p or {}).get("unit", ""),
+                      "habis": pstok <= 0, "missing": p is None})
+    return {"id": str(b["_id"]), "name": b["name"], "category": b.get("category", "Paket"),
+            "harga_jual": b.get("harga_jual", 0), "components": comps,
+            "stok": max(0, stok or 0), "hpp": hpp, "is_bundle": True}
+
+@api_router.get("/bundles")
+async def list_bundles(user: dict = Depends(get_current_user)):
+    pmap = {str(p["_id"]): p for p in await db.products.find().to_list(5000)}
+    bundles = await db.bundles.find().sort("name", 1).to_list(1000)
+    return [await _bundle_view(b, pmap) for b in bundles]
+
+@api_router.post("/bundles")
+async def create_bundle(data: BundleInput, admin: dict = Depends(require_admin)):
+    if not data.components:
+        raise HTTPException(status_code=400, detail="Komponen paket tidak boleh kosong")
+    doc = {"name": data.name, "category": data.category or "Paket", "harga_jual": data.harga_jual,
+           "components": [c.model_dump() for c in data.components], "created_at": now_iso()}
+    res = await db.bundles.insert_one(doc)
+    return {"ok": True, "id": str(res.inserted_id)}
+
+@api_router.put("/bundles/{bid}")
+async def update_bundle(bid: str, data: BundleInput, admin: dict = Depends(require_admin)):
+    if not data.components:
+        raise HTTPException(status_code=400, detail="Komponen paket tidak boleh kosong")
+    r = await db.bundles.update_one({"_id": ObjectId(bid)}, {"$set": {
+        "name": data.name, "category": data.category or "Paket", "harga_jual": data.harga_jual,
+        "components": [c.model_dump() for c in data.components]}})
+    if r.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Paket tidak ditemukan")
+    return {"ok": True}
+
+@api_router.delete("/bundles/{bid}")
+async def delete_bundle(bid: str, admin: dict = Depends(require_admin)):
+    await db.bundles.delete_one({"_id": ObjectId(bid)})
+    return {"ok": True}
+
+@api_router.post("/bundles/{bid}/reduce")
+async def reduce_bundle(bid: str, data: BundleReduce, admin: dict = Depends(require_admin)):
+    b = await db.bundles.find_one({"_id": ObjectId(bid)})
+    if not b:
+        raise HTTPException(status_code=404, detail="Paket tidak ditemukan")
+    if data.qty <= 0:
+        raise HTTPException(status_code=400, detail="Qty tidak valid")
+    pmap = {str(p["_id"]): p for p in await db.products.find().to_list(5000)}
+    view = await _bundle_view(b, pmap)
+    if data.qty > view["stok"]:
+        raise HTTPException(status_code=400, detail=f"Stok paket hanya tersedia {view['stok']}")
+    for c in b["components"]:
+        await db.products.update_one({"_id": ObjectId(c["product_id"])}, {"$inc": {"stok": -c["qty"] * data.qty}})
+    return {"ok": True}
+
+async def _apply_sale_items(data_items):
+    items = []
+    subtotal = 0.0
+    for it in data_items:
+        line = it.qty * it.harga
+        subtotal += line
+        item = {"product_id": it.product_id, "name": it.name, "qty": it.qty, "harga": it.harga, "subtotal": line}
+        if getattr(it, "is_bundle", False):
+            b = await db.bundles.find_one({"_id": ObjectId(it.product_id)})
+            if not b:
+                raise HTTPException(status_code=400, detail=f"Paket {it.name} tidak ditemukan")
+            hpp_unit = 0.0
+            for c in b["components"]:
+                p = await db.products.find_one({"_id": ObjectId(c["product_id"])})
+                hpp_unit += c["qty"] * (p.get("harga_beli", 0) if p else 0)
+                await db.products.update_one({"_id": ObjectId(c["product_id"])}, {"$inc": {"stok": -c["qty"] * it.qty}})
+            item["is_bundle"] = True
+            item["hpp"] = hpp_unit
+            item["components"] = b["components"]
+        else:
+            await db.products.update_one({"_id": ObjectId(it.product_id)}, {"$inc": {"stok": -it.qty}})
+        items.append(item)
+    return items, subtotal
+
+async def _restore_sale_items(old_items):
+    for i in old_items:
+        if i.get("is_bundle"):
+            for c in i.get("components", []):
+                await db.products.update_one({"_id": ObjectId(c["product_id"])}, {"$inc": {"stok": c["qty"] * i["qty"]}})
+        else:
+            await db.products.update_one({"_id": ObjectId(i["product_id"])}, {"$inc": {"stok": i["qty"]}})
+
+
 # ---------------- Transaction routes ----------------
 async def gen_invoice() -> str:
     count = await db.transactions.count_documents({})
@@ -312,14 +425,7 @@ async def gen_invoice() -> str:
 async def create_transaction(data: TransactionInput, user: dict = Depends(get_current_user)):
     if not data.items:
         raise HTTPException(status_code=400, detail="Keranjang kosong")
-    items = []
-    subtotal = 0.0
-    for it in data.items:
-        line = it.qty * it.harga
-        subtotal += line
-        items.append({"product_id": it.product_id, "name": it.name, "qty": it.qty,
-                      "harga": it.harga, "subtotal": line})
-        await db.products.update_one({"_id": ObjectId(it.product_id)}, {"$inc": {"stok": -it.qty}})
+    items, subtotal = await _apply_sale_items(data.items)
     discount = max(0.0, min(data.discount, subtotal))
     total = subtotal - discount
     amount_paid = total if data.amount_paid is None else max(0.0, min(data.amount_paid, total))
@@ -354,16 +460,8 @@ async def update_transaction(tid: str, data: TransactionInput, admin: dict = Dep
         raise HTTPException(status_code=404, detail="Transaksi tidak ditemukan")
     if not data.items:
         raise HTTPException(status_code=400, detail="Item tidak boleh kosong")
-    for i in old.get("items", []):
-        await db.products.update_one({"_id": ObjectId(i["product_id"])}, {"$inc": {"stok": i["qty"]}})
-    items = []
-    subtotal = 0.0
-    for it in data.items:
-        line = it.qty * it.harga
-        subtotal += line
-        items.append({"product_id": it.product_id, "name": it.name, "qty": it.qty,
-                      "harga": it.harga, "subtotal": line})
-        await db.products.update_one({"_id": ObjectId(it.product_id)}, {"$inc": {"stok": -it.qty}})
+    await _restore_sale_items(old.get("items", []))
+    items, subtotal = await _apply_sale_items(data.items)
     discount = max(0.0, min(data.discount, subtotal))
     total = subtotal - discount
     amount_paid = total if data.amount_paid is None else max(0.0, min(data.amount_paid, total))
@@ -381,8 +479,7 @@ async def delete_transaction(tid: str, admin: dict = Depends(require_admin)):
     t = await db.transactions.find_one({"_id": ObjectId(tid)})
     if not t:
         raise HTTPException(status_code=404, detail="Transaksi tidak ditemukan")
-    for i in t.get("items", []):
-        await db.products.update_one({"_id": ObjectId(i["product_id"])}, {"$inc": {"stok": i["qty"]}})
+    await _restore_sale_items(t.get("items", []))
     await db.transactions.delete_one({"_id": ObjectId(tid)})
     return {"ok": True}
 
@@ -427,7 +524,7 @@ async def product_profit(txs: List[dict], cost: dict, limit: int = 5):
     for t in txs:
         f = tx_fraction(t)
         for i in t["items"]:
-            hb = cost.get(i["product_id"], 0)
+            hb = cost.get(i["product_id"], i.get("hpp", 0))
             e = agg.setdefault(i["name"], {"name": i["name"], "qty": 0, "omzet": 0, "laba": 0})
             e["qty"] += i["qty"]; e["omzet"] += i["subtotal"] * f
             e["laba"] += f * i["qty"] * (i["harga"] - hb)
@@ -444,7 +541,7 @@ async def category_profit(txs: List[dict], cost: dict):
             cat = prods.get(i["product_id"], {}).get("category", "Lainnya")
             e = agg.setdefault(cat, {"category": cat, "omzet": 0, "laba": 0})
             e["omzet"] += i["subtotal"] * f
-            e["laba"] += f * i["qty"] * (i["harga"] - cost.get(i["product_id"], 0))
+            e["laba"] += f * i["qty"] * (i["harga"] - cost.get(i["product_id"], i.get("hpp", 0)))
     return sorted(agg.values(), key=lambda x: x["laba"], reverse=True)
 
 @api_router.get("/reports/daily")

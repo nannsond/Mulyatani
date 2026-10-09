@@ -3,7 +3,8 @@ import { api, apiError } from "@/lib/api";
 import { rupiah } from "@/lib/format";
 import { useAuth } from "@/context/AuthContext";
 import { useSettings } from "@/context/SettingsContext";
-import { Plus, Pencil, Trash2, FileDown, FileSpreadsheet, X, Search, User, Users, Printer, AlertTriangle, ShoppingBag } from "lucide-react";
+import { Plus, Pencil, Trash2, FileDown, FileSpreadsheet, X, Search, User, Users, Printer, AlertTriangle, ShoppingBag, Package, Boxes } from "lucide-react";
+import BundlingPanel from "@/components/BundlingPanel";
 import { exportPDF, exportExcel, printPriceList } from "@/lib/exporter";
 import { toast } from "sonner";
 
@@ -22,6 +23,7 @@ export default function DaftarHarga() {
   const [sortBy, setSortBy] = useState("name");
   const [lowOnly, setLowOnly] = useState(false);
   const [modal, setModal] = useState(null);
+  const [view, setView] = useState("satuan");
 
   const load = () => api.get("/products").then((r) => setProducts(r.data));
   useEffect(() => { load(); }, []);
@@ -73,6 +75,19 @@ export default function DaftarHarga() {
 
   return (
     <div className="space-y-5">
+      <div className="flex rounded-xl border border-input overflow-hidden w-fit" data-testid="stock-view-switch">
+        <button onClick={() => setView("satuan")} data-testid="view-satuan"
+          className={`flex items-center gap-2 px-5 py-2.5 text-sm font-semibold transition-colors ${view === "satuan" ? "bg-[#0F281E] text-white" : "bg-card hover:bg-secondary"}`}>
+          <Package className="w-4 h-4" /> Produk Satuan
+        </button>
+        <button onClick={() => setView("bundling")} data-testid="view-bundling"
+          className={`flex items-center gap-2 px-5 py-2.5 text-sm font-semibold transition-colors ${view === "bundling" ? "bg-[#0F281E] text-white" : "bg-card hover:bg-secondary"}`}>
+          <Boxes className="w-4 h-4" /> Paket Bundling
+        </button>
+      </div>
+
+      {view === "bundling" ? <BundlingPanel isAdmin={isAdmin} onChanged={load} /> : (
+      <>
       <div className="flex rounded-xl border border-input overflow-hidden w-fit" data-testid="price-tab">
         <button onClick={() => setTab("normal")} data-testid="price-tab-normal"
           className={`flex items-center gap-2 px-5 py-2.5 text-sm font-semibold transition-colors ${tab === "normal" ? "bg-[#1B5E3B] text-white" : "bg-card hover:bg-secondary"}`}>
@@ -173,6 +188,8 @@ export default function DaftarHarga() {
           </tbody>
         </table>
       </div>
+      </>
+      )}
 
       {modal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">

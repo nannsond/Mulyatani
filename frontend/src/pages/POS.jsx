@@ -11,6 +11,7 @@ export default function POS() {
   const logoUrl = settings?.has_logo ? `${process.env.REACT_APP_BACKEND_URL}/api/settings/logo?v=${encodeURIComponent(settings.logo_updated || "")}` : undefined;
   const storeInfo = { store_name: settings?.store_name, address: settings?.address, phone: settings?.phone };
   const [products, setProducts] = useState([]);
+  const [bundles, setBundles] = useState([]);
   const [search, setSearch] = useState("");
   const [cart, setCart] = useState([]);
   const [payment, setPayment] = useState("Tunai");
@@ -24,9 +25,9 @@ export default function POS() {
   const [isHutang, setIsHutang] = useState(false);
   const [amountPaid, setAmountPaid] = useState("");
 
-  const priceOf = (p) => (priceMode === "reseller" ? (p.harga_reseller || p.harga_jual) : p.harga_jual);
+  const priceOf = (p) => (p.is_bundle ? p.harga_jual : priceMode === "reseller" ? (p.harga_reseller || p.harga_jual) : p.harga_jual);
 
-  const load = () => api.get("/products").then((r) => setProducts(r.data));
+  const load = () => Promise.all([api.get("/products"), api.get("/bundles")]).then(([p, b]) => { setProducts(p.data); setBundles(b.data); });
   useEffect(() => { load(); }, []);
 
   // Sync cart prices when switching price mode
@@ -38,8 +39,12 @@ export default function POS() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [priceMode]);
 
-  const filtered = products.filter((p) =>
-    p.name.toLowerCase().includes(search.toLowerCase()) || p.sku.toLowerCase().includes(search.toLowerCase())
+  const sellable = [
+    ...products,
+    ...bundles.map((b) => ({ id: b.id, name: b.name, category: "Paket", harga_jual: b.harga_jual, stok: b.stok, stok_minimal: 0, is_bundle: true })),
+  ];
+  const filtered = sellable.filter((p) =>
+    p.name.toLowerCase().includes(search.toLowerCase()) || (p.sku || "").toLowerCase().includes(search.toLowerCase())
   );
 
   const addToCart = (p) => {
@@ -50,7 +55,7 @@ export default function POS() {
         if (ex.qty >= p.stok) { toast.error("Melebihi stok"); return c; }
         return c.map((i) => i.product_id === p.id ? { ...i, qty: i.qty + 1 } : i);
       }
-      return [...c, { product_id: p.id, name: p.name, harga: priceOf(p), qty: 1, stok: p.stok }];
+      return [...c, { product_id: p.id, name: p.name, harga: priceOf(p), qty: 1, stok: p.stok, is_bundle: !!p.is_bundle }];
     });
   };
 
@@ -69,7 +74,7 @@ export default function POS() {
     setSaving(true);
     try {
       const { data } = await api.post("/transactions", {
-        items: cart.map((i) => ({ product_id: i.product_id, name: i.name, qty: i.qty, harga: i.harga })),
+        items: cart.map((i) => ({ product_id: i.product_id, name: i.name, qty: i.qty, harga: i.harga, is_bundle: !!i.is_bundle })),
         payment_method: payment,
         discount,
         discount_reason: discReason,
@@ -119,7 +124,7 @@ export default function POS() {
               data-testid={`pos-product-${p.id}`}
               className="text-left bg-card rounded-xl border border-slate-200 p-4 hover:border-[#1B5E3B] hover:shadow-md transition-all disabled:opacity-50"
             >
-              <span className="text-[10px] uppercase tracking-wider font-semibold text-[#C85A32]">{p.category}</span>
+              <span className={`text-[10px] uppercase tracking-wider font-semibold ${p.is_bundle ? "text-[#2563EB]" : "text-[#C85A32]"}`}>{p.is_bundle ? "★ Paket Bundling" : p.category}</span>
               <p className="font-medium text-sm text-[#0F281E] mt-1 line-clamp-2 min-h-[2.5rem]">{p.name}</p>
               <div className="flex items-center justify-between mt-2">
                 <span className={`font-mono font-bold ${priceMode === "reseller" ? "text-[#C85A32]" : "text-[#1B5E3B]"}`}>{rupiah(priceOf(p))}</span>

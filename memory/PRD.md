@@ -99,6 +99,14 @@ Aplikasi laporan penjualan sederhana untuk bisnis toko pertanian: laporan harian
 - **Kas Periode**: kartu Kas di Laba Rugi punya toggle "Total vs Periode Ini"; mode periode mengikuti Bulanan/Tahunan + bulan/tahun aktif, tanpa saldo awal (arus kas basis kas periode). Backend: GET /reports/cash?period=YYYY[-MM] + flag is_period.
 - **Fix global modal**: keyframe `fade-up` di index.css diubah jadi opacity-only (hapus translateY). Sebelumnya `<main>` menyimpan transform identity (animation-fill both) yang membuat `position:fixed` modal mengacu ke <main> (halaman panjang → modal muncul jauh di bawah). Kini semua modal (Riwayat, Pembelian, Daftar Harga, Kehadiran) center di viewport.
 
+## Implemented (2026-10-09) — Paket Bundling (Inventaris)
+- Halaman Daftar Harga punya switch atas: **Produk Satuan** vs **Paket Bundling** (komponen BundlingPanel).
+- Paket bundling tidak punya stok fisik sendiri; stok dihitung real-time = Min(floor(stok komponen / qty di paket)). Kartu paket menampilkan komposisi, stok terhitung (badge), dan indikator merah "Ada komponen habis" bila salah satu penyusun habis.
+- Admin: CRUD paket (nama, harga jual manual, komponen produk+qty) + tombol **Kurangi Stok** (memotong stok tiap komponen sesuai qty).
+- **POS**: paket tampil sebagai kartu "★ Paket Bundling" dan bisa dijual; saat terjual, stok tiap produk satuan penyusun otomatis terpotong (qty komponen × qty paket). Penjualan produk satuan otomatis memengaruhi ketersediaan paket.
+- Backend: koleksi `bundles`; GET/POST/PUT/DELETE /bundles, POST /bundles/{id}/reduce; helper `_apply_sale_items`/`_restore_sale_items` menangani bundle di create/update/delete transaksi; CartItem punya `is_bundle`; item bundle menyimpan `hpp` (biaya = Σ harga_beli komponen) agar laba/HPP tetap akurat (compute_profit/product_profit/category_profit pakai fallback `i.hpp`).
+- Diverifikasi curl (calc stok 12, hpp 35.000, jual 1 paket → komponen −2/−1, delete restore, reduce) + screenshot (panel bundling, modal, kartu POS).
+
 ## Backlog (P1/P2)
 - P1: Cetak struk/nota transaksi POS
 - P1: Manajemen user (tambah kasir dari UI)
