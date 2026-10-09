@@ -9,7 +9,7 @@ from fastapi import FastAPI, APIRouter, HTTPException, Request, Depends, Respons
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 from pydantic import BaseModel, Field, EmailStr, BeforeValidator, ConfigDict
-from typing import List, Optional, Annotated, Any
+from typing import List, Optional, Annotated, Any, Dict
 from bson import ObjectId
 from datetime import datetime, timezone, timedelta
 import logging
@@ -209,6 +209,7 @@ class Product(BaseModel):
     harga_jual: float = 0
     harga_reseller: float = 0
     harga_online: float = 0
+    harga_channel: Dict[str, float] = {}
     stok: int = 0
     stok_minimal: int = 5
 
@@ -221,6 +222,7 @@ class ProductInput(BaseModel):
     harga_jual: float = 0
     harga_reseller: float = 0
     harga_online: float = 0
+    harga_channel: Dict[str, float] = {}
     stok: int = 0
     stok_minimal: int = 5
 
@@ -449,13 +451,13 @@ async def create_transaction(data: TransactionInput, user: dict = Depends(get_cu
     return doc
 
 @api_router.get("/transactions")
-async def list_transactions(date: Optional[str] = None, q: Optional[str] = None, limit: int = 50, user: dict = Depends(get_current_user)):
+async def list_transactions(date: Optional[str] = None, q: Optional[str] = None, limit: int = 50, sort: str = "desc", user: dict = Depends(get_current_user)):
     query = {}
     if date:
         query["created_at"] = {"$regex": f"^{re.escape(date)}"}
     if q:
         query["invoice_no"] = {"$regex": re.escape(q), "$options": "i"}
-    docs = await db.transactions.find(query).sort("created_at", -1).to_list(min(limit, 500))
+    docs = await db.transactions.find(query).sort("created_at", 1 if sort == "asc" else -1).to_list(min(limit, 2000))
     for d in docs:
         d["id"] = str(d["_id"])
         d.pop("_id", None)

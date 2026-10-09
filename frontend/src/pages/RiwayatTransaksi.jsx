@@ -17,6 +17,11 @@ export default function RiwayatTransaksi() {
   const [detail, setDetail] = useState(null);
   const [products, setProducts] = useState([]);
   const [edit, setEdit] = useState(null);
+  const [period, setPeriod] = useState("all");
+  const [periodVal, setPeriodVal] = useState("");
+  const [sort, setSort] = useState("desc");
+  const [selected, setSelected] = useState([]);
+  const [bulkDeleting, setBulkDeleting] = useState(false);
   useEffect(() => { if (isAdmin) api.get("/products").then((r) => setProducts(r.data)); }, [isAdmin]);
 
   const logoUrl = settings?.has_logo
@@ -24,12 +29,22 @@ export default function RiwayatTransaksi() {
     : undefined;
   const storeInfo = { store_name: settings?.store_name, address: settings?.address, phone: settings?.phone };
 
-  const load = (query = "") => {
+  const dateParam = period !== "all" && periodVal ? periodVal : "";
+  const load = (query = q) => {
     setLoading(true);
-    const url = `/transactions?limit=100${query ? `&q=${encodeURIComponent(query)}` : ""}`;
+    const url = `/transactions?limit=${dateParam ? 2000 : 100}&sort=${sort}${dateParam ? `&date=${dateParam}` : ""}${query ? `&q=${encodeURIComponent(query)}` : ""}`;
+    setSelected([]);
     api.get(url).then((r) => setTxs(r.data)).finally(() => setLoading(false));
   };
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); }, [dateParam, sort]);
+  const changePeriod = (v) => {
+    const now = new Date();
+    const iso = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+    setPeriod(v);
+    setPeriodVal(v === "date" ? iso : v === "month" ? iso.slice(0, 7) : v === "year" ? iso.slice(0, 4) : "");
+  };
+  const years = Array.from({ length: 6 }, (_, i) => String(new Date().getFullYear() - i));
+  const periodLabel = dateParam ? `Periode: ${dateParam}` : "Semua transaksi terbaru";
 
   const onSearch = (e) => { e.preventDefault(); load(q); };
 
@@ -68,6 +83,22 @@ export default function RiwayatTransaksi() {
     catch (err) { toast.error(apiError(err.response?.data?.detail)); }
   };
 
+  const toggleOne = (id) => setSelected((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]));
+  const allChecked = txs.length > 0 && selected.length === txs.length;
+  const toggleAll = () => setSelected(allChecked ? [] : txs.map((t) => t.id));
+  const bulkDelete = async () => {
+    if (!window.confirm(`Hapus ${selected.length} transaksi terpilih? Stok akan dikembalikan.`)) return;
+    setBulkDeleting(true);
+    let ok = 0;
+    for (const id of selected) {
+      try { await api.delete(`/transactions/${id}`); ok++; } catch { /* lanjut ke berikutnya */ }
+    }
+    setBulkDeleting(false);
+    if (ok) toast.success(`${ok} transaksi dihapus`);
+    if (ok < selected.length) toast.error(`${selected.length - ok} transaksi gagal dihapus`);
+    load(q);
+  };
+
   const cols = ["Invoice", "Waktu", "Kasir", "Pembayaran", "Item", "Total"];
   const rows = txs.map((t) => [t.invoice_no, fmtDateTime(t.created_at), t.cashier_name, t.payment_method, t.items.reduce((s, i) => s + i.qty, 0), t.total]);
   const foot = ["", "", "", "", "TOTAL", txs.reduce((s, t) => s + t.total, 0)];
@@ -84,8 +115,35 @@ export default function RiwayatTransaksi() {
           </div>
           <button type="submit" data-testid="riwayat-search-button" className="px-4 py-2.5 rounded-xl bg-[#1B5E3B] text-white text-sm font-semibold hover:bg-[#143D2B]">Cari</button>
         </form>
+        <div className="flex flex-wrap items-center gap-2" data-testid="riwayat-period-filter">
+          <select value={period} onChange={(e) => changePeriod(e.target.value)} data-testid="riwayat-period-select"
+            className="px-3 py-2.5 rounded-xl border border-input bg-card text-sm">
+            <option value="all">Semua Waktu</option>
+            <option value="date">Per Tanggal</option>
+            <option value="month">Per Bulan</option>
+            <option value="year">Per Tahun</option>
+          </select>
+          {period === "date" && <input type="date" value={periodVal} onChange={(e) => setPeriodVal(e.target.value)} data-testid="riwayat-date-input" className="px-3 py-2 rounded-xl border border-input bg-card text-sm" />}
+          {period === "month" && <input type="month" value={periodVal} onChange={(e) => setPeriodVal(e.target.value)} data-testid="riwayat-month-input" className="px-3 py-2 rounded-xl border border-input bg-card text-sm" />}
+          {period === "year" && (
+            <select value={periodVal} onChange={(e) => setPeriodVal(e.target.value)} data-testid="riwayat-year-select" className="px-3 py-2.5 rounded-xl border border-input bg-card text-sm">
+              {years.map((y) => <option key={y} value={y}>{y}</option>)}
+            </select>
+          )}
+          <select value={sort} onChange={(e) => setSort(e.target.value)} data-testid="riwayat-sort-select"
+            className="px-3 py-2.5 rounded-xl border border-input bg-card text-sm">
+            <option value="desc">Terbaru dulu</option>
+            <option value="asc">Terlama dulu</option>
+          </select>
+        </div>
         <div className="flex gap-2">
-          <button onClick={() => exportPDF({ title: "Riwayat Transaksi", subtitle: q ? `Filter: ${q}` : "Semua transaksi terbaru", columns: cols, rows, foot })} data-testid="export-pdf-button"
+          {isAdmin && selected.length > 0 && (
+            <button onClick={bulkDelete} disabled={bulkDeleting} data-testid="riwayat-bulk-delete-button"
+              className="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-destructive text-white text-sm font-semibold hover:opacity-90 disabled:opacity-60">
+              {bulkDeleting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />} Hapus Terpilih ({selected.length})
+            </button>
+          )}
+          <button onClick={() => exportPDF({ title: "Riwayat Transaksi", subtitle: q ? `Filter: ${q} • ${periodLabel}` : periodLabel, columns: cols, rows, foot })} data-testid="export-pdf-button"
             className="flex items-center gap-2 px-3 py-2.5 rounded-xl border border-input text-sm hover:bg-secondary"><FileDown className="w-4 h-4" /> PDF</button>
           <button onClick={() => exportExcel({ filename: "Riwayat_Transaksi", sheetName: "Riwayat", columns: cols, rows })} data-testid="export-excel-button"
             className="flex items-center gap-2 px-3 py-2.5 rounded-xl border border-input text-sm hover:bg-secondary"><FileSpreadsheet className="w-4 h-4" /> Excel</button>
@@ -97,6 +155,7 @@ export default function RiwayatTransaksi() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-slate-200 bg-secondary/50 text-left">
+                {isAdmin && <th className="pl-4 py-3 w-8"><input type="checkbox" checked={allChecked} onChange={toggleAll} data-testid="riwayat-select-all" className="w-4 h-4 accent-[#1B5E3B] cursor-pointer" /></th>}
                 <th className="px-4 py-3 font-semibold">Invoice</th>
                 <th className="px-4 py-3 font-semibold">Waktu</th>
                 <th className="px-4 py-3 font-semibold">Kasir</th>
@@ -107,9 +166,14 @@ export default function RiwayatTransaksi() {
               </tr>
             </thead>
             <tbody>
-              {txs.length === 0 && <tr><td colSpan={7} className="px-4 py-10 text-center text-muted-foreground">Tidak ada transaksi.</td></tr>}
+              {txs.length === 0 && <tr><td colSpan={isAdmin ? 8 : 7} className="px-4 py-10 text-center text-muted-foreground">Tidak ada transaksi.</td></tr>}
               {txs.map((t) => (
                 <tr key={t.id} onClick={() => setDetail(t)} className="border-b border-slate-100 hover:bg-secondary/30 cursor-pointer" data-testid={`riwayat-row-${t.id}`}>
+                  {isAdmin && (
+                    <td className="pl-4 py-3" onClick={(e) => e.stopPropagation()}>
+                      <input type="checkbox" checked={selected.includes(t.id)} onChange={() => toggleOne(t.id)} data-testid={`riwayat-select-${t.id}`} className="w-4 h-4 accent-[#1B5E3B] cursor-pointer" />
+                    </td>
+                  )}
                   <td className="px-4 py-3 font-mono text-xs">{t.invoice_no}</td>
                   <td className="px-4 py-3 text-xs text-muted-foreground">{fmtDateTime(t.created_at)}</td>
                   <td className="px-4 py-3">{t.cashier_name}</td>

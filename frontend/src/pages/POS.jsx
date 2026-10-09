@@ -83,7 +83,6 @@ export default function POS() {
       });
       setLastInvoice(data);
       toast.success(`Transaksi ${data.invoice_no} berhasil!`);
-      printReceipt(data, logoUrl, storeInfo);
       setCart([]); setCustomerName(""); setDiscRp(""); setDiscPct(""); setDiscReason(""); setIsHutang(false); setAmountPaid("");
       load();
     } catch (err) {

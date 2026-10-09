@@ -52,6 +52,10 @@ export default function PenjualanOnline() {
     ...products,
     ...bundles.map((b) => ({ id: b.id, name: b.name, category: "Paket", harga_online: b.harga_online, stok: b.stok, stok_minimal: 0, is_bundle: true, hemat: b.hemat })),
   ];
+  const priceFor = (p) => p.harga_channel?.[channel] || p.harga_online || 0;
+  useEffect(() => {
+    setCart((c) => c.map((i) => { const p = sellable.find((x) => x.id === i.product_id); return p ? { ...i, harga: priceFor(p) } : i; }));
+  }, [channel]);
   const filtered = sellable.filter((p) =>
     p.name.toLowerCase().includes(search.toLowerCase()) || (p.sku || "").toLowerCase().includes(search.toLowerCase()));
 
@@ -63,7 +67,7 @@ export default function PenjualanOnline() {
         if (ex.qty >= p.stok) { toast.error("Melebihi stok"); return c; }
         return c.map((i) => i.product_id === p.id ? { ...i, qty: i.qty + 1 } : i);
       }
-      return [...c, { product_id: p.id, name: p.name, harga: p.harga_online || 0, qty: 1, stok: p.stok, is_bundle: !!p.is_bundle }];
+      return [...c, { product_id: p.id, name: p.name, harga: priceFor(p), qty: 1, stok: p.stok, is_bundle: !!p.is_bundle }];
     });
   };
   const setQty = (id, delta) => setCart((c) =>
@@ -159,7 +163,7 @@ export default function PenjualanOnline() {
                 <span className={`text-[10px] uppercase tracking-wider font-semibold ${p.is_bundle ? "text-[#2563EB]" : "text-[#C85A32]"}`}>{p.is_bundle ? "★ Paket Bundling" : p.category}</span>
                 <p className="font-medium text-sm text-[#0F281E] mt-1 line-clamp-2 min-h-[2.5rem]">{p.name}</p>
                 <div className="flex items-center justify-between mt-2">
-                  <span className={`font-mono font-bold ${p.harga_online ? "text-[#1B5E3B]" : "text-muted-foreground text-xs"}`}>{p.harga_online ? rupiah(p.harga_online) : "Harga online belum diatur"}</span>
+                  <span className={`font-mono font-bold ${priceFor(p) ? "text-[#1B5E3B]" : "text-muted-foreground text-xs"}`}>{priceFor(p) ? rupiah(priceFor(p)) : "Harga online belum diatur"}</span>
                   <span className={`text-xs ${p.stok <= p.stok_minimal ? "text-destructive" : "text-muted-foreground"}`}>Stok: {p.stok}</span>
                 </div>
                 {p.is_bundle && p.hemat > 0 && <span className="inline-block mt-1.5 text-[10px] font-bold px-2 py-0.5 rounded-full bg-green-100 text-green-700">Hemat {rupiah(p.hemat)}</span>}

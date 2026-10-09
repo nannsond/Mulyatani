@@ -8,7 +8,7 @@ import BundlingPanel from "@/components/BundlingPanel";
 import { exportPDF, exportExcel, printPriceList } from "@/lib/exporter";
 import { toast } from "sonner";
 
-const EMPTY = { sku: "", name: "", category: "Pupuk", unit: "pcs", harga_beli: 0, harga_jual: 0, harga_reseller: 0, harga_online: 0, stok: 0, stok_minimal: 10 };
+const EMPTY = { sku: "", name: "", category: "Pupuk", unit: "pcs", harga_beli: 0, harga_jual: 0, harga_reseller: 0, harga_online: 0, harga_channel: {}, stok: 0, stok_minimal: 10 };
 const CATS = ["Pupuk", "Benih", "Pestisida", "Alat Tani", "Lainnya"];
 
 export default function DaftarHarga() {
@@ -24,9 +24,10 @@ export default function DaftarHarga() {
   const [lowOnly, setLowOnly] = useState(false);
   const [modal, setModal] = useState(null);
   const [view, setView] = useState("satuan");
+  const [channels, setChannels] = useState([]);
 
   const load = () => api.get("/products").then((r) => setProducts(r.data));
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); api.get("/channels").then((r) => setChannels(r.data.filter((c) => c.active))); }, []);
 
   const stockLevel = (p) => (p.stok <= 0 ? 2 : p.stok <= p.stok_minimal ? 1 : 0);
   const lowCount = products.filter((p) => stockLevel(p) > 0).length;
@@ -51,6 +52,7 @@ export default function DaftarHarga() {
     const body = { ...modal };
     delete body.id;
     ["harga_beli", "harga_jual", "harga_reseller", "harga_online", "stok", "stok_minimal"].forEach((k) => (body[k] = Number(body[k])));
+    body.harga_channel = Object.fromEntries(Object.entries(modal.harga_channel || {}).map(([k, v]) => [k, Number(v)]).filter(([, v]) => v > 0));
     try {
       if (modal.id) await api.put(`/products/${modal.id}`, body);
       else await api.post("/products", body);
@@ -147,6 +149,7 @@ export default function DaftarHarga() {
               <th className={`px-4 py-3 font-semibold text-right ${tab === "normal" ? "text-[#1B5E3B]" : ""}`}>Harga Normal</th>
               <th className={`px-4 py-3 font-semibold text-right ${isReseller ? "text-[#C85A32]" : ""}`}>Harga Reseller</th>
               <th className={`px-4 py-3 font-semibold text-right ${isOnline ? "text-[#2563EB]" : ""}`}>Harga Online</th>
+              {isOnline && channels.map((c) => <th key={c.name} className="px-4 py-3 font-semibold text-right" style={{ color: c.color }}>{c.name}</th>)}
               <th className="px-4 py-3 font-semibold text-right">Stok</th>
               {isAdmin && <th className="px-4 py-3 font-semibold text-center">Aksi</th>}
             </tr>
@@ -174,6 +177,11 @@ export default function DaftarHarga() {
                 <td className={`px-4 py-3 text-right font-mono ${tab === "normal" ? "font-semibold text-[#1B5E3B]" : "text-muted-foreground"}`}>{rupiah(p.harga_jual)}</td>
                 <td className={`px-4 py-3 text-right font-mono ${isReseller ? "font-semibold text-[#C85A32]" : "text-muted-foreground"}`}>{rupiah(p.harga_reseller || 0)}</td>
                 <td className={`px-4 py-3 text-right font-mono ${isOnline ? "font-semibold text-[#2563EB]" : "text-muted-foreground"}`}>{p.harga_online ? rupiah(p.harga_online) : <span className="text-xs italic">belum diatur</span>}</td>
+                {isOnline && channels.map((c) => (
+                  <td key={c.name} className="px-4 py-3 text-right font-mono" data-testid={`channel-price-${p.id}-${c.name.replace(/\s+/g, "-").toLowerCase()}`}>
+                    {p.harga_channel?.[c.name] ? rupiah(p.harga_channel[c.name]) : <span className="text-xs italic text-muted-foreground">= online</span>}
+                  </td>
+                ))}
                 <td className="px-4 py-3 text-right font-mono"><span className={p.stok <= p.stok_minimal ? "text-destructive font-semibold" : ""}>{p.stok} {p.unit}</span></td>
                 {isAdmin && (
                   <td className="px-4 py-3">
@@ -214,6 +222,22 @@ export default function DaftarHarga() {
               <Field label="Harga Normal" type="number" testid="product-harga-jual-input" value={modal.harga_jual} onChange={(v) => setModal({ ...modal, harga_jual: v })} />
               <Field label="Harga Reseller" type="number" testid="product-harga-reseller-input" value={modal.harga_reseller} onChange={(v) => setModal({ ...modal, harga_reseller: v })} />
               <Field label="Harga Online" type="number" testid="product-harga-online-input" value={modal.harga_online} onChange={(v) => setModal({ ...modal, harga_online: v })} />
+              {channels.length > 0 && (
+                <div className="col-span-2 rounded-xl border border-dashed border-[#2563EB]/40 p-3">
+                  <p className="text-sm font-medium">Harga per Platform <span className="text-xs text-muted-foreground font-normal">(kosongkan = pakai Harga Online)</span></p>
+                  <div className="grid grid-cols-2 gap-2 mt-2">
+                    {channels.map((c) => (
+                      <div key={c.name}>
+                        <label className="text-xs font-semibold" style={{ color: c.color }}>{c.name}</label>
+                        <input type="number" min="0" value={modal.harga_channel?.[c.name] ?? ""} placeholder={String(modal.harga_online || 0)}
+                          onChange={(e) => setModal({ ...modal, harga_channel: { ...(modal.harga_channel || {}), [c.name]: e.target.value } })}
+                          data-testid={`product-channel-price-${c.name.replace(/\s+/g, "-").toLowerCase()}`}
+                          className="mt-1 w-full px-3 py-2 rounded-xl border border-input text-sm focus:outline-none focus:ring-2 focus:ring-[#2563EB]" />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
               <Field label="Stok" type="number" testid="product-stok-input" value={modal.stok} onChange={(v) => setModal({ ...modal, stok: v })} />
               <Field label="Stok Minimal" type="number" testid="product-stok-min-input" value={modal.stok_minimal} onChange={(v) => setModal({ ...modal, stok_minimal: v })} />
             </div>
