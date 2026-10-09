@@ -1,10 +1,68 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { api, apiError } from "@/lib/api";
 import { rupiah, fmtDateTime, todayStr } from "@/lib/format";
 import { exportPDF, exportExcel } from "@/lib/exporter";
 import { useAuth } from "@/context/AuthContext";
-import { Plus, Trash2, Truck, FileDown, FileSpreadsheet, Pencil, X } from "lucide-react";
+import { Plus, Trash2, Truck, FileDown, FileSpreadsheet, Pencil, X, Search } from "lucide-react";
 import { toast } from "sonner";
+
+// Pencarian produk ketik manual (typeahead) — hanya produk terdaftar yang cocok bisa dipilih
+function ProductSearch({ products, exclude = [], onPick, placeholder = "Cari produk...", testid }) {
+  const [q, setQ] = useState("");
+  const [open, setOpen] = useState(false);
+  const boxRef = useRef(null);
+
+  useEffect(() => {
+    const onDocClick = (e) => { if (boxRef.current && !boxRef.current.contains(e.target)) setOpen(false); };
+    document.addEventListener("mousedown", onDocClick);
+    return () => document.removeEventListener("mousedown", onDocClick);
+  }, []);
+
+  const term = q.trim().toLowerCase();
+  const matches = term
+    ? products
+        .filter((p) => !exclude.includes(p.id) && p.name.toLowerCase().includes(term))
+        .slice(0, 8)
+    : [];
+
+  const choose = (p) => { onPick(p.id); setQ(""); setOpen(false); };
+
+  return (
+    <div className="relative" ref={boxRef}>
+      <div className="relative">
+        <Search className="w-4 h-4 text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+        <input
+          value={q}
+          onChange={(e) => { setQ(e.target.value); setOpen(true); }}
+          onFocus={() => setOpen(true)}
+          placeholder={placeholder}
+          data-testid={testid}
+          className="w-full pl-9 pr-3 py-2.5 rounded-xl border border-input text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#1B5E3B]"
+        />
+      </div>
+      {open && term && (
+        <div className="absolute z-20 mt-1 w-full bg-white border border-slate-200 rounded-xl shadow-lg max-h-56 overflow-y-auto" data-testid={testid ? `${testid}-results` : undefined}>
+          {matches.length === 0 ? (
+            <div className="px-3 py-2.5 text-sm text-muted-foreground">Produk tidak ditemukan</div>
+          ) : (
+            matches.map((p) => (
+              <button
+                key={p.id}
+                type="button"
+                onClick={() => choose(p)}
+                data-testid={testid ? `${testid}-option-${p.id}` : undefined}
+                className="w-full text-left px-3 py-2.5 text-sm hover:bg-secondary flex items-center justify-between gap-2"
+              >
+                <span className="truncate">{p.name}</span>
+                <span className="text-xs text-muted-foreground font-mono shrink-0">{rupiah(p.harga_beli)}</span>
+              </button>
+            ))
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function Pembelian() {
   const [products, setProducts] = useState([]);
@@ -15,7 +73,6 @@ export default function Pembelian() {
   const [note, setNote] = useState("");
   const [hutang, setHutang] = useState(false);
   const [amountPaid, setAmountPaid] = useState("");
-  const [pick, setPick] = useState("");
   const { user } = useAuth();
   const isAdmin = user?.role === "admin";
   const [edit, setEdit] = useState(null);
@@ -29,7 +86,6 @@ export default function Pembelian() {
     const p = products.find((x) => x.id === pid);
     if (!p || lines.find((l) => l.product_id === pid)) return;
     setLines([...lines, { product_id: p.id, name: p.name, qty: 1, harga_beli: p.harga_beli }]);
-    setPick("");
   };
   const upd = (pid, k, v) => setLines(lines.map((l) => l.product_id === pid ? { ...l, [k]: v } : l));
   const total = lines.reduce((s, l) => s + Number(l.qty) * Number(l.harga_beli), 0);
@@ -88,11 +144,8 @@ export default function Pembelian() {
         <div className="grid sm:grid-cols-2 gap-3 mb-3">
           <input value={supplier} onChange={(e) => setSupplier(e.target.value)} placeholder="Nama supplier" data-testid="purchase-supplier-input"
             className="px-3 py-2.5 rounded-xl border border-input text-sm focus:outline-none focus:ring-2 focus:ring-[#1B5E3B]" />
-          <select value={pick} onChange={(e) => addLine(e.target.value)} data-testid="purchase-add-product"
-            className="px-3 py-2.5 rounded-xl border border-input text-sm bg-white">
-            <option value="">+ Tambah produk...</option>
-            {products.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-          </select>
+          <ProductSearch products={products} exclude={lines.map((l) => l.product_id)} onPick={addLine}
+            placeholder="Cari & tambah produk..." testid="purchase-add-product" />
         </div>
         {lines.length > 0 && (
           <div className="space-y-2 mb-3">
@@ -184,13 +237,9 @@ export default function Pembelian() {
               ))}
             </div>
 
-            <div className="mt-3 flex items-center gap-2">
-              <Plus className="w-4 h-4 text-muted-foreground" />
-              <select onChange={(e) => { if (e.target.value) { eAdd(e.target.value); e.target.value = ""; } }} data-testid="edit-purchase-add-select"
-                className="flex-1 px-3 py-2 rounded-lg border border-input text-sm bg-white">
-                <option value="">+ Tambah produk...</option>
-                {products.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-              </select>
+            <div className="mt-3">
+              <ProductSearch products={products} exclude={edit.items.map((i) => i.product_id)} onPick={eAdd}
+                placeholder="Cari & tambah produk..." testid="edit-purchase-add-select" />
             </div>
 
             <input value={edit.note} onChange={(e) => setEdit({ ...edit, note: e.target.value })} placeholder="Catatan (opsional)" data-testid="edit-purchase-note"
