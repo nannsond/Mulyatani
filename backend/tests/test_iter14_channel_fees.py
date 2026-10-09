@@ -2,7 +2,7 @@
 import os, pytest, requests, subprocess
 from datetime import datetime, timezone
 
-BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', 'https://mulyatani-setup.preview.emergentagent.com').rstrip('/')
+BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', 'https://mulyatani-preview.preview.emergentagent.com').rstrip('/')
 API = f"{BASE_URL}/api"
 
 EXPECTED_DEFAULTS = {
