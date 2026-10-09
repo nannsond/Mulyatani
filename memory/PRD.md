@@ -173,3 +173,9 @@ Aplikasi laporan penjualan sederhana untuk bisnis toko pertanian: laporan harian
 - Field `telepon` di TransactionInput + disimpan (create & update). Input "No. HP pembeli" di Kasir (POS); dicetak di struk (baris "HP:").
 - Riwayat: input "No. HP Pembeli" di modal Edit (passthrough openEdit/saveEdit) & baris "No. HP" di modal Detail.
 - Diverifikasi: backend simpan+preserve '081234567890'; UI input POS & Edit tampil.
+
+## Implemented (2026-10-09) — WhatsApp, Daftar Pengantaran, Pelanggan Tersimpan
+- Tombol WhatsApp: No. HP di Detail Transaksi & halaman Pengantaran jadi link wa.me (normalisasi 0->62).
+- Daftar Pengantaran: halaman baru /pengantaran (menu sidebar "Pengantaran", ikon MapPin). Menampilkan pesanan yg perlu diantar (alamat !='' ATAU ongkir>0) dgn alamat, No HP (WA), item, total, ongkir, status antar. Tab filter (Semua/Belum/Diantar/Selesai) + tombol ubah status. Backend: field status_antar di transaksi (set saat create/update), endpoint GET /deliveries & PUT /deliveries/{id}/status.
+- Pelanggan Tersimpan: collection customers (upsert saat create/update transaksi by telepon/nama). Endpoint GET /customers. POS: datalist nama & no HP; mengetik nama/HP yg cocok otomatis mengisi telepon & alamat.
+- Diverifikasi API & UI; data uji dibersihkan.

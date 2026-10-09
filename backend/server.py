@@ -473,6 +473,23 @@ async def gen_invoice() -> str:
     count = await db.transactions.count_documents({})
     return f"INV-{datetime.now().strftime('%Y%m%d')}-{count + 1:04d}"
 
+async def _upsert_customer(name: str, telepon: str, alamat: str):
+    name = (name or "").strip(); telepon = (telepon or "").strip(); alamat = (alamat or "").strip()
+    if not name and not telepon:
+        return
+    q = {"telepon": telepon} if telepon else {"name_lower": name.lower()}
+    existing = await db.customers.find_one(q)
+    base = existing or {}
+    final_name = name or base.get("name", "")
+    fields = {"name": final_name, "name_lower": final_name.lower(),
+              "telepon": telepon or base.get("telepon", ""),
+              "alamat": alamat or base.get("alamat", ""), "updated_at": now_iso()}
+    if existing:
+        await db.customers.update_one({"_id": existing["_id"]}, {"$set": fields})
+    else:
+        fields["id"] = uuid.uuid4().hex; fields["created_at"] = now_iso()
+        await db.customers.insert_one(fields)
+
 @api_router.post("/transactions")
 async def create_transaction(data: TransactionInput, user: dict = Depends(get_current_user)):
     if not data.items:
@@ -483,15 +500,49 @@ async def create_transaction(data: TransactionInput, user: dict = Depends(get_cu
     total = subtotal - discount + ongkir
     amount_paid = total if data.amount_paid is None else max(0.0, min(data.amount_paid, total))
     status = "lunas" if amount_paid >= total else ("sebagian" if amount_paid > 0 else "belum")
+    needs_delivery = bool((data.alamat or "").strip()) or ongkir > 0
     doc = {"invoice_no": await gen_invoice(), "items": items, "subtotal": subtotal,
            "discount": discount, "discount_reason": data.discount_reason, "ongkir": ongkir, "total": total,
            "payment_method": data.payment_method, "customer_name": data.customer_name, "alamat": data.alamat, "telepon": data.telepon,
+           "status_antar": ("belum" if needs_delivery else ""),
            "amount_paid": amount_paid, "status": status, "payments": [],
            "cashier_id": user["id"], "cashier_name": user["name"], "created_at": now_iso()}
     res = await db.transactions.insert_one(doc)
     doc["id"] = str(res.inserted_id)
     doc.pop("_id", None)
+    await _upsert_customer(data.customer_name, data.telepon, data.alamat)
     return doc
+
+@api_router.get("/customers")
+async def list_customers(user: dict = Depends(get_current_user)):
+    docs = await db.customers.find().sort("name_lower", 1).to_list(1000)
+    return [{"id": d.get("id"), "name": d.get("name", ""), "telepon": d.get("telepon", ""), "alamat": d.get("alamat", "")} for d in docs]
+
+@api_router.get("/deliveries")
+async def list_deliveries(status: Optional[str] = None, user: dict = Depends(get_current_user)):
+    query: Dict[str, Any] = {"$or": [{"alamat": {"$nin": ["", None]}}, {"ongkir": {"$gt": 0}}]}
+    if status:
+        query["status_antar"] = status
+    docs = await db.transactions.find(query).sort("created_at", -1).to_list(500)
+    for d in docs:
+        d["id"] = str(d["_id"]); d.pop("_id", None)
+        if not d.get("status_antar"):
+            d["status_antar"] = "belum"
+    return docs
+
+@api_router.put("/deliveries/{tid}/status")
+async def update_delivery_status(tid: str, body: Dict[str, Any], user: dict = Depends(get_current_user)):
+    st = body.get("status_antar", "belum")
+    if st not in ("belum", "diantar", "selesai"):
+        raise HTTPException(status_code=400, detail="Status tidak valid")
+    try:
+        oid = ObjectId(tid)
+    except InvalidId:
+        raise HTTPException(status_code=404, detail="Transaksi tidak ditemukan")
+    r = await db.transactions.update_one({"_id": oid}, {"$set": {"status_antar": st}})
+    if r.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Transaksi tidak ditemukan")
+    return {"ok": True, "status_antar": st}
 
 @api_router.get("/transactions")
 async def list_transactions(date: Optional[str] = None, q: Optional[str] = None, limit: int = 50, sort: str = "desc", user: dict = Depends(get_current_user)):
@@ -520,10 +571,14 @@ async def update_transaction(tid: str, data: TransactionInput, admin: dict = Dep
     total = subtotal - discount + ongkir
     amount_paid = total if data.amount_paid is None else max(0.0, min(data.amount_paid, total))
     status = "lunas" if amount_paid >= total else ("sebagian" if amount_paid > 0 else "belum")
+    needs_delivery = bool((data.alamat or "").strip()) or ongkir > 0
+    status_antar = old.get("status_antar") or ("belum" if needs_delivery else "")
     await db.transactions.update_one({"_id": ObjectId(tid)}, {"$set": {
         "items": items, "subtotal": subtotal, "discount": discount, "discount_reason": data.discount_reason,
         "ongkir": ongkir, "total": total, "payment_method": data.payment_method, "customer_name": data.customer_name, "alamat": data.alamat, "telepon": data.telepon,
+        "status_antar": status_antar,
         "amount_paid": amount_paid, "status": status, "edited_at": now_iso(), "edited_by": admin["name"]}})
+    await _upsert_customer(data.customer_name, data.telepon, data.alamat)
     doc = await db.transactions.find_one({"_id": ObjectId(tid)})
     doc["id"] = str(doc["_id"]); doc.pop("_id", None)
     return doc

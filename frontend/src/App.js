@@ -25,6 +25,7 @@ import { SettingsProvider } from "@/context/SettingsContext";
 import LaporanHarian from "@/pages/LaporanHarian";
 import LaporanBulanan from "@/pages/LaporanBulanan";
 import LaporanTahunan from "@/pages/LaporanTahunan";
+import Pengantaran from "@/pages/Pengantaran";
 import { Loader2 } from "lucide-react";
 
 function Protected({ children, adminOnly }) {
@@ -47,6 +48,7 @@ function AppRoutes() {
       <Route path="/laporan/bulanan" element={<Protected><LaporanBulanan /></Protected>} />
       <Route path="/laporan/tahunan" element={<Protected><LaporanTahunan /></Protected>} />
       <Route path="/riwayat" element={<Protected><RiwayatTransaksi /></Protected>} />
+      <Route path="/pengantaran" element={<Protected><Pengantaran /></Protected>} />
       <Route path="/kelola-kasir" element={<Protected adminOnly><KelolaKasir /></Protected>} />
       <Route path="/pengaturan" element={<Protected adminOnly><Pengaturan /></Protected>} />
       <Route path="/pembelian" element={<Protected adminOnly><Pembelian /></Protected>} />

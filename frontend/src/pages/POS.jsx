@@ -27,6 +27,7 @@ export default function POS() {
   const [ongkir, setOngkir] = useState("");
   const [alamat, setAlamat] = useState("");
   const [telepon, setTelepon] = useState("");
+  const [customers, setCustomers] = useState([]);
 
   const priceOf = (p) => (priceMode === "reseller" ? (p.harga_reseller || p.harga_jual) : p.harga_jual);
 
@@ -41,6 +42,19 @@ export default function POS() {
     }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [priceMode]);
+
+  useEffect(() => { api.get("/customers").then((r) => setCustomers(r.data)).catch(() => {}); }, []);
+
+  const pickCustomerByName = (v) => {
+    setCustomerName(v);
+    const c = customers.find((x) => x.name && x.name.toLowerCase() === v.trim().toLowerCase());
+    if (c) { if (c.telepon) setTelepon(c.telepon); if (c.alamat) setAlamat(c.alamat); }
+  };
+  const pickCustomerByPhone = (v) => {
+    setTelepon(v);
+    const c = customers.find((x) => x.telepon && x.telepon === v.trim());
+    if (c) { if (c.name) setCustomerName(c.name); if (c.alamat) setAlamat(c.alamat); }
+  };
 
   const sellable = [
     ...products,
@@ -91,6 +105,7 @@ export default function POS() {
       setLastInvoice(data);
       toast.success(`Transaksi ${data.invoice_no} berhasil!`);
       setCart([]); setCustomerName(""); setDiscRp(""); setDiscPct(""); setDiscReason(""); setIsHutang(false); setAmountPaid(""); setOngkir(""); setAlamat(""); setTelepon("");
+      api.get("/customers").then((r) => setCustomers(r.data)).catch(() => {});
       load();
     } catch (err) {
       toast.error(apiError(err.response?.data?.detail));
@@ -173,9 +188,11 @@ export default function POS() {
         )}
 
         <div className="mt-4 pt-4 border-t border-slate-200 space-y-3">
-          <input value={customerName} onChange={(e) => setCustomerName(e.target.value)} data-testid="pos-customer-input"
+          <input value={customerName} onChange={(e) => pickCustomerByName(e.target.value)} data-testid="pos-customer-input"
+            list="cust-name-list" autoComplete="off"
             placeholder="Nama pelanggan (opsional)"
             className="w-full px-3 py-2 rounded-lg border border-input text-sm focus:outline-none focus:ring-2 focus:ring-[#1B5E3B]" />
+          <datalist id="cust-name-list">{customers.map((c) => <option key={c.id} value={c.name} />)}</datalist>
           <div className="flex gap-2">
             <input type="number" value={discRp} onChange={(e) => setDiscRp(e.target.value)} data-testid="pos-discount-rp" placeholder="Diskon Rp"
               className="w-1/2 px-3 py-2 rounded-lg border border-input text-sm" />
@@ -190,8 +207,10 @@ export default function POS() {
             className="w-full px-3 py-2 rounded-lg border border-input text-sm focus:outline-none focus:ring-2 focus:ring-[#1B5E3B]" />
           <input value={alamat} onChange={(e) => setAlamat(e.target.value)} data-testid="pos-alamat" placeholder="Alamat pengiriman (jika diantar)"
             className="w-full px-3 py-2 rounded-lg border border-input text-sm focus:outline-none focus:ring-2 focus:ring-[#1B5E3B]" />
-          <input value={telepon} onChange={(e) => setTelepon(e.target.value)} data-testid="pos-telepon" placeholder="No. HP pembeli (untuk pengantaran)"
+          <input value={telepon} onChange={(e) => pickCustomerByPhone(e.target.value)} data-testid="pos-telepon" placeholder="No. HP pembeli (untuk pengantaran)"
+            list="cust-phone-list" autoComplete="off"
             className="w-full px-3 py-2 rounded-lg border border-input text-sm focus:outline-none focus:ring-2 focus:ring-[#1B5E3B]" />
+          <datalist id="cust-phone-list">{customers.filter((c) => c.telepon).map((c) => <option key={c.id} value={c.telepon}>{c.name}</option>)}</datalist>
           <div className="flex gap-2">
             {["Tunai", "Transfer", "QRIS"].map((m) => (
               <button key={m} onClick={() => setPayment(m)}

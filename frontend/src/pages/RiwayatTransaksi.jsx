@@ -5,7 +5,7 @@ import { printReceipt, exportPDF, exportExcel } from "@/lib/exporter";
 import { useSettings } from "@/context/SettingsContext";
 import { useAuth } from "@/context/AuthContext";
 import { toast } from "sonner";
-import { Search, Printer, Loader2, FileDown, FileSpreadsheet, X, Eye, Pencil, Trash2 } from "lucide-react";
+import { Search, Printer, Loader2, FileDown, FileSpreadsheet, X, Eye, Pencil, Trash2, MessageCircle } from "lucide-react";
 import ProductSearch from "@/components/ProductSearch";
 
 export default function RiwayatTransaksi() {
@@ -222,7 +222,15 @@ export default function RiwayatTransaksi() {
               <div className="flex justify-between"><span className="text-muted-foreground">Pembayaran</span><span>{detail.payment_method}</span></div>
               {detail.ongkir > 0 && <div className="flex justify-between"><span className="text-muted-foreground">Ongkos Kirim</span><span className="font-mono">{rupiah(detail.ongkir)}</span></div>}
               {detail.alamat && <div className="flex justify-between gap-3"><span className="text-muted-foreground shrink-0">Alamat Antar</span><span className="text-right font-medium text-[#0F281E]" data-testid="detail-alamat">{detail.alamat}</span></div>}
-              {detail.telepon && <div className="flex justify-between"><span className="text-muted-foreground">No. HP</span><span className="font-medium text-[#0F281E]" data-testid="detail-telepon">{detail.telepon}</span></div>}
+              {detail.telepon && (
+                <div className="flex justify-between items-center gap-3">
+                  <span className="text-muted-foreground">No. HP</span>
+                  <a href={`https://wa.me/${(detail.telepon || "").replace(/\D/g, "").replace(/^0/, "62")}`} target="_blank" rel="noopener noreferrer" data-testid="detail-wa"
+                    className="inline-flex items-center gap-1 text-[#1B5E3B] font-medium hover:underline">
+                    <MessageCircle className="w-4 h-4" /> {detail.telepon}
+                  </a>
+                </div>
+              )}
             </div>
             <div className="mt-3 space-y-2">
               {detail.items.map((i, idx) => (
