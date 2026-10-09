@@ -190,3 +190,14 @@ Aplikasi laporan penjualan sederhana untuk bisnis toko pertanian: laporan harian
 - Platform cron: .emergent/crons.yml -> harian 01:00 WIB POST /api/cron/auto-archive-deliveries.
 - Endpoint cron diamankan Bearer WEBHOOK_CRON_SECRET (constant-time compare), ack 2xx + kerja di background (update_many set arsip=true utk selesai_at/created_at < cutoff 3 hari).
 - Diverifikasi: auth 401/401/200; tx selesai di-backdate 5 hari otomatis terarsip; lint bersih.
+
+## 2026-10-09 — Impor dari GitHub (branch conflict_091026_2223)
+- Repo diimpor ke /app, tidak ada penanda konflik merge. Dependensi backend & frontend (Vite) terpasang.
+- Seed produk contoh & transaksi palsu (2 tahun) dihapus dari server.py; DB dibersihkan. Hanya akun admin yang di-seed (kasir hanya jika KASIR_EMAIL/PASSWORD diset).
+- Baru: Kirim struk via WhatsApp (wa.me click-to-chat) di panel transaksi terakhir POS (components/WhatsAppReceipt.jsx).
+- Perbaikan: warning <option> di Kehadiran & StokOpname; tombol ekspor Riwayat dinonaktifkan saat loading.
+- Tes: iteration_17 (backend 52/52), iteration_18 (23 ekspor + alur gaji UI), iteration_19 (perbaikan) — semua lulus.
+- Deployment check: PASS.
+
+## Backlog
+- P2: DELETE arsip slip gaji; /api/settings/logo 200+null bila kosong; pecah server.py per router.
