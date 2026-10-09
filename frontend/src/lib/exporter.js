@@ -105,6 +105,10 @@ export async function printReceipt(tx, logoUrl, info = {}) {
   doc.setFontSize(8);
   doc.text(`Pembayaran: ${tx.payment_method}`, 5, y); y += lineH - 1;
   if (tx.customer_name) { doc.text(`Pelanggan: ${tx.customer_name}`, 5, y); y += 4; }
+  if (tx.alamat) {
+    const al = doc.splitTextToSize(`Alamat: ${tx.alamat}`, 70);
+    doc.text(al, 5, y); y += 4 * al.length;
+  }
   if (tx.status && tx.status !== "lunas") {
     doc.text(`Dibayar: ${rp(tx.amount_paid || 0)}`, 5, y); y += 4;
     doc.text(`Sisa (Piutang): ${rp((tx.total || 0) - (tx.amount_paid || 0))}`, 5, y); y += 4;

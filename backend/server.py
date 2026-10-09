@@ -278,6 +278,7 @@ class TransactionInput(BaseModel):
     discount: float = 0
     discount_reason: str = ""
     customer_name: str = ""
+    alamat: str = ""
     ongkir: float = 0
     amount_paid: Optional[float] = None
 
@@ -483,7 +484,7 @@ async def create_transaction(data: TransactionInput, user: dict = Depends(get_cu
     status = "lunas" if amount_paid >= total else ("sebagian" if amount_paid > 0 else "belum")
     doc = {"invoice_no": await gen_invoice(), "items": items, "subtotal": subtotal,
            "discount": discount, "discount_reason": data.discount_reason, "ongkir": ongkir, "total": total,
-           "payment_method": data.payment_method, "customer_name": data.customer_name,
+           "payment_method": data.payment_method, "customer_name": data.customer_name, "alamat": data.alamat,
            "amount_paid": amount_paid, "status": status, "payments": [],
            "cashier_id": user["id"], "cashier_name": user["name"], "created_at": now_iso()}
     res = await db.transactions.insert_one(doc)
@@ -520,7 +521,7 @@ async def update_transaction(tid: str, data: TransactionInput, admin: dict = Dep
     status = "lunas" if amount_paid >= total else ("sebagian" if amount_paid > 0 else "belum")
     await db.transactions.update_one({"_id": ObjectId(tid)}, {"$set": {
         "items": items, "subtotal": subtotal, "discount": discount, "discount_reason": data.discount_reason,
-        "ongkir": ongkir, "total": total, "payment_method": data.payment_method, "customer_name": data.customer_name,
+        "ongkir": ongkir, "total": total, "payment_method": data.payment_method, "customer_name": data.customer_name, "alamat": data.alamat,
         "amount_paid": amount_paid, "status": status, "edited_at": now_iso(), "edited_by": admin["name"]}})
     doc = await db.transactions.find_one({"_id": ObjectId(tid)})
     doc["id"] = str(doc["_id"]); doc.pop("_id", None)
@@ -540,15 +541,17 @@ async def delete_transaction(tid: str, admin: dict = Depends(require_admin)):
 def summarize(txs: List[dict]) -> dict:
     total = 0.0
     qty = 0
+    ongkir = 0.0
     pay = {}
     for t in txs:
         f = tx_fraction(t)
         rec = t["total"] * f
         total += rec
+        ongkir += (t.get("ongkir", 0) or 0) * f
         qty += sum(i["qty"] for i in t["items"])
         pay[t["payment_method"]] = pay.get(t["payment_method"], 0) + rec
     count = len(txs)
-    return {"total_omzet": total, "jumlah_transaksi": count, "total_item": qty,
+    return {"total_omzet": total, "jumlah_transaksi": count, "total_item": qty, "total_ongkir": ongkir,
             "rata_rata": total / count if count else 0, "pembayaran": pay}
 
 async def top_products(txs: List[dict], limit: int = 5):

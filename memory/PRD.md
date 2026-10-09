@@ -157,3 +157,9 @@ Aplikasi laporan penjualan sederhana untuk bisnis toko pertanian: laporan harian
 - Kasir Penjualan: input "Ongkos kirim (Rp) - jika diantar" di keranjang. Ongkir ditambahkan ke Total yang dibayar pembeli; rincian Subtotal/Diskon/Ongkos Kirim tampil di keranjang & tercetak di struk PDF (baris "Ongkir").
 - Ongkir DIHITUNG sebagai pendapatan toko: masuk omzet (total transaksi) & laba (compute_profit menambah ongkir sebagai pendapatan tanpa HPP). Berlaku di Dashboard, Laporan Harian/Bulanan/Tahunan, Laba Rugi, dan Kas.
 - Backend: field `ongkir` di TransactionInput + disimpan di doc; total = subtotal − diskon + ongkir (create & update transaksi). Online (normalize_online) tidak terpengaruh. Diverifikasi via API (omzet +Rp88k, laba +Rp33k utk produk margin 23k + ongkir 10k) & UI (Total Rp93k dgn ongkir 15k).
+
+## Implemented (2026-10-09) — Alamat Antar, Laporan Ongkir, Edit Riwayat (search manual)
+- Alamat Antar: field `alamat` di TransactionInput + disimpan (create & update). Input "Alamat pengiriman" di Kasir; dicetak di struk PDF (baris "Alamat:" wrap). 
+- Laporan Ongkir: summarize() kini kembalikan `total_ongkir` (proporsional paid fraction). Kartu "Ongkos Kirim" ditambah di Laporan Harian/Bulanan/Tahunan (terpisah dari omzet produk; omzet tetap termasuk ongkir).
+- Edit Transaksi di Riwayat: dropdown "+ Tambah produk" diganti komponen bersama `components/ProductSearch.jsx` (ketik manual nama/SKU, Enter=pilih teratas). Riwayat openEdit/saveEdit meneruskan ongkir & alamat agar tidak ter-reset saat admin menyimpan.
+- Diverifikasi API (alamat tersimpan & tetap setelah edit; total_ongkir +12k) & UI (kartu Ongkos Kirim, search Riwayat menambah item, input alamat POS).

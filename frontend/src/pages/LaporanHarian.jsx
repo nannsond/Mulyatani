@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { rupiah, fmtDateTime, todayStr } from "@/lib/format";
 import { exportPDF, exportExcel } from "@/lib/exporter";
-import { FileDown, FileSpreadsheet, Loader2, Receipt, Wallet, Package } from "lucide-react";
+import { FileDown, FileSpreadsheet, Loader2, Receipt, Wallet, Package, Truck } from "lucide-react";
 
 function Stat({ label, value, icon: Icon }) {
   return (
@@ -50,6 +50,7 @@ export default function LaporanHarian() {
             <Stat label="Transaksi" value={data.summary.jumlah_transaksi} icon={Receipt} />
             <Stat label="Item Terjual" value={data.summary.total_item} icon={Package} />
             <Stat label="Rata-rata" value={rupiah(data.summary.rata_rata)} icon={Wallet} />
+            <Stat label="Ongkos Kirim" value={rupiah(data.summary.total_ongkir || 0)} icon={Truck} />
           </div>
 
           <div className="bg-card rounded-2xl border border-slate-200 overflow-x-auto">

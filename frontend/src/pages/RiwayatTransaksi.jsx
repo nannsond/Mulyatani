@@ -5,7 +5,8 @@ import { printReceipt, exportPDF, exportExcel } from "@/lib/exporter";
 import { useSettings } from "@/context/SettingsContext";
 import { useAuth } from "@/context/AuthContext";
 import { toast } from "sonner";
-import { Search, Printer, Loader2, FileDown, FileSpreadsheet, X, Eye, Pencil, Trash2, Plus } from "lucide-react";
+import { Search, Printer, Loader2, FileDown, FileSpreadsheet, X, Eye, Pencil, Trash2 } from "lucide-react";
+import ProductSearch from "@/components/ProductSearch";
 
 export default function RiwayatTransaksi() {
   const { settings } = useSettings();
@@ -53,6 +54,7 @@ export default function RiwayatTransaksi() {
     items: t.items.map((i) => ({ product_id: i.product_id, name: i.name, qty: i.qty, harga: i.harga })),
     discount: t.discount || 0, discount_reason: t.discount_reason || "",
     payment_method: t.payment_method || "Tunai", customer_name: t.customer_name || "",
+    ongkir: t.ongkir || 0, alamat: t.alamat || "",
     amount_paid: t.amount_paid ?? t.total,
   });
   const editSubtotal = edit ? edit.items.reduce((s, i) => s + (Number(i.qty) || 0) * (Number(i.harga) || 0), 0) : 0;
@@ -72,7 +74,7 @@ export default function RiwayatTransaksi() {
       await api.put(`/transactions/${edit.id}`, {
         items: edit.items.map((i) => ({ product_id: i.product_id, name: i.name, qty: Number(i.qty), harga: Number(i.harga) })),
         payment_method: edit.payment_method, discount: Number(edit.discount) || 0, discount_reason: edit.discount_reason,
-        customer_name: edit.customer_name, amount_paid: Number(edit.amount_paid),
+        customer_name: edit.customer_name, ongkir: Number(edit.ongkir) || 0, alamat: edit.alamat || "", amount_paid: Number(edit.amount_paid),
       });
       toast.success("Transaksi diperbarui"); setEdit(null); load(q);
     } catch (err) { toast.error(apiError(err.response?.data?.detail)); }
@@ -266,13 +268,9 @@ export default function RiwayatTransaksi() {
               ))}
             </div>
 
-            <div className="mt-3 flex items-center gap-2">
-              <Plus className="w-4 h-4 text-muted-foreground" />
-              <select onChange={(e) => { if (e.target.value) { addItem(e.target.value); e.target.value = ""; } }} data-testid="edit-add-item-select"
-                className="flex-1 px-3 py-2 rounded-lg border border-input text-sm bg-white">
-                <option value="">+ Tambah produk...</option>
-                {products.map((p) => <option key={p.id} value={p.id}>{p.name} ({rupiah(p.harga_jual)})</option>)}
-              </select>
+            <div className="mt-3">
+              <ProductSearch products={products} exclude={edit.items.map((i) => i.product_id)} onPick={addItem}
+                placeholder="Cari & tambah produk..." testid="edit-add-item-select" />
             </div>
 
             <div className="mt-4 grid grid-cols-2 gap-3">

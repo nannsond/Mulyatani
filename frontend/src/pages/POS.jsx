@@ -25,6 +25,7 @@ export default function POS() {
   const [isHutang, setIsHutang] = useState(false);
   const [amountPaid, setAmountPaid] = useState("");
   const [ongkir, setOngkir] = useState("");
+  const [alamat, setAlamat] = useState("");
 
   const priceOf = (p) => (priceMode === "reseller" ? (p.harga_reseller || p.harga_jual) : p.harga_jual);
 
@@ -82,11 +83,12 @@ export default function POS() {
         discount_reason: discReason,
         customer_name: customerName,
         ongkir: ongkirNum,
+        alamat,
         amount_paid: isHutang ? paid : null,
       });
       setLastInvoice(data);
       toast.success(`Transaksi ${data.invoice_no} berhasil!`);
-      setCart([]); setCustomerName(""); setDiscRp(""); setDiscPct(""); setDiscReason(""); setIsHutang(false); setAmountPaid(""); setOngkir("");
+      setCart([]); setCustomerName(""); setDiscRp(""); setDiscPct(""); setDiscReason(""); setIsHutang(false); setAmountPaid(""); setOngkir(""); setAlamat("");
       load();
     } catch (err) {
       toast.error(apiError(err.response?.data?.detail));
@@ -183,6 +185,8 @@ export default function POS() {
               className="w-full px-3 py-2 rounded-lg border border-input text-sm" />
           )}
           <input type="number" min="0" value={ongkir} onChange={(e) => setOngkir(e.target.value)} data-testid="pos-ongkir" placeholder="Ongkos kirim (Rp) - jika diantar"
+            className="w-full px-3 py-2 rounded-lg border border-input text-sm focus:outline-none focus:ring-2 focus:ring-[#1B5E3B]" />
+          <input value={alamat} onChange={(e) => setAlamat(e.target.value)} data-testid="pos-alamat" placeholder="Alamat pengiriman (jika diantar)"
             className="w-full px-3 py-2 rounded-lg border border-input text-sm focus:outline-none focus:ring-2 focus:ring-[#1B5E3B]" />
           <div className="flex gap-2">
             {["Tunai", "Transfer", "QRIS"].map((m) => (
