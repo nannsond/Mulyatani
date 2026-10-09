@@ -179,3 +179,8 @@ Aplikasi laporan penjualan sederhana untuk bisnis toko pertanian: laporan harian
 - Daftar Pengantaran: halaman baru /pengantaran (menu sidebar "Pengantaran", ikon MapPin). Menampilkan pesanan yg perlu diantar (alamat !='' ATAU ongkir>0) dgn alamat, No HP (WA), item, total, ongkir, status antar. Tab filter (Semua/Belum/Diantar/Selesai) + tombol ubah status. Backend: field status_antar di transaksi (set saat create/update), endpoint GET /deliveries & PUT /deliveries/{id}/status.
 - Pelanggan Tersimpan: collection customers (upsert saat create/update transaksi by telepon/nama). Endpoint GET /customers. POS: datalist nama & no HP; mengetik nama/HP yg cocok otomatis mengisi telepon & alamat.
 - Diverifikasi API & UI; data uji dibersihkan.
+
+## Implemented (2026-10-09) — Arsip Pengantaran Selesai
+- Kartu pesanan berstatus "Selesai" punya tombol "Arsipkan" (field `arsip` di transaksi). Default daftar pengantaran menyembunyikan yang diarsipkan.
+- Tab "Arsip" untuk melihat pesanan terarsip + tombol "Keluarkan dari Arsip".
+- Backend: param `archived` di GET /deliveries + endpoint PUT /deliveries/{id}/archive. Diverifikasi API & UI.

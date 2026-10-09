@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { rupiah, fmtDateTime } from "@/lib/format";
-import { MapPin, MessageCircle, Loader2, PackageCheck, Clock, Truck } from "lucide-react";
+import { MapPin, MessageCircle, Loader2, PackageCheck, Clock, Truck, Archive, ArchiveRestore } from "lucide-react";
 import { toast } from "sonner";
 
 const TABS = [
@@ -9,6 +9,7 @@ const TABS = [
   { key: "belum", label: "Belum Diantar" },
   { key: "diantar", label: "Sedang Diantar" },
   { key: "selesai", label: "Selesai" },
+  { key: "arsip", label: "Arsip" },
 ];
 
 const STATUS_STYLE = {
@@ -23,13 +24,16 @@ export default function Pengantaran() {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
 
+  const archivedView = tab === "arsip";
   const load = () => {
     setLoading(true);
-    api.get(`/deliveries${tab ? `?status=${tab}` : ""}`).then((r) => setRows(r.data)).catch(() => {}).finally(() => setLoading(false));
+    const url = tab === "arsip" ? "/deliveries?archived=true" : `/deliveries${tab ? `?status=${tab}` : ""}`;
+    api.get(url).then((r) => setRows(r.data)).catch(() => {}).finally(() => setLoading(false));
   };
   useEffect(() => {
     setLoading(true);
-    api.get(`/deliveries${tab ? `?status=${tab}` : ""}`).then((r) => setRows(r.data)).catch(() => {}).finally(() => setLoading(false));
+    const url = tab === "arsip" ? "/deliveries?archived=true" : `/deliveries${tab ? `?status=${tab}` : ""}`;
+    api.get(url).then((r) => setRows(r.data)).catch(() => {}).finally(() => setLoading(false));
   }, [tab]);
 
   const setStatus = async (id, status_antar) => {
@@ -39,6 +43,16 @@ export default function Pengantaran() {
       load();
     } catch (e) {
       toast.error("Gagal memperbarui status");
+    }
+  };
+
+  const setArsip = async (id, arsip) => {
+    try {
+      await api.put(`/deliveries/${id}/archive`, { arsip });
+      toast.success(arsip ? "Pesanan diarsipkan" : "Pesanan dikeluarkan dari arsip");
+      load();
+    } catch (e) {
+      toast.error("Gagal memperbarui arsip");
     }
   };
 
@@ -93,18 +107,29 @@ export default function Pengantaran() {
                 <span className="text-muted-foreground">Ongkir {rupiah(d.ongkir || 0)}</span>
                 <span className="font-mono font-bold text-[#1B5E3B]">{rupiah(d.total)}</span>
               </div>
-              <div className="flex gap-2 pt-1">
-                {d.status_antar !== "diantar" && d.status_antar !== "selesai" && (
-                  <button onClick={() => setStatus(d.id, "diantar")} data-testid={`delivery-set-diantar-${d.id}`}
-                    className="flex-1 inline-flex items-center justify-center gap-1 text-xs font-semibold py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700"><Truck className="w-3.5 h-3.5" /> Diantar</button>
-                )}
-                {d.status_antar !== "selesai" && (
-                  <button onClick={() => setStatus(d.id, "selesai")} data-testid={`delivery-set-selesai-${d.id}`}
-                    className="flex-1 inline-flex items-center justify-center gap-1 text-xs font-semibold py-2 rounded-lg bg-[#1B5E3B] text-white hover:bg-[#143D2B]"><PackageCheck className="w-3.5 h-3.5" /> Selesai</button>
-                )}
-                {d.status_antar === "selesai" && (
-                  <button onClick={() => setStatus(d.id, "belum")} data-testid={`delivery-set-belum-${d.id}`}
-                    className="flex-1 inline-flex items-center justify-center gap-1 text-xs font-semibold py-2 rounded-lg border border-input hover:bg-secondary"><Clock className="w-3.5 h-3.5" /> Set Belum</button>
+              <div className="flex gap-2 pt-1 flex-wrap">
+                {archivedView ? (
+                  <button onClick={() => setArsip(d.id, false)} data-testid={`delivery-unarchive-${d.id}`}
+                    className="flex-1 inline-flex items-center justify-center gap-1 text-xs font-semibold py-2 rounded-lg border border-input hover:bg-secondary"><ArchiveRestore className="w-3.5 h-3.5" /> Keluarkan dari Arsip</button>
+                ) : (
+                  <>
+                    {d.status_antar !== "diantar" && d.status_antar !== "selesai" && (
+                      <button onClick={() => setStatus(d.id, "diantar")} data-testid={`delivery-set-diantar-${d.id}`}
+                        className="flex-1 inline-flex items-center justify-center gap-1 text-xs font-semibold py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700"><Truck className="w-3.5 h-3.5" /> Diantar</button>
+                    )}
+                    {d.status_antar !== "selesai" && (
+                      <button onClick={() => setStatus(d.id, "selesai")} data-testid={`delivery-set-selesai-${d.id}`}
+                        className="flex-1 inline-flex items-center justify-center gap-1 text-xs font-semibold py-2 rounded-lg bg-[#1B5E3B] text-white hover:bg-[#143D2B]"><PackageCheck className="w-3.5 h-3.5" /> Selesai</button>
+                    )}
+                    {d.status_antar === "selesai" && (
+                      <>
+                        <button onClick={() => setStatus(d.id, "belum")} data-testid={`delivery-set-belum-${d.id}`}
+                          className="flex-1 inline-flex items-center justify-center gap-1 text-xs font-semibold py-2 rounded-lg border border-input hover:bg-secondary"><Clock className="w-3.5 h-3.5" /> Set Belum</button>
+                        <button onClick={() => setArsip(d.id, true)} data-testid={`delivery-archive-${d.id}`}
+                          className="flex-1 inline-flex items-center justify-center gap-1 text-xs font-semibold py-2 rounded-lg bg-slate-600 text-white hover:bg-slate-700"><Archive className="w-3.5 h-3.5" /> Arsipkan</button>
+                      </>
+                    )}
+                  </>
                 )}
               </div>
             </div>

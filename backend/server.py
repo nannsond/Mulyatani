@@ -519,16 +519,34 @@ async def list_customers(user: dict = Depends(get_current_user)):
     return [{"id": d.get("id"), "name": d.get("name", ""), "telepon": d.get("telepon", ""), "alamat": d.get("alamat", "")} for d in docs]
 
 @api_router.get("/deliveries")
-async def list_deliveries(status: Optional[str] = None, user: dict = Depends(get_current_user)):
-    query: Dict[str, Any] = {"$or": [{"alamat": {"$nin": ["", None]}}, {"ongkir": {"$gt": 0}}]}
-    if status:
-        query["status_antar"] = status
+async def list_deliveries(status: Optional[str] = None, archived: bool = False, user: dict = Depends(get_current_user)):
+    base = {"$or": [{"alamat": {"$nin": ["", None]}}, {"ongkir": {"$gt": 0}}]}
+    conds: List[dict] = [base]
+    if archived:
+        conds.append({"arsip": True})
+    else:
+        conds.append({"arsip": {"$ne": True}})
+        if status:
+            conds.append({"status_antar": status})
+    query: Dict[str, Any] = {"$and": conds}
     docs = await db.transactions.find(query).sort("created_at", -1).to_list(500)
     for d in docs:
         d["id"] = str(d["_id"]); d.pop("_id", None)
         if not d.get("status_antar"):
             d["status_antar"] = "belum"
     return docs
+
+@api_router.put("/deliveries/{tid}/archive")
+async def archive_delivery(tid: str, body: Dict[str, Any], user: dict = Depends(get_current_user)):
+    arsip = bool(body.get("arsip", True))
+    try:
+        oid = ObjectId(tid)
+    except InvalidId:
+        raise HTTPException(status_code=404, detail="Transaksi tidak ditemukan")
+    r = await db.transactions.update_one({"_id": oid}, {"$set": {"arsip": arsip}})
+    if r.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Transaksi tidak ditemukan")
+    return {"ok": True, "arsip": arsip}
 
 @api_router.put("/deliveries/{tid}/status")
 async def update_delivery_status(tid: str, body: Dict[str, Any], user: dict = Depends(get_current_user)):
