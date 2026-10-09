@@ -314,6 +314,8 @@ class BundleInput(BaseModel):
     name: str
     category: str = "Paket"
     harga_jual: float = 0
+    harga_reseller: float = 0
+    harga_online: float = 0
     components: List[BundleComponent] = []
 
 class BundleReduce(BaseModel):
@@ -323,19 +325,23 @@ async def _bundle_view(b: dict, pmap: dict) -> dict:
     comps = []
     stok = None
     hpp = 0.0
+    satuan_total = 0.0
     for c in b.get("components", []):
         p = pmap.get(c["product_id"])
         q = max(1, c.get("qty", 1))
         pstok = p.get("stok", 0) if p else 0
         hpp += q * (p.get("harga_beli", 0) if p else 0)
+        satuan_total += q * (p.get("harga_jual", 0) if p else 0)
         avail = pstok // q
         stok = avail if stok is None else min(stok, avail)
         comps.append({"product_id": c["product_id"], "name": (p or {}).get("name", c.get("name", "")),
                       "qty": q, "stok": pstok, "unit": (p or {}).get("unit", ""),
                       "habis": pstok <= 0, "missing": p is None})
     return {"id": str(b["_id"]), "name": b["name"], "category": b.get("category", "Paket"),
-            "harga_jual": b.get("harga_jual", 0), "components": comps,
-            "stok": max(0, stok or 0), "hpp": hpp, "is_bundle": True}
+            "harga_jual": b.get("harga_jual", 0), "harga_reseller": b.get("harga_reseller", 0),
+            "harga_online": b.get("harga_online", 0), "components": comps,
+            "stok": max(0, stok or 0), "hpp": hpp, "harga_satuan_total": satuan_total,
+            "hemat": max(0, satuan_total - b.get("harga_jual", 0)), "is_bundle": True}
 
 @api_router.get("/bundles")
 async def list_bundles(user: dict = Depends(get_current_user)):
@@ -348,6 +354,7 @@ async def create_bundle(data: BundleInput, admin: dict = Depends(require_admin))
     if not data.components:
         raise HTTPException(status_code=400, detail="Komponen paket tidak boleh kosong")
     doc = {"name": data.name, "category": data.category or "Paket", "harga_jual": data.harga_jual,
+           "harga_reseller": data.harga_reseller, "harga_online": data.harga_online,
            "components": [c.model_dump() for c in data.components], "created_at": now_iso()}
     res = await db.bundles.insert_one(doc)
     return {"ok": True, "id": str(res.inserted_id)}
@@ -358,6 +365,7 @@ async def update_bundle(bid: str, data: BundleInput, admin: dict = Depends(requi
         raise HTTPException(status_code=400, detail="Komponen paket tidak boleh kosong")
     r = await db.bundles.update_one({"_id": ObjectId(bid)}, {"$set": {
         "name": data.name, "category": data.category or "Paket", "harga_jual": data.harga_jual,
+        "harga_reseller": data.harga_reseller, "harga_online": data.harga_online,
         "components": [c.model_dump() for c in data.components]}})
     if r.matched_count == 0:
         raise HTTPException(status_code=404, detail="Paket tidak ditemukan")
@@ -947,6 +955,7 @@ class EcomItem(BaseModel):
     name: str
     qty: int
     harga: float
+    is_bundle: bool = False
 
 class EcomSaleInput(BaseModel):
     channel: str
@@ -970,16 +979,8 @@ async def create_ecom_sale(data: EcomSaleInput, user: dict = Depends(get_current
     if not data.items:
         raise HTTPException(status_code=400, detail="Item penjualan kosong")
     cost = await product_cost_map()
-    items = []
-    omzet = 0.0
-    hpp = 0.0
-    for it in data.items:
-        line = it.qty * it.harga
-        omzet += line
-        hpp += it.qty * cost.get(it.product_id, 0)
-        items.append({"product_id": it.product_id, "name": it.name, "qty": it.qty,
-                      "harga": it.harga, "subtotal": line})
-        await db.products.update_one({"_id": ObjectId(it.product_id)}, {"$inc": {"stok": -it.qty}})
+    items, omzet = await _apply_sale_items(data.items)
+    hpp = sum(it["qty"] * (it.get("hpp", 0) if it.get("is_bundle") else cost.get(it["product_id"], 0)) for it in items)
     admin_fee = max(0.0, data.admin_fee)
     ongkir = max(0.0, data.ongkir)
     biaya_lain = max(0.0, data.biaya_lain)
@@ -1017,8 +1018,7 @@ async def delete_ecom_sale(sid: str, admin: dict = Depends(require_admin)):
     doc = await db.ecommerce_sales.find_one({"_id": ObjectId(sid)})
     if not doc:
         raise HTTPException(status_code=404, detail="Penjualan tidak ditemukan")
-    for i in doc.get("items", []):
-        await db.products.update_one({"_id": ObjectId(i["product_id"])}, {"$inc": {"stok": i["qty"]}})
+    await _restore_sale_items(doc.get("items", []))
     await db.ecommerce_sales.delete_one({"_id": ObjectId(sid)})
     return {"ok": True}
 
@@ -1035,8 +1035,7 @@ async def update_ecom_status(sid: str, data: EcomStatusInput, admin: dict = Depe
         raise HTTPException(status_code=404, detail="Penjualan tidak ditemukan")
     update = {"status": data.status}
     if data.status == "Dikembalikan" and data.restore_stock and not doc.get("stock_restored"):
-        for i in doc.get("items", []):
-            await db.products.update_one({"_id": ObjectId(i["product_id"])}, {"$inc": {"stok": i["qty"]}})
+        await _restore_sale_items(doc.get("items", []))
         update["stock_restored"] = True
     await db.ecommerce_sales.update_one({"_id": ObjectId(sid)}, {"$set": update})
     return {"ok": True, "status": data.status, "stock_restored": update.get("stock_restored", doc.get("stock_restored", False))}

@@ -19,6 +19,7 @@ export default function PenjualanOnline() {
   const isAdmin = user?.role === "admin";
   const fileRef = useRef(null);
   const [products, setProducts] = useState([]);
+  const [bundles, setBundles] = useState([]);
   const [channels, setChannels] = useState([]);
   const [search, setSearch] = useState("");
   const [cart, setCart] = useState([]);
@@ -39,15 +40,20 @@ export default function PenjualanOnline() {
   const activeChannels = channels.filter((c) => c.active);
 
   const loadProducts = () => api.get("/products").then((r) => setProducts(r.data));
+  const loadBundles = () => api.get("/bundles").then((r) => setBundles(r.data));
   const loadRecent = () => api.get(`/ecommerce/sales?month=${filterMonth}${filterChannel ? `&channel=${encodeURIComponent(filterChannel)}` : ""}`).then((r) => setRecent(r.data));
   useEffect(() => {
-    loadProducts();
+    loadProducts(); loadBundles();
     api.get("/channels").then((r) => { setChannels(r.data); const act = r.data.filter((c) => c.active); if (act.length) setChannel(act[0].name); });
   }, []);
   useEffect(() => { loadRecent(); }, [filterMonth, filterChannel]);
 
-  const filtered = products.filter((p) =>
-    p.name.toLowerCase().includes(search.toLowerCase()) || p.sku.toLowerCase().includes(search.toLowerCase()));
+  const sellable = [
+    ...products,
+    ...bundles.map((b) => ({ id: b.id, name: b.name, category: "Paket", harga_online: b.harga_online, stok: b.stok, stok_minimal: 0, is_bundle: true, hemat: b.hemat })),
+  ];
+  const filtered = sellable.filter((p) =>
+    p.name.toLowerCase().includes(search.toLowerCase()) || (p.sku || "").toLowerCase().includes(search.toLowerCase()));
 
   const addToCart = (p) => {
     if (p.stok <= 0) { toast.error("Stok habis"); return; }
@@ -57,7 +63,7 @@ export default function PenjualanOnline() {
         if (ex.qty >= p.stok) { toast.error("Melebihi stok"); return c; }
         return c.map((i) => i.product_id === p.id ? { ...i, qty: i.qty + 1 } : i);
       }
-      return [...c, { product_id: p.id, name: p.name, harga: p.harga_online || 0, qty: 1, stok: p.stok }];
+      return [...c, { product_id: p.id, name: p.name, harga: p.harga_online || 0, qty: 1, stok: p.stok, is_bundle: !!p.is_bundle }];
     });
   };
   const setQty = (id, delta) => setCart((c) =>
@@ -76,7 +82,7 @@ export default function PenjualanOnline() {
     try {
       const { data } = await api.post("/ecommerce/sales", {
         channel,
-        items: cart.map((i) => ({ product_id: i.product_id, name: i.name, qty: i.qty, harga: i.harga })),
+        items: cart.map((i) => ({ product_id: i.product_id, name: i.name, qty: i.qty, harga: i.harga, is_bundle: !!i.is_bundle })),
         admin_fee: Number(adminFee) || 0,
         ongkir: Number(ongkir) || 0,
         biaya_lain: Number(biayaLain) || 0,
@@ -86,7 +92,7 @@ export default function PenjualanOnline() {
       });
       toast.success(`Penjualan ${channel} ${data.ecom_no} tersimpan (status: Diproses)`);
       setCart([]); setAdminFee(""); setOngkir(""); setBiayaLain(""); setCustomerName(""); setOrderNo("");
-      loadProducts(); loadRecent();
+      loadProducts(); loadBundles(); loadRecent();
     } catch (err) {
       toast.error(apiError(err.response?.data?.detail));
     } finally { setSaving(false); }
@@ -101,7 +107,7 @@ export default function PenjualanOnline() {
     try {
       await api.put(`/ecommerce/sales/${s.id}/status`, { status: newStatus, restore_stock: restore });
       toast.success(`Status ${s.ecom_no} → ${newStatus}${restore ? " (stok dikembalikan)" : ""}`);
-      loadProducts(); loadRecent();
+      loadProducts(); loadBundles(); loadRecent();
     } catch (err) { toast.error(apiError(err.response?.data?.detail)); }
   };
 
@@ -122,7 +128,7 @@ export default function PenjualanOnline() {
       if (data.created > 0) toast.success(`${data.created} penjualan diimpor`);
       if (data.errors?.length) toast.error(`${data.errors.length} baris gagal: ${data.errors.slice(0, 3).join("; ")}${data.errors.length > 3 ? "…" : ""}`);
       if (data.created === 0 && !data.errors?.length) toast.error("Tidak ada data yang diimpor");
-      loadProducts(); loadRecent();
+      loadProducts(); loadBundles(); loadRecent();
     } catch (err) { toast.error("Gagal membaca file Excel"); }
     finally { setImporting(false); if (fileRef.current) fileRef.current.value = ""; }
   };
@@ -150,12 +156,13 @@ export default function PenjualanOnline() {
             {filtered.map((p) => (
               <button key={p.id} onClick={() => addToCart(p)} disabled={p.stok <= 0} data-testid={`ecom-product-${p.id}`}
                 className="text-left bg-card rounded-xl border border-slate-200 p-4 hover:border-[#1B5E3B] hover:shadow-md transition-all disabled:opacity-50">
-                <span className="text-[10px] uppercase tracking-wider font-semibold text-[#C85A32]">{p.category}</span>
+                <span className={`text-[10px] uppercase tracking-wider font-semibold ${p.is_bundle ? "text-[#2563EB]" : "text-[#C85A32]"}`}>{p.is_bundle ? "★ Paket Bundling" : p.category}</span>
                 <p className="font-medium text-sm text-[#0F281E] mt-1 line-clamp-2 min-h-[2.5rem]">{p.name}</p>
                 <div className="flex items-center justify-between mt-2">
                   <span className={`font-mono font-bold ${p.harga_online ? "text-[#1B5E3B]" : "text-muted-foreground text-xs"}`}>{p.harga_online ? rupiah(p.harga_online) : "Harga online belum diatur"}</span>
                   <span className={`text-xs ${p.stok <= p.stok_minimal ? "text-destructive" : "text-muted-foreground"}`}>Stok: {p.stok}</span>
                 </div>
+                {p.is_bundle && p.hemat > 0 && <span className="inline-block mt-1.5 text-[10px] font-bold px-2 py-0.5 rounded-full bg-green-100 text-green-700">Hemat {rupiah(p.hemat)}</span>}
               </button>
             ))}
           </div>

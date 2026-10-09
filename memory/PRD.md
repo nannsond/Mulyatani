@@ -107,6 +107,12 @@ Aplikasi laporan penjualan sederhana untuk bisnis toko pertanian: laporan harian
 - Backend: koleksi `bundles`; GET/POST/PUT/DELETE /bundles, POST /bundles/{id}/reduce; helper `_apply_sale_items`/`_restore_sale_items` menangani bundle di create/update/delete transaksi; CartItem punya `is_bundle`; item bundle menyimpan `hpp` (biaya = Σ harga_beli komponen) agar laba/HPP tetap akurat (compute_profit/product_profit/category_profit pakai fallback `i.hpp`).
 - Diverifikasi curl (calc stok 12, hpp 35.000, jual 1 paket → komponen −2/−1, delete restore, reduce) + screenshot (panel bundling, modal, kartu POS).
 
+## Implemented (2026-10-09) — Harga Paket Lengkap & Hemat Bundling
+- Paket bundling kini punya 3 harga: Normal, **Reseller**, dan **Online** (input di modal BundlingPanel). Backend: BundleInput + _bundle_view + create/update menyimpan harga_reseller & harga_online.
+- **POS**: paket mengikuti mode Normal/Reseller (pakai harga_reseller). **Penjualan Online**: paket kini tampil sebagai kartu "★ Paket Bundling" dan bisa dijual memakai harga_online; stok komponen otomatis terpotong, omzet/HPP/laba akurat, restore saat hapus/retur (pakai _apply_sale_items/_restore_sale_items; EcomItem punya is_bundle).
+- **Diskon Paket Otomatis**: _bundle_view menghitung `harga_satuan_total` (Σ qty×harga_jual komponen) & `hemat` = max(0, satuan_total − harga_jual). Badge hijau "Hemat Rp…" tampil di kartu BundlingPanel, POS, dan Penjualan Online bila hemat>0.
+- Diverifikasi curl (prices persist, hemat math, jual 2 paket online → komponen −2, omzet 220k/hpp 50k/laba 165k, delete restore) + screenshot (kartu paket di Penjualan Online).
+
 ## Backlog (P1/P2)
 - P1: Cetak struk/nota transaksi POS
 - P1: Manajemen user (tambah kasir dari UI)

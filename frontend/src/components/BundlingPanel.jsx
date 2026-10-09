@@ -4,7 +4,7 @@ import { rupiah } from "@/lib/format";
 import { toast } from "sonner";
 import { Plus, Pencil, Trash2, X, Boxes, AlertTriangle, PackageMinus, Loader2 } from "lucide-react";
 
-const EMPTY = { name: "", category: "Paket", harga_jual: 0, components: [] };
+const EMPTY = { name: "", category: "Paket", harga_jual: 0, harga_reseller: 0, harga_online: 0, components: [] };
 
 export default function BundlingPanel({ isAdmin, onChanged }) {
   const [bundles, setBundles] = useState([]);
@@ -35,6 +35,7 @@ export default function BundlingPanel({ isAdmin, onChanged }) {
     if (modal.components.length === 0) { toast.error("Tambahkan minimal 1 komponen"); return; }
     const body = {
       name: modal.name, category: modal.category || "Paket", harga_jual: Number(modal.harga_jual) || 0,
+      harga_reseller: Number(modal.harga_reseller) || 0, harga_online: Number(modal.harga_online) || 0,
       components: modal.components.map((c) => ({ product_id: c.product_id, name: pName(c.product_id), qty: Number(c.qty) || 1 })),
     };
     try {
@@ -65,6 +66,7 @@ export default function BundlingPanel({ isAdmin, onChanged }) {
 
   const openEdit = (b) => setModal({
     id: b.id, name: b.name, category: b.category || "Paket", harga_jual: b.harga_jual,
+    harga_reseller: b.harga_reseller || 0, harga_online: b.harga_online || 0,
     components: b.components.map((c) => ({ product_id: c.product_id, name: c.name, qty: c.qty })),
   });
 
@@ -103,6 +105,15 @@ export default function BundlingPanel({ isAdmin, onChanged }) {
                 </div>
 
                 <p className="font-mono font-bold text-[#1B5E3B] mt-1">{rupiah(b.harga_jual)}</p>
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1 text-xs text-muted-foreground">
+                  {b.harga_reseller > 0 && <span>Reseller: <span className="font-mono text-[#C85A32]">{rupiah(b.harga_reseller)}</span></span>}
+                  {b.harga_online > 0 && <span>Online: <span className="font-mono text-[#2563EB]">{rupiah(b.harga_online)}</span></span>}
+                </div>
+                {b.hemat > 0 && (
+                  <span data-testid={`bundle-hemat-${b.id}`} className="inline-flex items-center gap-1 mt-2 text-xs font-bold px-2 py-0.5 rounded-full bg-green-100 text-green-700 w-fit">
+                    Hemat {rupiah(b.hemat)} vs beli satuan
+                  </span>
+                )}
 
                 <div className="mt-3 space-y-1.5 flex-1">
                   <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Komposisi</p>
@@ -151,10 +162,22 @@ export default function BundlingPanel({ isAdmin, onChanged }) {
                 <input value={modal.name} onChange={(e) => setModal({ ...modal, name: e.target.value })} data-testid="bundle-name-input"
                   placeholder="mis. Paket Hemat Tani" className="mt-1 w-full px-3 py-2.5 rounded-xl border border-input text-sm focus:outline-none focus:ring-2 focus:ring-[#1B5E3B]" />
               </div>
-              <div>
-                <label className="text-sm font-medium">Harga Jual Paket (Rp)</label>
-                <input type="number" min="0" value={modal.harga_jual} onChange={(e) => setModal({ ...modal, harga_jual: e.target.value })} data-testid="bundle-harga-input"
-                  className="mt-1 w-full px-3 py-2.5 rounded-xl border border-input text-sm font-mono focus:outline-none focus:ring-2 focus:ring-[#1B5E3B]" />
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-sm font-medium">Harga Jual (Normal)</label>
+                  <input type="number" min="0" value={modal.harga_jual} onChange={(e) => setModal({ ...modal, harga_jual: e.target.value })} data-testid="bundle-harga-input"
+                    className="mt-1 w-full px-3 py-2.5 rounded-xl border border-input text-sm font-mono focus:outline-none focus:ring-2 focus:ring-[#1B5E3B]" />
+                </div>
+                <div>
+                  <label className="text-sm font-medium">Harga Reseller</label>
+                  <input type="number" min="0" value={modal.harga_reseller} onChange={(e) => setModal({ ...modal, harga_reseller: e.target.value })} data-testid="bundle-reseller-input"
+                    className="mt-1 w-full px-3 py-2.5 rounded-xl border border-input text-sm font-mono focus:outline-none focus:ring-2 focus:ring-[#C85A32]" />
+                </div>
+                <div className="col-span-2">
+                  <label className="text-sm font-medium">Harga Online (untuk Penjualan Online)</label>
+                  <input type="number" min="0" value={modal.harga_online} onChange={(e) => setModal({ ...modal, harga_online: e.target.value })} data-testid="bundle-online-input"
+                    className="mt-1 w-full px-3 py-2.5 rounded-xl border border-input text-sm font-mono focus:outline-none focus:ring-2 focus:ring-[#2563EB]" />
+                </div>
               </div>
 
               <div>

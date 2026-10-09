@@ -25,7 +25,7 @@ export default function POS() {
   const [isHutang, setIsHutang] = useState(false);
   const [amountPaid, setAmountPaid] = useState("");
 
-  const priceOf = (p) => (p.is_bundle ? p.harga_jual : priceMode === "reseller" ? (p.harga_reseller || p.harga_jual) : p.harga_jual);
+  const priceOf = (p) => (priceMode === "reseller" ? (p.harga_reseller || p.harga_jual) : p.harga_jual);
 
   const load = () => Promise.all([api.get("/products"), api.get("/bundles")]).then(([p, b]) => { setProducts(p.data); setBundles(b.data); });
   useEffect(() => { load(); }, []);
@@ -41,7 +41,7 @@ export default function POS() {
 
   const sellable = [
     ...products,
-    ...bundles.map((b) => ({ id: b.id, name: b.name, category: "Paket", harga_jual: b.harga_jual, stok: b.stok, stok_minimal: 0, is_bundle: true })),
+    ...bundles.map((b) => ({ id: b.id, name: b.name, category: "Paket", harga_jual: b.harga_jual, harga_reseller: b.harga_reseller, stok: b.stok, stok_minimal: 0, is_bundle: true, hemat: b.hemat })),
   ];
   const filtered = sellable.filter((p) =>
     p.name.toLowerCase().includes(search.toLowerCase()) || (p.sku || "").toLowerCase().includes(search.toLowerCase())
@@ -130,6 +130,7 @@ export default function POS() {
                 <span className={`font-mono font-bold ${priceMode === "reseller" ? "text-[#C85A32]" : "text-[#1B5E3B]"}`}>{rupiah(priceOf(p))}</span>
                 <span className={`text-xs ${p.stok <= p.stok_minimal ? "text-destructive" : "text-muted-foreground"}`}>Stok: {p.stok}</span>
               </div>
+              {p.is_bundle && p.hemat > 0 && <span className="inline-block mt-1.5 text-[10px] font-bold px-2 py-0.5 rounded-full bg-green-100 text-green-700">Hemat {rupiah(p.hemat)}</span>}
             </button>
           ))}
         </div>
