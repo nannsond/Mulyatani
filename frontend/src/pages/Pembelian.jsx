@@ -5,9 +5,8 @@ import { exportPDF, exportExcel } from "@/lib/exporter";
 import { useAuth } from "@/context/AuthContext";
 import { Plus, Trash2, Truck, FileDown, FileSpreadsheet, Pencil, X, Search } from "lucide-react";
 import { toast } from "sonner";
-import { beepSuccess, beepError } from "@/lib/sound";
 
-// Pencarian/scan produk: ketik manual atau scan barcode (scanner fisik mengetik kode + Enter)
+// Pencarian produk ketik manual (typeahead) dengan harga beli terakhir
 function ProductSearch({ products, exclude = [], onPick, placeholder = "Cari produk...", testid, lastPrices = {} }) {
   const [q, setQ] = useState("");
   const [open, setOpen] = useState(false);
@@ -24,8 +23,7 @@ function ProductSearch({ products, exclude = [], onPick, placeholder = "Cari pro
     ? products
         .filter((p) => !exclude.includes(p.id) && (
           p.name.toLowerCase().includes(term) ||
-          (p.sku || "").toLowerCase().includes(term) ||
-          (p.barcode || "").toLowerCase().includes(term)
+          (p.sku || "").toLowerCase().includes(term)
         ))
         .slice(0, 8)
     : [];
@@ -35,14 +33,7 @@ function ProductSearch({ products, exclude = [], onPick, placeholder = "Cari pro
   const onKeyDown = (e) => {
     if (e.key === "Enter") {
       e.preventDefault();
-      const raw = q.trim();
-      if (!raw) return;
-      // Scanner fisik: cocokkan persis dengan barcode atau SKU lebih dulu
-      const exact = products.find((p) => !exclude.includes(p.id) &&
-        ((p.barcode && p.barcode === raw) || (p.sku && p.sku.toLowerCase() === raw.toLowerCase())));
-      if (exact) { choose(exact); beepSuccess(); return; }
-      if (matches.length > 0) { choose(matches[0]); beepSuccess(); return; }
-      beepError();
+      if (matches.length > 0) choose(matches[0]);
     }
   };
 
@@ -75,7 +66,7 @@ function ProductSearch({ products, exclude = [], onPick, placeholder = "Cari pro
                   data-testid={testid ? `${testid}-option-${p.id}` : undefined}
                   className="w-full text-left px-3 py-2.5 text-sm hover:bg-secondary flex items-center justify-between gap-2"
                 >
-                  <span className="truncate">{p.name}{p.barcode ? <span className="text-[10px] text-muted-foreground font-mono ml-1">#{p.barcode}</span> : null}</span>
+                  <span className="truncate">{p.name}</span>
                   <span className="text-xs shrink-0 text-right">
                     {last != null
                       ? <span className="text-[#1B5E3B] font-mono">Terakhir: {rupiah(last)}</span>
@@ -180,7 +171,7 @@ export default function Pembelian() {
             {suppliers.map((s) => <option key={s} value={s} />)}
           </datalist>
           <ProductSearch products={products} exclude={lines.map((l) => l.product_id)} onPick={addLine} lastPrices={lastPrices}
-            placeholder="Cari / scan barcode produk..." testid="purchase-add-product" />
+            placeholder="Cari & tambah produk..." testid="purchase-add-product" />
         </div>
         {lines.length > 0 && (
           <div className="space-y-2 mb-3">
@@ -274,7 +265,7 @@ export default function Pembelian() {
 
             <div className="mt-3">
               <ProductSearch products={products} exclude={edit.items.map((i) => i.product_id)} onPick={eAdd} lastPrices={lastPrices}
-                placeholder="Cari / scan barcode produk..." testid="edit-purchase-add-select" />
+                placeholder="Cari & tambah produk..." testid="edit-purchase-add-select" />
             </div>
 
             <input value={edit.note} onChange={(e) => setEdit({ ...edit, note: e.target.value })} placeholder="Catatan (opsional)" data-testid="edit-purchase-note"

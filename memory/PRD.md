@@ -147,3 +147,8 @@ Aplikasi laporan penjualan sederhana untuk bisnis toko pertanian: laporan harian
 - Input Qty Cepat: SUDAH DIHAPUS sesuai permintaan (tidak ada field qty di kotak pencarian).
 - Login: foto hero diganti logo MULYA TANI (/mulyatani-logo.png) di panel kiri + ikon header.
 - Fix setup: reset password admin/kasir agar cocok dengan backend/.env (hash DB lama tidak cocok → login 401).
+
+## Reverted (2026-10-09) — Hapus Fitur Barcode
+- Dihapus seluruhnya atas permintaan user: field `barcode` di model Product/ProductInput (backend), input Barcode di form Daftar Harga, pencocokan barcode & handler scan (Enter) di POS/Pembelian/Penjualan Online, serta bunyi konfirmasi scan (file src/lib/sound.js dihapus beserta semua import/pemakaian beepSuccess/beepError).
+- TETAP ADA: pencarian produk ketik-manual di Pembelian, supplier tersimpan (datalist), harga beli terakhir di dropdown, dan logo login MULYA TANI. Placeholder dikembalikan: POS/Online "Cari produk / SKU...", Pembelian "Cari & tambah produk...".
+- Diverifikasi: grep tidak menemукан sisa referensi barcode/sound/beep; backend login 200 & produk tanpa key barcode; lint bersih; UI POS/Daftar Harga/Pembelian normal.

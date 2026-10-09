@@ -240,7 +240,6 @@ class Product(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
     id: Optional[PyObjectId] = Field(default=None, alias="_id")
     sku: str
-    barcode: str = ""
     name: str
     category: str
     unit: str = "pcs"
@@ -254,7 +253,6 @@ class Product(BaseModel):
 
 class ProductInput(BaseModel):
     sku: str
-    barcode: str = ""
     name: str
     category: str
     unit: str = "pcs"

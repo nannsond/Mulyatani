@@ -10,7 +10,7 @@ import { toast } from "sonner";
 import { calcFees, suggestPrice, targetProfit } from "@/lib/fees";
 import SuggestPricePanel, { TargetInput } from "@/components/SuggestPricePanel";
 
-const EMPTY = { sku: "", barcode: "", name: "", category: "Pupuk", unit: "pcs", harga_beli: 0, harga_jual: 0, harga_reseller: 0, harga_online: 0, harga_channel: {}, stok: 0, stok_minimal: 10 };
+const EMPTY = { sku: "", name: "", category: "Pupuk", unit: "pcs", harga_beli: 0, harga_jual: 0, harga_reseller: 0, harga_online: 0, harga_channel: {}, stok: 0, stok_minimal: 10 };
 const CATS = ["Pupuk", "Benih", "Pestisida", "Alat Tani", "Lainnya"];
 
 export default function DaftarHarga() {
@@ -236,7 +236,6 @@ export default function DaftarHarga() {
                   {CATS.map((c) => <option key={c}>{c}</option>)}
                 </select>
               </div>
-              <div className="col-span-2"><Field label="Barcode" testid="product-barcode-input" value={modal.barcode || ""} onChange={(v) => setModal({ ...modal, barcode: v })} /></div>
               <div className="col-span-2"><Field label="Nama Produk" testid="product-name-input" value={modal.name} onChange={(v) => setModal({ ...modal, name: v })} /></div>
               <Field label="Satuan" testid="product-unit-input" value={modal.unit} onChange={(v) => setModal({ ...modal, unit: v })} />
               <Field label="Harga Beli" type="number" testid="product-harga-beli-input" value={modal.harga_beli} onChange={(v) => setModal({ ...modal, harga_beli: v })} />
