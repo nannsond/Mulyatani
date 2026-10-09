@@ -128,3 +128,9 @@ Aplikasi laporan penjualan sederhana untuk bisnis toko pertanian: laporan harian
 - Products: `harga_channel` {channel: harga} — harga online berbeda per Shopee/Tokopedia/Lazada/TikTok Shop (kosong = pakai Harga Online). Daftar Harga tab Online menampilkan kolom per platform; modal produk punya input per platform. Penjualan Online memakai harga sesuai channel & re-price keranjang saat ganti channel.
 - POS: struk tidak lagi otomatis terunduh setelah bayar; unduh lewat tombol "Cetak Struk PDF".
 - Riwayat Transaksi: filter Semua/Tanggal/Bulan/Tahun + urutan terbaru/terlama (GET /transactions?date=&sort=); checklist + "Hapus Terpilih" (admin, stok dikembalikan). Tested iter 13: 100%
+
+## Implemented (2026-10-09) — Potongan per Platform (Channel Fees)
+- Tiap channel punya `fees` [{label, type percent|fixed, value, cap}] dengan default referensi kebijakan 2026 (non-Star/Mall): Shopee admin 8% + Gratis Ongkir XTRA 4% (maks 40rb) + proses pesanan Rp1.250; Tokopedia/TikTok Shop komisi 6.5% + layanan Xtra 4% (maks 40rb) + Rp1.250; Lazada komisi 6% + FSM 4% (maks 20rb) + Rp1.250.
+- Pengaturan: editor potongan per channel (tambah/hapus/reset ke referensi). GET /channels/fee-defaults.
+- Penjualan Online: potongan dihitung otomatis + rincian, bisa override manual; fee_breakdown disimpan. Impor Excel: admin_fee 0 → otomatis.
+- Daftar Harga tab Online: estimasi "bersih" per platform (merah jika < harga beli). Tested iter 14: 100%
