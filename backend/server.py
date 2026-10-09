@@ -16,7 +16,6 @@ import logging
 import jwt
 import hmac
 import bcrypt
-import random
 import uuid
 import requests
 import re
@@ -1784,22 +1783,6 @@ app.add_middleware(
 )
 
 # ---------------- Seed ----------------
-CATEGORIES = {
-    "Pupuk": [("NPK Phonska 25kg", "karung", 135000, 155000, 80),
-              ("Urea Pupuk Indonesia 50kg", "karung", 230000, 260000, 60),
-              ("Pupuk Organik Petroganik 40kg", "karung", 28000, 38000, 120),
-              ("KCl Mahkota 50kg", "karung", 340000, 380000, 30)],
-    "Benih": [("Benih Padi Ciherang 5kg", "bungkus", 65000, 85000, 90),
-              ("Benih Jagung Hibrida Bisi-18 1kg", "bungkus", 85000, 110000, 70),
-              ("Benih Cabai Rawit Dewata 10gr", "sachet", 18000, 28000, 150)],
-    "Pestisida": [("Gramoxone 1L", "botol", 72000, 95000, 45),
-                  ("Roundup 1L", "botol", 85000, 110000, 40),
-                  ("Curacron 500ml", "botol", 95000, 125000, 35)],
-    "Alat Tani": [("Tangki Sprayer Elektrik 16L", "unit", 320000, 410000, 15),
-                  ("Cangkul Baja Super", "unit", 55000, 78000, 25),
-                  ("Sabit Bergerigi", "unit", 25000, 40000, 40)],
-}
-
 async def seed():
     # users
     for email_key, pwd_key, name_key, role in [
@@ -1815,15 +1798,6 @@ async def seed():
             await db.users.insert_one({"email": email, "password_hash": hash_password(pwd),
                                        "name": name, "role": role, "created_at": now_iso()})
 
-    if await db.products.count_documents({}) == 0:
-        sku_n = 1001
-        for cat, items in CATEGORIES.items():
-            for name, unit, beli, jual, stok in items:
-                await db.products.insert_one({"sku": f"SKU-{sku_n}", "name": name, "category": cat,
-                    "unit": unit, "harga_beli": beli, "harga_jual": jual,
-                    "stok": stok, "stok_minimal": 10})
-                sku_n += 1
-
     async for p in db.products.find({"harga_reseller": {"$exists": False}}):
         await db.products.update_one({"_id": p["_id"]}, {"$set": {"harga_reseller": round(p["harga_jual"] * 0.9)}})
 
@@ -1831,39 +1805,6 @@ async def seed():
         await db.settings.update_one({"key": "channels"}, {"$set": {"list": [dict(c) for c in DEFAULT_CHANNELS]}}, upsert=True)
     await db.ecommerce_sales.update_many({"status": {"$exists": False}}, {"$set": {"status": "Selesai"}})
 
-    if await db.transactions.count_documents({}) == 0:
-        products = await db.products.find().to_list(1000)
-        cashiers = await db.users.find().to_list(10)
-        inv = 1
-        now = datetime.now(timezone.utc)
-        # generate ~2 years of data (monthly seasonality)
-        for days_ago in range(0, 730):
-            day = now - timedelta(days=days_ago)
-            month = day.month
-            # planting seasons: more sales in Oct-Dec and Mar-May
-            base = 6 if month in (10, 11, 12, 3, 4, 5) else 3
-            n_tx = random.randint(max(1, base - 2), base + 3)
-            for _ in range(n_tx):
-                n_items = random.randint(1, 4)
-                chosen = random.sample(products, min(n_items, len(products)))
-                items = []
-                total = 0
-                for p in chosen:
-                    qty = random.randint(1, 5)
-                    sub = qty * p["harga_jual"]
-                    total += sub
-                    items.append({"product_id": str(p["_id"]), "name": p["name"],
-                                  "qty": qty, "harga": p["harga_jual"], "subtotal": sub})
-                ts = day.replace(hour=random.randint(8, 17), minute=random.randint(0, 59))
-                c = random.choice(cashiers)
-                await db.transactions.insert_one({
-                    "invoice_no": f"INV-{ts.strftime('%Y%m%d')}-{inv:04d}",
-                    "items": items, "total": total,
-                    "payment_method": random.choice(["Tunai", "Tunai", "Transfer", "QRIS"]),
-                    "cashier_id": str(c["_id"]), "cashier_name": c["name"],
-                    "created_at": ts.isoformat()})
-                inv += 1
-        logger.info(f"Seeded {inv} transactions")
 
 @app.on_event("startup")
 async def startup():

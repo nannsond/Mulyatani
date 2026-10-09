@@ -5,6 +5,7 @@ import { Search, Plus, Minus, Trash2, ShoppingCart, Loader2, CheckCircle2, Print
 import { toast } from "sonner";
 import { printReceipt } from "@/lib/exporter";
 import { useSettings } from "@/context/SettingsContext";
+import { WhatsAppReceipt } from "@/components/WhatsAppReceipt";
 
 export default function POS() {
   const { settings } = useSettings();
@@ -254,6 +255,7 @@ export default function POS() {
               className="mt-2 w-full flex items-center justify-center gap-2 border border-green-300 text-green-800 py-2 rounded-lg text-sm font-semibold hover:bg-green-100">
               <Printer className="w-4 h-4" /> Cetak Struk PDF
             </button>
+            <WhatsAppReceipt key={lastInvoice.id} tx={lastInvoice} store={storeInfo} />
           </div>
         )}
       </div>
