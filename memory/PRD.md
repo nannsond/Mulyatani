@@ -123,3 +123,8 @@ Aplikasi laporan penjualan sederhana untuk bisnis toko pertanian: laporan harian
 - P2: Target penjualan bulanan & perbandingan
 - P2: Barcode scanner untuk POS
 - P2: Margin keuntungan per laporan (harga beli vs jual)
+
+## Implemented (2026-10-09) — Harga per Platform, Struk Manual, Filter & Hapus Massal Riwayat
+- Products: `harga_channel` {channel: harga} — harga online berbeda per Shopee/Tokopedia/Lazada/TikTok Shop (kosong = pakai Harga Online). Daftar Harga tab Online menampilkan kolom per platform; modal produk punya input per platform. Penjualan Online memakai harga sesuai channel & re-price keranjang saat ganti channel.
+- POS: struk tidak lagi otomatis terunduh setelah bayar; unduh lewat tombol "Cetak Struk PDF".
+- Riwayat Transaksi: filter Semua/Tanggal/Bulan/Tahun + urutan terbaru/terlama (GET /transactions?date=&sort=); checklist + "Hapus Terpilih" (admin, stok dikembalikan). Tested iter 13: 100%
