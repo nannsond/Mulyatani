@@ -5,6 +5,7 @@ import { exportEcomTemplate, readEcomExcel } from "@/lib/exporter";
 import { Search, Plus, Minus, Trash2, ShoppingBag, Loader2, CheckCircle2, FileSpreadsheet, Upload } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/context/AuthContext";
+import { calcFees } from "@/lib/fees";
 
 const STATUSES = ["Diproses", "Dikirim", "Selesai", "Dikembalikan"];
 const STATUS_STYLE = {
@@ -76,7 +77,10 @@ export default function PenjualanOnline() {
   const removeItem = (id) => setCart((c) => c.filter((i) => i.product_id !== id));
 
   const omzet = cart.reduce((s, i) => s + i.qty * i.harga, 0);
-  const totalFee = (Number(adminFee) || 0) + (Number(ongkir) || 0) + (Number(biayaLain) || 0);
+  const autoFee = calcFees(channels.find((c) => c.name === channel)?.fees || [], omzet);
+  const isAutoFee = adminFee === "";
+  const effAdmin = isAutoFee ? autoFee.total : Number(adminFee) || 0;
+  const totalFee = effAdmin + (Number(ongkir) || 0) + (Number(biayaLain) || 0);
   const estNet = omzet - totalFee;
 
   const submit = async () => {
@@ -87,7 +91,8 @@ export default function PenjualanOnline() {
       const { data } = await api.post("/ecommerce/sales", {
         channel,
         items: cart.map((i) => ({ product_id: i.product_id, name: i.name, qty: i.qty, harga: i.harga, is_bundle: !!i.is_bundle })),
-        admin_fee: Number(adminFee) || 0,
+        admin_fee: effAdmin,
+        fee_breakdown: isAutoFee ? autoFee.items : [{ label: "Biaya admin (manual)", amount: effAdmin }],
         ongkir: Number(ongkir) || 0,
         biaya_lain: Number(biayaLain) || 0,
         customer_name: customerName,
@@ -198,8 +203,17 @@ export default function PenjualanOnline() {
           )}
 
           <div className="mt-4 pt-4 border-t border-slate-200 space-y-2.5">
+            <div className="rounded-lg bg-secondary/50 p-2.5 text-xs space-y-1" data-testid="ecom-fee-breakdown">
+              <div className="flex items-center justify-between font-semibold text-[#0F281E]">
+                <span>Potongan {channel || "platform"} {isAutoFee ? "(otomatis)" : "(manual)"}</span>
+                {!isAutoFee && <button onClick={() => setAdminFee("")} data-testid="ecom-fee-auto-reset" className="text-[#2563EB] font-semibold">Pakai otomatis</button>}
+              </div>
+              {isAutoFee && (autoFee.items.length ? autoFee.items.map((f, i) => (
+                <div key={i} className="flex justify-between text-muted-foreground"><span>{f.label}</span><span className="font-mono">-{rupiah(f.amount)}</span></div>
+              )) : <p className="text-muted-foreground">Belum ada potongan untuk channel ini (atur di Pengaturan).</p>)}
+            </div>
             <div className="grid grid-cols-3 gap-2">
-              <input type="number" value={adminFee} onChange={(e) => setAdminFee(e.target.value)} data-testid="ecom-admin-fee" placeholder="Biaya admin" className="px-2 py-2 rounded-lg border border-input text-xs" />
+              <input type="number" value={adminFee} onChange={(e) => setAdminFee(e.target.value)} data-testid="ecom-admin-fee" placeholder={`Potongan: ${autoFee.total}`} title="Kosongkan untuk potongan otomatis" className="px-2 py-2 rounded-lg border border-input text-xs" />
               <input type="number" value={ongkir} onChange={(e) => setOngkir(e.target.value)} data-testid="ecom-ongkir" placeholder="Ongkir" className="px-2 py-2 rounded-lg border border-input text-xs" />
               <input type="number" value={biayaLain} onChange={(e) => setBiayaLain(e.target.value)} data-testid="ecom-biaya-lain" placeholder="Biaya lain" className="px-2 py-2 rounded-lg border border-input text-xs" />
             </div>

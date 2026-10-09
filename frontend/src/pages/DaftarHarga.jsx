@@ -7,6 +7,7 @@ import { Plus, Pencil, Trash2, FileDown, FileSpreadsheet, X, Search, User, Users
 import BundlingPanel from "@/components/BundlingPanel";
 import { exportPDF, exportExcel, printPriceList } from "@/lib/exporter";
 import { toast } from "sonner";
+import { calcFees } from "@/lib/fees";
 
 const EMPTY = { sku: "", name: "", category: "Pupuk", unit: "pcs", harga_beli: 0, harga_jual: 0, harga_reseller: 0, harga_online: 0, harga_channel: {}, stok: 0, stok_minimal: 10 };
 const CATS = ["Pupuk", "Benih", "Pestisida", "Alat Tani", "Lainnya"];
@@ -180,6 +181,11 @@ export default function DaftarHarga() {
                 {isOnline && channels.map((c) => (
                   <td key={c.name} className="px-4 py-3 text-right font-mono" data-testid={`channel-price-${p.id}-${c.name.replace(/\s+/g, "-").toLowerCase()}`}>
                     {p.harga_channel?.[c.name] ? rupiah(p.harga_channel[c.name]) : <span className="text-xs italic text-muted-foreground">= online</span>}
+                    {(p.harga_channel?.[c.name] || p.harga_online) > 0 && (() => {
+                      const price = p.harga_channel?.[c.name] || p.harga_online;
+                      const net = price - calcFees(c.fees, price).total;
+                      return <div className={`text-[10px] ${net < p.harga_beli ? "text-destructive font-semibold" : "text-muted-foreground"}`}>bersih {rupiah(net)}</div>;
+                    })()}
                   </td>
                 ))}
                 <td className="px-4 py-3 text-right font-mono"><span className={p.stok <= p.stok_minimal ? "text-destructive font-semibold" : ""}>{p.stok} {p.unit}</span></td>

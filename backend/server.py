@@ -151,11 +151,49 @@ DEFAULT_CHANNELS = [
     {"name": "TikTok Shop", "color": "#111827", "active": True},
 ]
 
+# Referensi umum kebijakan potongan 2026 (toko non-Star/non-Mall); bisa diubah di Pengaturan.
+DEFAULT_CHANNEL_FEES = {
+    "Shopee": [
+        {"label": "Biaya Administrasi", "type": "percent", "value": 8, "cap": 0},
+        {"label": "Program Gratis Ongkir XTRA", "type": "percent", "value": 4, "cap": 40000},
+        {"label": "Biaya Proses Pesanan", "type": "fixed", "value": 1250, "cap": 0},
+    ],
+    "Tokopedia": [
+        {"label": "Komisi Platform", "type": "percent", "value": 6.5, "cap": 0},
+        {"label": "Biaya Layanan (Program Xtra)", "type": "percent", "value": 4, "cap": 40000},
+        {"label": "Biaya Proses Pesanan", "type": "fixed", "value": 1250, "cap": 0},
+    ],
+    "Lazada": [
+        {"label": "Komisi Marketplace", "type": "percent", "value": 6, "cap": 0},
+        {"label": "Free Shipping Max", "type": "percent", "value": 4, "cap": 20000},
+        {"label": "Biaya Proses Pesanan", "type": "fixed", "value": 1250, "cap": 0},
+    ],
+    "TikTok Shop": [
+        {"label": "Komisi Platform", "type": "percent", "value": 6.5, "cap": 0},
+        {"label": "Biaya Layanan (Program Xtra)", "type": "percent", "value": 4, "cap": 40000},
+        {"label": "Biaya Proses Pesanan", "type": "fixed", "value": 1250, "cap": 0},
+    ],
+}
+
+def default_fees(name: str) -> List[dict]:
+    return [dict(f) for f in DEFAULT_CHANNEL_FEES.get(name, [])]
+
+def calc_channel_fee(fees: List[dict], omzet: float) -> float:
+    total = 0.0
+    for f in fees or []:
+        amt = omzet * f.get("value", 0) / 100 if f.get("type") == "percent" else f.get("value", 0)
+        if f.get("cap", 0) > 0:
+            amt = min(amt, f["cap"])
+        total += amt
+    return round(total)
+
 async def get_channels_cfg() -> List[dict]:
     s = await db.settings.find_one({"key": "channels"})
-    if not s or not s.get("list"):
-        return [dict(c) for c in DEFAULT_CHANNELS]
-    return s["list"]
+    cfg = [dict(c) for c in DEFAULT_CHANNELS] if not s or not s.get("list") else s["list"]
+    for c in cfg:
+        if "fees" not in c:
+            c["fees"] = default_fees(c["name"])
+    return cfg
 
 def normalize_online(s: dict) -> dict:
     return {"id": str(s.get("_id", "")), "items": s.get("items", []),
@@ -963,6 +1001,7 @@ class EcomSaleInput(BaseModel):
     channel: str
     items: List[EcomItem]
     admin_fee: float = 0
+    fee_breakdown: List[dict] = []
     ongkir: float = 0
     biaya_lain: float = 0
     customer_name: str = ""
@@ -994,7 +1033,7 @@ async def create_ecom_sale(data: EcomSaleInput, user: dict = Depends(get_current
         created = created + "T00:00:00+00:00"
     doc = {"ecom_no": await gen_ecom_no(), "channel": data.channel, "items": items,
            "omzet": omzet, "hpp": hpp, "laba_kotor": laba_kotor,
-           "admin_fee": admin_fee, "ongkir": ongkir, "biaya_lain": biaya_lain,
+           "admin_fee": admin_fee, "fee_breakdown": data.fee_breakdown, "ongkir": ongkir, "biaya_lain": biaya_lain,
            "total_fee": total_fee, "laba_bersih": laba_bersih,
            "customer_name": data.customer_name, "order_no": data.order_no,
            "status": "Diproses",
@@ -1057,7 +1096,9 @@ class EcomBulkInput(BaseModel):
 
 @api_router.post("/ecommerce/sales/bulk")
 async def bulk_ecom_sales(data: EcomBulkInput, admin: dict = Depends(require_admin)):
-    names = [c["name"] for c in await get_channels_cfg()]
+    cfg = await get_channels_cfg()
+    names = [c["name"] for c in cfg]
+    fee_cfg = {c["name"]: c.get("fees", []) for c in cfg}
     cost = await product_cost_map()
     prods = {p["sku"]: p for p in await db.products.find().to_list(5000)}
     created = 0
@@ -1073,7 +1114,8 @@ async def bulk_ecom_sales(data: EcomBulkInput, admin: dict = Depends(require_adm
         pid = str(p["_id"])
         omzet = r.qty * r.harga
         hpp = r.qty * cost.get(pid, p.get("harga_beli", 0))
-        total_fee = max(0.0, r.admin_fee) + max(0.0, r.ongkir) + max(0.0, r.biaya_lain)
+        admin_fee = max(0.0, r.admin_fee) or calc_channel_fee(fee_cfg.get(r.channel), omzet)
+        total_fee = admin_fee + max(0.0, r.ongkir) + max(0.0, r.biaya_lain)
         laba_kotor = omzet - hpp
         created_at = r.date or now_iso()
         if len(created_at) == 10:
@@ -1081,7 +1123,7 @@ async def bulk_ecom_sales(data: EcomBulkInput, admin: dict = Depends(require_adm
         doc = {"ecom_no": await gen_ecom_no(), "channel": r.channel,
                "items": [{"product_id": pid, "name": p["name"], "qty": r.qty, "harga": r.harga, "subtotal": omzet}],
                "omzet": omzet, "hpp": hpp, "laba_kotor": laba_kotor,
-               "admin_fee": max(0.0, r.admin_fee), "ongkir": max(0.0, r.ongkir), "biaya_lain": max(0.0, r.biaya_lain),
+               "admin_fee": admin_fee, "ongkir": max(0.0, r.ongkir), "biaya_lain": max(0.0, r.biaya_lain),
                "total_fee": total_fee, "laba_bersih": laba_kotor - total_fee,
                "customer_name": "", "order_no": "", "status": "Diproses",
                "user_id": admin["id"], "user_name": admin["name"], "created_at": created_at}
@@ -1112,9 +1154,16 @@ class ChannelInput(BaseModel):
     name: str
     color: str = "#64748b"
 
+class ChannelFee(BaseModel):
+    label: str
+    type: str = "percent"
+    value: float = 0
+    cap: float = 0
+
 class ChannelUpdate(BaseModel):
     active: Optional[bool] = None
     color: Optional[str] = None
+    fees: Optional[List[ChannelFee]] = None
 
 @api_router.get("/channels")
 async def list_channels(user: dict = Depends(get_current_user)):
@@ -1125,9 +1174,13 @@ async def add_channel(data: ChannelInput, admin: dict = Depends(require_admin)):
     cfg = await get_channels_cfg()
     if any(c["name"].lower() == data.name.lower() for c in cfg):
         raise HTTPException(status_code=400, detail="Channel sudah ada")
-    cfg.append({"name": data.name, "color": data.color, "active": True})
+    cfg.append({"name": data.name, "color": data.color, "active": True, "fees": default_fees(data.name)})
     await db.settings.update_one({"key": "channels"}, {"$set": {"list": cfg}}, upsert=True)
     return {"ok": True, "list": cfg}
+
+@api_router.get("/channels/fee-defaults")
+async def channel_fee_defaults(user: dict = Depends(get_current_user)):
+    return DEFAULT_CHANNEL_FEES
 
 @api_router.put("/channels/{name}")
 async def update_channel(name: str, data: ChannelUpdate, admin: dict = Depends(require_admin)):
@@ -1139,6 +1192,8 @@ async def update_channel(name: str, data: ChannelUpdate, admin: dict = Depends(r
                 c["active"] = data.active
             if data.color is not None:
                 c["color"] = data.color
+            if data.fees is not None:
+                c["fees"] = [f.model_dump() for f in data.fees if f.label.strip() and f.type in ("percent", "fixed")]
             found = True
     if not found:
         raise HTTPException(status_code=404, detail="Channel tidak ditemukan")
