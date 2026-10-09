@@ -145,10 +145,10 @@ export default function RiwayatTransaksi() {
               {bulkDeleting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />} Hapus Terpilih ({selected.length})
             </button>
           )}
-          <button onClick={() => exportPDF({ title: "Riwayat Transaksi", subtitle: q ? `Filter: ${q} • ${periodLabel}` : periodLabel, columns: cols, rows, foot })} data-testid="export-pdf-button"
-            className="flex items-center gap-2 px-3 py-2.5 rounded-xl border border-input text-sm hover:bg-secondary"><FileDown className="w-4 h-4" /> PDF</button>
-          <button onClick={() => exportExcel({ filename: "Riwayat_Transaksi", sheetName: "Riwayat", columns: cols, rows })} data-testid="export-excel-button"
-            className="flex items-center gap-2 px-3 py-2.5 rounded-xl border border-input text-sm hover:bg-secondary"><FileSpreadsheet className="w-4 h-4" /> Excel</button>
+          <button onClick={() => exportPDF({ title: "Riwayat Transaksi", subtitle: q ? `Filter: ${q} • ${periodLabel}` : periodLabel, columns: cols, rows, foot })} data-testid="export-pdf-button" disabled={loading}
+            className="flex items-center gap-2 px-3 py-2.5 rounded-xl border border-input text-sm hover:bg-secondary disabled:opacity-50"><FileDown className="w-4 h-4" /> PDF</button>
+          <button onClick={() => exportExcel({ filename: "Riwayat_Transaksi", sheetName: "Riwayat", columns: cols, rows })} data-testid="export-excel-button" disabled={loading}
+            className="flex items-center gap-2 px-3 py-2.5 rounded-xl border border-input text-sm hover:bg-secondary disabled:opacity-50"><FileSpreadsheet className="w-4 h-4" /> Excel</button>
         </div>
       </div>
 

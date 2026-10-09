@@ -138,7 +138,7 @@ export default function Kehadiran() {
               <h3 className="font-heading font-semibold text-lg flex items-center gap-2 mb-4"><UserCheck className="w-5 h-5 text-[#1B5E3B]" /> Tandai Kehadiran Karyawan</h3>
               <div className="space-y-3">
                 <select value={mark.user_id} onChange={(e) => setMark({ ...mark, user_id: e.target.value })} data-testid="mark-employee-select" className="w-full px-3 py-2.5 rounded-xl border border-input text-sm bg-white">
-                  {employees.map((u) => <option key={u.id} value={u.id}>{u.name} ({u.role})</option>)}
+                  {employees.map((u) => <option key={u.id} value={u.id}>{`${u.name} (${u.role})`}</option>)}
                 </select>
                 <div className="flex gap-2">
                   <input type="date" value={mark.date} onChange={(e) => setMark({ ...mark, date: e.target.value })} data-testid="mark-date-input" className="flex-1 min-w-0 px-3 py-2.5 rounded-xl border border-input text-sm" />
