@@ -42,8 +42,7 @@ export default function LabaRugi() {
   const labaKotor = s?.total_laba || 0;
   const hpp = omzet - labaKotor;
   const pengeluaran = s?.total_pengeluaran || 0;
-  const marketplace = s?.biaya_marketplace || 0;
-  const labaBersih = s?.laba_bersih ?? (labaKotor - pengeluaran - marketplace);
+  const labaBersih = s?.laba_bersih ?? (labaKotor - pengeluaran);
   const periode = mode === "bulanan" ? `${MONTHS[month - 1]} ${year}` : `Tahun ${year}`;
 
   const catMap = {};
@@ -59,7 +58,6 @@ export default function LabaRugi() {
     ["Harga Pokok Penjualan (HPP)", -hpp],
     ["Laba Kotor", labaKotor],
     ["Pengeluaran Operasional", -pengeluaran],
-    ["Biaya Marketplace (Online)", -marketplace],
     ["Laba Bersih", labaBersih],
   ];
   const exportRows = [...statementRows, ["", ""], ["RINCIAN PENGELUARAN", ""], ...cats.map((c) => [c.category, -c.amount])];
@@ -113,7 +111,6 @@ export default function LabaRugi() {
             <Line label="Harga Pokok Penjualan (HPP)" value={hpp} negative testid="lr-hpp" />
             <Line label="Laba Kotor" value={labaKotor} bold testid="lr-laba-kotor" />
             <Line label="Pengeluaran Operasional" value={pengeluaran} negative testid="lr-pengeluaran" />
-            <Line label="Biaya Marketplace (Online)" value={marketplace} negative testid="lr-marketplace" />
             <Line label="Laba Bersih" value={labaBersih} bold accent testid="lr-laba-bersih" />
             {mode === "bulanan" && change !== null && (
               <div className="mt-4 flex items-center gap-2 text-sm" data-testid="lr-comparison">
@@ -187,11 +184,10 @@ export default function LabaRugi() {
             <Line label="Omzet Diterima (Kas)" value={cash.omzet} testid="kas-omzet" />
             <Line label="Pembelian Dibayar" value={cash.pembelian} negative testid="kas-pembelian" />
             <Line label="Pengeluaran" value={cash.pengeluaran} negative testid="kas-pengeluaran" />
-            <Line label="Biaya Marketplace" value={cash.biaya_marketplace} negative testid="kas-marketplace" />
             <Line label={cash.is_period ? "Arus Kas Bersih Periode" : "Kas Saat Ini"} value={cash.kas_saat_ini} bold accent testid="kas-total" />
             <p className="text-xs text-muted-foreground mt-3">{cash.is_period
-              ? "Arus Kas = Omzet Diterima − Pembelian Dibayar − Pengeluaran − Biaya Marketplace pada periode ini (basis kas)."
-              : "Kas = Saldo Awal + Omzet Diterima − Pembelian Dibayar − Pengeluaran − Biaya Marketplace. Hutang pembelian & piutang belum dihitung sampai benar-benar dibayar."}</p>
+              ? "Arus Kas = Omzet Diterima − Pembelian Dibayar − Pengeluaran pada periode ini (basis kas)."
+              : "Kas = Saldo Awal + Omzet Diterima − Pembelian Dibayar − Pengeluaran. Hutang pembelian & piutang belum dihitung sampai benar-benar dibayar."}</p>
           </div>
         )}
         </>

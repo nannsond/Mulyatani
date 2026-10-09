@@ -113,6 +113,10 @@ Aplikasi laporan penjualan sederhana untuk bisnis toko pertanian: laporan harian
 - **Diskon Paket Otomatis**: _bundle_view menghitung `harga_satuan_total` (Σ qty×harga_jual komponen) & `hemat` = max(0, satuan_total − harga_jual). Badge hijau "Hemat Rp…" tampil di kartu BundlingPanel, POS, dan Penjualan Online bila hemat>0.
 - Diverifikasi curl (prices persist, hemat math, jual 2 paket online → komponen −2, omzet 220k/hpp 50k/laba 165k, delete restore) + screenshot (kartu paket di Penjualan Online).
 
+## Implemented (2026-10-09) — Hapus Biaya Marketplace di Laba Rugi
+- Baris "Biaya Marketplace" dihapus dari laporan Laba Rugi dan kartu Kas. Laba Bersih kini = Laba Kotor − Pengeluaran; Kas = Saldo Awal + Omzet − Pembelian − Pengeluaran (tanpa biaya marketplace).
+- Backend: laba_bersih harian/bulanan/tahunan & kas_saat_ini tidak lagi mengurangi online_fee (field biaya_marketplace tetap ada untuk Laporan Online). Diverifikasi curl (laba_bersih==laba_kotor−pengeluaran, kas tanpa fee) + screenshot.
+
 ## Backlog (P1/P2)
 - P1: Cetak struk/nota transaksi POS
 - P1: Manajemen user (tambah kasir dari UI)

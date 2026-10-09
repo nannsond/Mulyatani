@@ -583,7 +583,7 @@ async def report_monthly(year: int, month: int, user: dict = Depends(get_current
     peng = await db.expenses.find({"created_at": {"$regex": f"^{prefix}"}}).to_list(2000)
     s["total_pengeluaran"] = sum(e["amount"] for e in peng)
     s["biaya_marketplace"] = online_fee
-    s["laba_bersih"] = s["total_laba"] - s["total_pengeluaran"] - online_fee
+    s["laba_bersih"] = s["total_laba"] - s["total_pengeluaran"]
     target = await db.targets.find_one({"year": year, "month": month})
     return {"year": year, "month": month, "summary": s,
             "target_omzet": target["target_omzet"] if target else 0,
@@ -610,7 +610,7 @@ async def report_yearly(year: int, user: dict = Depends(get_current_user)):
     s["total_pengeluaran"] = sum(e["amount"] for e in peng)
     online_fee_total = sum(s2.get("total_fee", 0) for s2 in online_docs)
     s["biaya_marketplace"] = online_fee_total
-    s["laba_bersih"] = s["total_laba"] - s["total_pengeluaran"] - online_fee_total
+    s["laba_bersih"] = s["total_laba"] - s["total_pengeluaran"]
     peng_by_month = {}
     for e in peng:
         em = int(e["created_at"][5:7])
@@ -622,7 +622,7 @@ async def report_yearly(year: int, user: dict = Depends(get_current_user)):
     for mm in range(1, 13):
         monthly[mm]["pengeluaran"] = peng_by_month.get(mm, 0)
         monthly[mm]["biaya_marketplace"] = fee_by_month.get(mm, 0)
-        monthly[mm]["laba_bersih"] = monthly[mm]["laba"] - peng_by_month.get(mm, 0) - fee_by_month.get(mm, 0)
+        monthly[mm]["laba_bersih"] = monthly[mm]["laba"] - peng_by_month.get(mm, 0)
     target = await db.targets.find_one({"year": year, "month": 0})
     return {"year": year, "summary": s,
             "target_omzet": target["target_omzet"] if target else 0,
@@ -738,7 +738,7 @@ async def report_cash(period: Optional[str] = None, user: dict = Depends(get_cur
     pembelian = sum(p.get("amount_paid", 0) for p in purchases)
     pengeluaran = sum(e.get("amount", 0) for e in exps)
     omzet = omzet_offline + omzet_online
-    kas = saldo + omzet - pembelian - pengeluaran - fee
+    kas = saldo + omzet - pembelian - pengeluaran
     return {"saldo_awal_kas": saldo, "omzet": omzet, "pembelian": pembelian,
             "pengeluaran": pengeluaran, "biaya_marketplace": fee, "kas_saat_ini": kas,
             "is_period": bool(period)}
