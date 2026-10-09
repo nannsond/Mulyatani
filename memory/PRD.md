@@ -163,3 +163,8 @@ Aplikasi laporan penjualan sederhana untuk bisnis toko pertanian: laporan harian
 - Laporan Ongkir: summarize() kini kembalikan `total_ongkir` (proporsional paid fraction). Kartu "Ongkos Kirim" ditambah di Laporan Harian/Bulanan/Tahunan (terpisah dari omzet produk; omzet tetap termasuk ongkir).
 - Edit Transaksi di Riwayat: dropdown "+ Tambah produk" diganti komponen bersama `components/ProductSearch.jsx` (ketik manual nama/SKU, Enter=pilih teratas). Riwayat openEdit/saveEdit meneruskan ongkir & alamat agar tidak ter-reset saat admin menyimpan.
 - Diverifikasi API (alamat tersimpan & tetap setelah edit; total_ongkir +12k) & UI (kartu Ongkos Kirim, search Riwayat menambah item, input alamat POS).
+
+## Implemented (2026-10-09) — Edit Ongkir/Alamat & Alamat di Detail (Riwayat)
+- Modal Edit Transaksi: tambah input "Ongkos Kirim (Rp)" & "Alamat Pengiriman" (editable); editTotal kini = subtotal − diskon + ongkir; ringkasan menampilkan baris Ongkos Kirim.
+- Modal Detail Transaksi: tampilkan "Ongkos Kirim" (jika >0) & "Alamat Antar" (jika ada) agar mudah dilihat saat pengantaran.
+- Diverifikasi UI: Detail menampilkan ongkir 8rb & alamat; Edit terisi & ubah ongkir 20rb → Total Rp98rb.

@@ -58,7 +58,7 @@ export default function RiwayatTransaksi() {
     amount_paid: t.amount_paid ?? t.total,
   });
   const editSubtotal = edit ? edit.items.reduce((s, i) => s + (Number(i.qty) || 0) * (Number(i.harga) || 0), 0) : 0;
-  const editTotal = Math.max(0, editSubtotal - (Number(edit?.discount) || 0));
+  const editTotal = Math.max(0, editSubtotal - (Number(edit?.discount) || 0) + (Number(edit?.ongkir) || 0));
   const setItem = (idx, patch) => setEdit((e) => ({ ...e, items: e.items.map((it, k) => (k === idx ? { ...it, ...patch } : it)) }));
   const removeItem = (idx) => setEdit((e) => ({ ...e, items: e.items.filter((_, k) => k !== idx) }));
   const addItem = (pid) => {
@@ -220,6 +220,8 @@ export default function RiwayatTransaksi() {
               <div className="flex justify-between"><span className="text-muted-foreground">Waktu</span><span>{fmtDateTime(detail.created_at)}</span></div>
               <div className="flex justify-between"><span className="text-muted-foreground">Kasir</span><span>{detail.cashier_name}</span></div>
               <div className="flex justify-between"><span className="text-muted-foreground">Pembayaran</span><span>{detail.payment_method}</span></div>
+              {detail.ongkir > 0 && <div className="flex justify-between"><span className="text-muted-foreground">Ongkos Kirim</span><span className="font-mono">{rupiah(detail.ongkir)}</span></div>}
+              {detail.alamat && <div className="flex justify-between gap-3"><span className="text-muted-foreground shrink-0">Alamat Antar</span><span className="text-right font-medium text-[#0F281E]" data-testid="detail-alamat">{detail.alamat}</span></div>}
             </div>
             <div className="mt-3 space-y-2">
               {detail.items.map((i, idx) => (
@@ -296,11 +298,23 @@ export default function RiwayatTransaksi() {
                 <input type="number" min="0" value={edit.amount_paid} onChange={(e) => setEdit({ ...edit, amount_paid: e.target.value })} data-testid="edit-amount-paid-input"
                   className="mt-1 w-full px-3 py-2 rounded-lg border border-input text-sm font-mono" />
               </div>
+              <div>
+                <label className="text-sm font-medium">Ongkos Kirim (Rp)</label>
+                <input type="number" min="0" value={edit.ongkir} onChange={(e) => setEdit({ ...edit, ongkir: e.target.value })} data-testid="edit-ongkir-input"
+                  className="mt-1 w-full px-3 py-2 rounded-lg border border-input text-sm font-mono" />
+              </div>
+              <div className="col-span-2">
+                <label className="text-sm font-medium">Alamat Pengiriman</label>
+                <input value={edit.alamat} onChange={(e) => setEdit({ ...edit, alamat: e.target.value })} data-testid="edit-alamat-input"
+                  placeholder="Alamat pengiriman (jika diantar)"
+                  className="mt-1 w-full px-3 py-2 rounded-lg border border-input text-sm" />
+              </div>
             </div>
 
             <div className="mt-4 pt-3 border-t border-slate-200 space-y-1 text-sm">
               <div className="flex justify-between"><span className="text-muted-foreground">Subtotal</span><span className="font-mono">{rupiah(editSubtotal)}</span></div>
               <div className="flex justify-between"><span className="text-muted-foreground">Diskon</span><span className="font-mono text-destructive">({rupiah(Number(edit.discount) || 0)})</span></div>
+              <div className="flex justify-between"><span className="text-muted-foreground">Ongkos Kirim</span><span className="font-mono">{rupiah(Number(edit.ongkir) || 0)}</span></div>
               <div className="flex justify-between font-semibold"><span>Total</span><span className="font-mono text-[#1B5E3B]" data-testid="edit-total">{rupiah(editTotal)}</span></div>
             </div>
 
