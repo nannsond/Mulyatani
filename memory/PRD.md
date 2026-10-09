@@ -134,3 +134,7 @@ Aplikasi laporan penjualan sederhana untuk bisnis toko pertanian: laporan harian
 - Pengaturan: editor potongan per channel (tambah/hapus/reset ke referensi). GET /channels/fee-defaults.
 - Penjualan Online: potongan dihitung otomatis + rincian, bisa override manual; fee_breakdown disimpan. Impor Excel: admin_fee 0 → otomatis.
 - Daftar Harga tab Online: estimasi "bersih" per platform (merah jika < harga beli). Tested iter 14: 100%
+
+## Implemented (2026-10-09) — Harga Jual Saran & Ringkasan Periode
+- Daftar Harga (tab Online): tombol "Harga Saran" → hitung harga per platform agar untung bersih (% modal atau Rp/unit) tercapai setelah potongan channel (bulat ke atas Rp100), preview + terapkan massal. Modal produk: "Isi Harga Saran".
+- Riwayat Transaksi: kartu ringkasan Total Omzet, Jumlah Transaksi, Item Terjual, Rata-rata untuk periode terpilih (limit periode 10.000). Tested iter 15: 100%
