@@ -5,7 +5,7 @@ import os
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
 
-from fastapi import FastAPI, APIRouter, HTTPException, Request, Depends, Response, UploadFile, File, Query
+from fastapi import FastAPI, APIRouter, HTTPException, Request, Depends, Response, UploadFile, File, Query, BackgroundTasks
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 from pydantic import BaseModel, Field, EmailStr, BeforeValidator, ConfigDict
@@ -14,6 +14,7 @@ from bson import ObjectId
 from datetime import datetime, timezone, timedelta
 import logging
 import jwt
+import hmac
 import bcrypt
 import random
 import uuid
@@ -557,10 +558,37 @@ async def update_delivery_status(tid: str, body: Dict[str, Any], user: dict = De
         oid = ObjectId(tid)
     except InvalidId:
         raise HTTPException(status_code=404, detail="Transaksi tidak ditemukan")
-    r = await db.transactions.update_one({"_id": oid}, {"$set": {"status_antar": st}})
+    update = {"status_antar": st}
+    if st == "selesai":
+        update["selesai_at"] = now_iso()
+    r = await db.transactions.update_one({"_id": oid}, {"$set": update})
     if r.matched_count == 0:
         raise HTTPException(status_code=404, detail="Transaksi tidak ditemukan")
     return {"ok": True, "status_antar": st}
+
+AUTO_ARCHIVE_DAYS = 3
+
+async def _auto_archive_deliveries():
+    cutoff = (datetime.now(timezone.utc) - timedelta(days=AUTO_ARCHIVE_DAYS)).isoformat()
+    q = {"status_antar": "selesai", "arsip": {"$ne": True},
+         "$or": [
+             {"selesai_at": {"$lt": cutoff}},
+             {"selesai_at": {"$in": [None, ""]}, "created_at": {"$lt": cutoff}},
+             {"selesai_at": {"$exists": False}, "created_at": {"$lt": cutoff}},
+         ]}
+    res = await db.transactions.update_many(q, {"$set": {"arsip": True}})
+    logger.info(f"Auto-archived {res.modified_count} selesai deliveries older than {AUTO_ARCHIVE_DAYS} days")
+
+@api_router.post("/cron/auto-archive-deliveries")
+async def cron_auto_archive(request: Request, background: BackgroundTasks):
+    # Cron endpoints must ack 2xx immediately; enqueue/background the actual work.
+    secret = os.environ.get("WEBHOOK_CRON_SECRET", "")
+    auth = request.headers.get("Authorization", "")
+    token = auth[7:] if auth.startswith("Bearer ") else ""
+    if not secret or not token or not hmac.compare_digest(token, secret):
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    background.add_task(_auto_archive_deliveries)
+    return {"ok": True}
 
 @api_router.get("/transactions")
 async def list_transactions(date: Optional[str] = None, q: Optional[str] = None, limit: int = 50, sort: str = "desc", user: dict = Depends(get_current_user)):

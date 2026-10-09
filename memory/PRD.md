@@ -184,3 +184,9 @@ Aplikasi laporan penjualan sederhana untuk bisnis toko pertanian: laporan harian
 - Kartu pesanan berstatus "Selesai" punya tombol "Arsipkan" (field `arsip` di transaksi). Default daftar pengantaran menyembunyikan yang diarsipkan.
 - Tab "Arsip" untuk melihat pesanan terarsip + tombol "Keluarkan dari Arsip".
 - Backend: param `archived` di GET /deliveries + endpoint PUT /deliveries/{id}/archive. Diverifikasi API & UI.
+
+## Implemented (2026-10-09) — Arsip Otomatis Pengantaran (Cron)
+- Pesanan pengantaran berstatus "selesai" lebih dari 3 hari diarsipkan otomatis. Field `selesai_at` dicatat saat status jadi selesai.
+- Platform cron: .emergent/crons.yml -> harian 01:00 WIB POST /api/cron/auto-archive-deliveries.
+- Endpoint cron diamankan Bearer WEBHOOK_CRON_SECRET (constant-time compare), ack 2xx + kerja di background (update_many set arsip=true utk selesai_at/created_at < cutoff 3 hari).
+- Diverifikasi: auth 401/401/200; tx selesai di-backdate 5 hari otomatis terarsip; lint bersih.
