@@ -5,6 +5,7 @@ import { Search, Plus, Minus, Trash2, ShoppingCart, Loader2, CheckCircle2, Print
 import { toast } from "sonner";
 import { printReceipt } from "@/lib/exporter";
 import { useSettings } from "@/context/SettingsContext";
+import { beepSuccess, beepError } from "@/lib/sound";
 
 export default function POS() {
   const { settings } = useSettings();
@@ -75,8 +76,8 @@ export default function POS() {
     const exact = sellable.find((p) =>
       (p.barcode && p.barcode === raw) || (p.sku && p.sku.toLowerCase() === raw.toLowerCase()));
     const target = exact || (filtered.length > 0 ? filtered[0] : null);
-    if (target) { addToCart(target); setSearch(""); }
-    else toast.error("Produk tidak ditemukan");
+    if (target) { addToCart(target); setSearch(""); beepSuccess(); }
+    else { toast.error("Produk tidak ditemukan"); beepError(); }
   };
 
   const subtotal = cart.reduce((s, i) => s + i.qty * i.harga, 0);

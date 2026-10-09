@@ -6,6 +6,7 @@ import { Search, Plus, Minus, Trash2, ShoppingBag, Loader2, CheckCircle2, FileSp
 import { toast } from "sonner";
 import { useAuth } from "@/context/AuthContext";
 import { calcFees } from "@/lib/fees";
+import { beepSuccess, beepError } from "@/lib/sound";
 
 const STATUSES = ["Diproses", "Dikirim", "Selesai", "Dikembalikan"];
 const STATUS_STYLE = {
@@ -58,7 +59,9 @@ export default function PenjualanOnline() {
     setCart((c) => c.map((i) => { const p = sellable.find((x) => x.id === i.product_id); return p ? { ...i, harga: priceFor(p) } : i; }));
   }, [channel]);
   const filtered = sellable.filter((p) =>
-    p.name.toLowerCase().includes(search.toLowerCase()) || (p.sku || "").toLowerCase().includes(search.toLowerCase()));
+    p.name.toLowerCase().includes(search.toLowerCase()) ||
+    (p.sku || "").toLowerCase().includes(search.toLowerCase()) ||
+    (p.barcode || "").toLowerCase().includes(search.toLowerCase()));
 
   const addToCart = (p) => {
     if (p.stok <= 0) { toast.error("Stok habis"); return; }
@@ -76,6 +79,18 @@ export default function PenjualanOnline() {
   const setHarga = (id, v) => setCart((c) => c.map((i) => i.product_id === id ? { ...i, harga: Number(v) || 0 } : i));
   const removeItem = (id) => setCart((c) => c.filter((i) => i.product_id !== id));
 
+  // Scanner fisik (USB/Bluetooth): ketik/scan kode lalu Enter → produk masuk keranjang
+  const handleSearchKey = (e) => {
+    if (e.key !== "Enter") return;
+    e.preventDefault();
+    const raw = search.trim();
+    if (!raw) return;
+    const exact = sellable.find((p) =>
+      (p.barcode && p.barcode === raw) || (p.sku && p.sku.toLowerCase() === raw.toLowerCase()));
+    const target = exact || (filtered.length > 0 ? filtered[0] : null);
+    if (target) { addToCart(target); setSearch(""); beepSuccess(); }
+    else { toast.error("Produk tidak ditemukan"); beepError(); }
+  };
   const omzet = cart.reduce((s, i) => s + i.qty * i.harga, 0);
   const autoFee = calcFees(channels.find((c) => c.name === channel)?.fees || [], omzet);
   const isAutoFee = adminFee === "";
@@ -158,8 +173,8 @@ export default function PenjualanOnline() {
           </div>
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <input value={search} onChange={(e) => setSearch(e.target.value)} data-testid="ecom-search-product-input"
-              placeholder="Cari produk / SKU..." className="w-full pl-10 pr-4 py-3 rounded-xl border border-input bg-card focus:outline-none focus:ring-2 focus:ring-[#1B5E3B] text-sm" />
+            <input value={search} onChange={(e) => setSearch(e.target.value)} onKeyDown={handleSearchKey} data-testid="ecom-search-product-input"
+              placeholder="Cari / scan barcode produk..." className="w-full pl-10 pr-4 py-3 rounded-xl border border-input bg-card focus:outline-none focus:ring-2 focus:ring-[#1B5E3B] text-sm" />
           </div>
           <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-3">
             {filtered.map((p) => (

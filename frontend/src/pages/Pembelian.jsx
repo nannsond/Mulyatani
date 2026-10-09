@@ -5,6 +5,7 @@ import { exportPDF, exportExcel } from "@/lib/exporter";
 import { useAuth } from "@/context/AuthContext";
 import { Plus, Trash2, Truck, FileDown, FileSpreadsheet, Pencil, X, Search } from "lucide-react";
 import { toast } from "sonner";
+import { beepSuccess, beepError } from "@/lib/sound";
 
 // Pencarian/scan produk: ketik manual atau scan barcode (scanner fisik mengetik kode + Enter)
 function ProductSearch({ products, exclude = [], onPick, placeholder = "Cari produk...", testid, lastPrices = {} }) {
@@ -39,8 +40,9 @@ function ProductSearch({ products, exclude = [], onPick, placeholder = "Cari pro
       // Scanner fisik: cocokkan persis dengan barcode atau SKU lebih dulu
       const exact = products.find((p) => !exclude.includes(p.id) &&
         ((p.barcode && p.barcode === raw) || (p.sku && p.sku.toLowerCase() === raw.toLowerCase())));
-      if (exact) { choose(exact); return; }
-      if (matches.length > 0) choose(matches[0]);
+      if (exact) { choose(exact); beepSuccess(); return; }
+      if (matches.length > 0) { choose(matches[0]); beepSuccess(); return; }
+      beepError();
     }
   };
 
