@@ -1,0 +1,24 @@
+{
+  "summary": "Iteration 7: Validated the brand-new Ecommerce (Penjualan Online) feature end-to-end. Backend: 12/12 pytest cases pass in /app/backend/tests/test_ecommerce.py covering create (field computation + stock decrement), invalid channel 400, empty items 400, listing (incl. channel filter), reports (harian/bulanan/tahunan with structure assertions, channel_names == 4 channels), RBAC (kasir can create but cannot delete -> 403), and admin delete restores stock. Frontend: Playwright flow logged in as Admin, selected Tokopedia channel, added a product, set harga=25000 + admin_fee=1000 + ongkir=9000 + biaya_lain=500, and verified Est. diterima rendered as Rp 14.500 (25000-10500) matching backend formula. Simpan Penjualan succeeded with success toast, new row appeared in 'Penjualan Online Terbaru', admin sees ecom-delete-{id} buttons. Laporan Online (/laporan/online) loads summary cards (Total Omzet Rp 230.000, Biaya Rp 55.000, Laba Kotor Rp 160.000, Laba Bersih Rp 105.000), per-channel comparison bar chart, trend chart, and breakdown table with TOTAL row across all 3 modes (harian/bulanan/tahunan). Kasir login confirmed: on /penjualan-online no ecom-delete-* buttons rendered (admin-only). No bugs found.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_ecommerce.py",
+    "/app/test_reports/pytest/iter7_ecom.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "server.py now at 905 lines - approaching the 700-line threshold where splitting into feature modules (ecommerce.py, reports.py, pos.py) would improve maintainability.",
+    "ecom create_ecom_sale decrements stock via $inc without validating that resulting stok >= 0 or checking current stok; a POST with qty > available stok would create a sale and push stok negative silently (frontend prevents it, but API has no server-side guard). Consider adding a pre-check mirroring POS logic.",
+    "gen_ecom_no() uses count_documents (not per-day) so ECOM number resets never happen; two sales deleted + new one could collide. Minor, non-blocking.",
+    "ecom_reports regex uses re.escape(prefix) over created_at (ISO string). Works, but a $gte/$lt range query on an indexed field would scale better than regex scan."
+  ],
+  "updated_files": ["/app/backend/tests/test_ecommerce.py"],
+  "success_rate": {"backend": "100% (12/12)", "frontend": "100% (admin create+view+delete, kasir RBAC, laporan 3 modes)"},
+  "test_credentials": "Admin: nannsond@gmail.com / T0k0Mulya#Tani2026 ; Kasir: kasir@tokotani.com / Kasir#Mulya2026",
+  "seed_data_creation": "Test ecommerce sales created by pytest + playwright were cleaned up at end of run.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Ecommerce feature fully validated in iter 7 (both pages: /penjualan-online and /laporan/online, and all 4 /api/ecommerce/* endpoints). Base URL from REACT_APP_BACKEND_URL. Pod date is Oct 2026 so default report mode shows Oct 2026 data (contains seed Shopee/TikTok/Tokopedia sales). Do not re-test POS/other features previously covered in iter 1-6.",
+  "rca of the issue": "N/A - no issues found."
+}

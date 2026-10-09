@@ -1,0 +1,26 @@
+{
+  "summary": "Iteration 8: Validated the 7 ecommerce enhancements end-to-end. Backend: 12/12 pytest cases pass in /app/backend/tests/test_iter8_features.py covering (a) status gating - a sale defaults to 'Diproses' and does not change monthly/daily/yearly totals; after PUT /api/ecommerce/sales/{id}/status to 'Selesai' the omzet (+120k) and total_fee (+10k) are merged into report summaries and laba_bersih = total_laba - total_pengeluaran - biaya_marketplace; (b) refund with restore_stock=true adds qty back to product.stok and sets stock_restored (second call is idempotent, no double-restore), restore_stock=false does not restore, and Dikembalikan sales are excluded from profit reports but still appear in ecom_reports.status_counts; (c) channels CRUD - 4 defaults listed, admin add+toggle+delete work, duplicate -> 400; kasir blocked (403) on POST/PUT/DELETE /api/channels and POST /api/ecommerce/targets; (d) bulk import POST /api/ecommerce/sales/bulk returns {created:1, errors:[2]} for a 3-row payload (1 valid + bad channel + bad SKU) and the created doc defaults to 'Diproses'; kasir cannot bulk (403); (e) targets GET/POST per channel persist and show up as c.target in ecom_reports; (f) unknown channel on create -> 400. Frontend Playwright flow logged in as Admin: /penjualan-online shows ecom-template-button and ecom-import-input, 6 status <select>s and 6 delete buttons (admin view); /pengaturan Channel card successfully adds, toggles active, and deletes a custom channel; /laporan/online renders ecom-rep-targets, ecom-rep-status-counts, ecom-rep-status filter and ecom-rep-table, and Shopee target save succeeded; /laporan/laba-rugi shows lr-marketplace line 'Biaya Marketplace (Online) (Rp 38.000)' between Pengeluaran Operasional and Laba Bersih. Kasir login confirmed: no ecom-template-button, no ecom-import-input, 0 status selects, 0 delete buttons on /penjualan-online. No bugs found.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_iter8_features.py",
+    "/app/test_reports/pytest/iter8.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "server.py now at 1102 lines - well past the 700-line threshold. Strongly recommend splitting into feature modules (auth.py, pos.py, ecommerce.py, channels.py, reports.py, dashboard.py, seed.py) for maintainability.",
+    "ecom_reports and all /reports/* endpoints use regex $regex: ^YYYY-MM over the ISO-string created_at field. This works but prevents index usage; a $gte/$lt range query on a dated-string field (or storing created_at as BSON Date) scales much better.",
+    "fetch_online_selesai() is called twice per day in dashboard's 7-day loop (14 round-trips to Mongo). Could batch into a single query with a 7-day prefix OR aggregate pipeline. Minor perf nit, not blocking.",
+    "update_ecom_status allows ANY status->Dikembalikan transition and vice-versa (no state machine validation). E.g. a 'Dikembalikan' sale can be set back to 'Selesai', which would then merge its omzet into reports while its stock has already been restored - this creates an inconsistency (double-count: refunded stock still restored but omzet counted). Consider enforcing transitions (Diproses->Dikirim->Selesai, any->Dikembalikan one-way; or clear stock_restored flag on return-from-Dikembalikan).",
+    "bulk_ecom_sales does not pre-check that resulting stok >= 0 (same gap flagged in iter 7 for the single create). A bulk import could silently push stock negative.",
+    "gen_ecom_no() uses count_documents() over all sales (not per-day). Delete+re-create can collide; use a counter collection or ObjectId timestamp instead."
+  ],
+  "updated_files": ["/app/backend/tests/test_iter8_features.py"],
+  "success_rate": {"backend": "100% (12/12)", "frontend": "100% (admin status/template/import, channel CRUD, targets, lr-marketplace, kasir RBAC readonly)"},
+  "test_credentials": "Admin: nannsond@gmail.com / T0k0Mulya#Tani2026 ; Kasir: kasir@tokotani.com / Kasir#Mulya2026",
+  "seed_data_creation": "Pytest and Playwright created transient ecommerce sales, channel entries, and targets - all cleaned up or using existing data. One Shopee monthly target of 500000 for current period remains from the UI persistence test.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "All iteration 8 ecommerce enhancements verified: status lifecycle gating (only 'Selesai' merges into profit reports), refund stock handling with idempotent restore, channel CRUD + RBAC, Excel bulk import with partial-error reporting, per-channel targets. Default report mode shows Oct 2026 (pod date). A Shopee target=500000 and a lingering ecommerce legacy test may exist in current month. Base URL from REACT_APP_BACKEND_URL. Do not re-test unrelated POS/other features (iter 1-7).",
+  "rca of the issue": "N/A - no bugs found. One intermittent parallel-worker race in the refund test was resolved by giving refund tests a separate product fixture (product_refund = last stocked product) to avoid stock contention with concurrent gating/RBAC tests touching the first product."
+}
