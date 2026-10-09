@@ -495,7 +495,7 @@ async def list_transactions(date: Optional[str] = None, q: Optional[str] = None,
         query["created_at"] = {"$regex": f"^{re.escape(date)}"}
     if q:
         query["invoice_no"] = {"$regex": re.escape(q), "$options": "i"}
-    docs = await db.transactions.find(query).sort("created_at", 1 if sort == "asc" else -1).to_list(min(limit, 2000))
+    docs = await db.transactions.find(query).sort("created_at", 1 if sort == "asc" else -1).to_list(min(limit, 10000))
     for d in docs:
         d["id"] = str(d["_id"])
         d.pop("_id", None)

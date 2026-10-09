@@ -32,7 +32,7 @@ export default function RiwayatTransaksi() {
   const dateParam = period !== "all" && periodVal ? periodVal : "";
   const load = (query = q) => {
     setLoading(true);
-    const url = `/transactions?limit=${dateParam ? 2000 : 100}&sort=${sort}${dateParam ? `&date=${dateParam}` : ""}${query ? `&q=${encodeURIComponent(query)}` : ""}`;
+    const url = `/transactions?limit=${dateParam ? 10000 : 100}&sort=${sort}${dateParam ? `&date=${dateParam}` : ""}${query ? `&q=${encodeURIComponent(query)}` : ""}`;
     setSelected([]);
     api.get(url).then((r) => setTxs(r.data)).finally(() => setLoading(false));
   };
@@ -149,6 +149,8 @@ export default function RiwayatTransaksi() {
             className="flex items-center gap-2 px-3 py-2.5 rounded-xl border border-input text-sm hover:bg-secondary"><FileSpreadsheet className="w-4 h-4" /> Excel</button>
         </div>
       </div>
+
+      {!loading && <PeriodSummary txs={txs} label={dateParam ? periodLabel : "100 transaksi terbaru"} />}
 
       {loading ? <div className="flex justify-center py-20"><Loader2 className="w-8 h-8 animate-spin text-[#1B5E3B]" /></div> : (
         <div className="bg-card rounded-2xl border border-slate-200 overflow-x-auto">
@@ -309,6 +311,30 @@ export default function RiwayatTransaksi() {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+function PeriodSummary({ txs, label }) {
+  const omzet = txs.reduce((s, t) => s + t.total, 0);
+  const items = txs.reduce((s, t) => s + t.items.reduce((a, i) => a + i.qty, 0), 0);
+  const cards = [
+    { k: "omzet", t: "Total Omzet", v: rupiah(omzet), c: "text-[#1B5E3B]" },
+    { k: "count", t: "Jumlah Transaksi", v: txs.length.toLocaleString("id-ID"), c: "text-[#0F281E]" },
+    { k: "items", t: "Item Terjual", v: items.toLocaleString("id-ID"), c: "text-[#C85A32]" },
+    { k: "avg", t: "Rata-rata / Transaksi", v: rupiah(txs.length ? Math.round(omzet / txs.length) : 0), c: "text-[#2563EB]" },
+  ];
+  return (
+    <div data-testid="riwayat-period-summary">
+      <p className="text-xs text-muted-foreground mb-2">Ringkasan: <span className="font-semibold">{label}</span></p>
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        {cards.map((x) => (
+          <div key={x.k} className="bg-card rounded-2xl border border-slate-200 p-4" data-testid={`riwayat-summary-${x.k}`}>
+            <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-semibold">{x.t}</p>
+            <p className={`mt-1 font-mono font-bold text-xl ${x.c}`}>{x.v}</p>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
