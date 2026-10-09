@@ -44,7 +44,9 @@ export default function POS() {
     ...bundles.map((b) => ({ id: b.id, name: b.name, category: "Paket", harga_jual: b.harga_jual, harga_reseller: b.harga_reseller, stok: b.stok, stok_minimal: 0, is_bundle: true, hemat: b.hemat })),
   ];
   const filtered = sellable.filter((p) =>
-    p.name.toLowerCase().includes(search.toLowerCase()) || (p.sku || "").toLowerCase().includes(search.toLowerCase())
+    p.name.toLowerCase().includes(search.toLowerCase()) ||
+    (p.sku || "").toLowerCase().includes(search.toLowerCase()) ||
+    (p.barcode || "").toLowerCase().includes(search.toLowerCase())
   );
 
   const addToCart = (p) => {
@@ -63,6 +65,19 @@ export default function POS() {
     c.map((i) => i.product_id === id ? { ...i, qty: Math.max(1, Math.min(i.stok, i.qty + delta)) } : i));
 
   const removeItem = (id) => setCart((c) => c.filter((i) => i.product_id !== id));
+
+  // Scanner fisik (USB/Bluetooth): mengetik kode lalu Enter → produk langsung masuk keranjang
+  const handleSearchKey = (e) => {
+    if (e.key !== "Enter") return;
+    e.preventDefault();
+    const raw = search.trim();
+    if (!raw) return;
+    const exact = sellable.find((p) =>
+      (p.barcode && p.barcode === raw) || (p.sku && p.sku.toLowerCase() === raw.toLowerCase()));
+    const target = exact || (filtered.length > 0 ? filtered[0] : null);
+    if (target) { addToCart(target); setSearch(""); }
+    else toast.error("Produk tidak ditemukan");
+  };
 
   const subtotal = cart.reduce((s, i) => s + i.qty * i.harga, 0);
   const discount = Math.min(subtotal, (Number(discRp) || 0) + Math.round(subtotal * (Number(discPct) || 0) / 100));
@@ -100,8 +115,9 @@ export default function POS() {
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <input
               value={search} onChange={(e) => setSearch(e.target.value)}
+              onKeyDown={handleSearchKey}
               data-testid="pos-search-product-input"
-              placeholder="Cari produk / SKU..."
+              placeholder="Cari / scan barcode produk..."
               className="w-full pl-10 pr-4 py-3 rounded-xl border border-input bg-card focus:outline-none focus:ring-2 focus:ring-[#1B5E3B] text-sm"
             />
           </div>
