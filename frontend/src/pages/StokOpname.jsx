@@ -52,7 +52,7 @@ export default function StokOpname() {
           <select value={form.product_id} onChange={(e) => setForm({ ...form, product_id: e.target.value })} data-testid="stok-opname-product-select"
             className="mt-1 w-full px-3 py-2.5 rounded-xl border border-input text-sm bg-white">
             <option value="">-- Pilih Produk --</option>
-            {products.map((p) => <option key={p.id} value={p.id}>{p.name} ({p.sku})</option>)}
+            {products.map((p) => <option key={p.id} value={p.id}>{`${p.name} (${p.sku})`}</option>)}
           </select>
         </div>
         {selected && (

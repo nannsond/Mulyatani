@@ -1,0 +1,46 @@
+{
+  "summary": "Iteration 17: Full end-to-end integration test (backend + frontend) of Mulyatani after sample-product removal and new WhatsApp receipt feature. Backend: 16/16 pytest integration tests pass (CRUD products, bundles, POS tx + stock decrement, piutang partial + pay-off, tx delete restores stock, stok opname, pembelian + hutang, pengantaran status/archive, ecommerce sale + delete restores stock, expenses, attendance mark + recap, payroll report + archive, daily/monthly/yearly reports, settings info, unauthorized access). Smoke suite 36/36 still green. Frontend: Playwright POS flow — login, product search, add-to-cart, checkout → invoice panel renders, WhatsApp receipt phone prefilled from pos-telepon, Kirim WA button disabled for <9 digits, enabled for valid phone, click opens wa.me/62xxx URL with invoice no + items + total; 08x correctly converted to 628x; Cetak Struk PDF button present; stock decremented 100→98. All TEST_ data cleaned up.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "/api/settings/logo", "issue": "Returns 404 when logo not set (from iter_16, still present; cosmetic)"},
+      {"endpoint": "backend startup", "issue": "Non-fatal 'Storage init failed: 400 Client Error' from objstore (from iter_16; does not block any feature)"}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "StokOpname", "issues": ["(Carried from iter_16) React hydration warning: <span> inside <option> — noisy console only"]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter17_integration.py",
+    "/app/backend/tests/test_smoke.py",
+    "/app/test_reports/pytest/iter17.xml",
+    "/app/test_reports/pytest/pytest_results.xml"
+  ],
+  "action_items": [
+    "No functional bugs found. All requested features (POS, stock flows, payroll, exports gatekeeping buttons, WA receipt) verified working.",
+    "(Carryover) Consider splitting /app/backend/server.py (1821 lines) into routers per domain for maintainability.",
+    "(Optional) /api/settings/logo could return 200 + null when unset instead of 404 for cleaner client handling.",
+    "(Optional) Fix StokOpname <option> hydration warning."
+  ],
+  "critical_code_review_comments": [
+    "server.py is a 1821-line monolith — split into routers (products, pos, purchases, payroll, attendance, reports, settings) for maintainability.",
+    "No rate-limit / retry handling in frontend for preview ingress 429 — rapid-fire navigation can throttle; already-documented in iter_16.",
+    "WhatsAppReceipt.jsx is clean and correct; toWaNumber handles '0' prefix only — numbers that start with '+62' or '62' pass through correctly.",
+    "Transaction edit/delete properly reconciles stock via _restore_sale_items + _apply_sale_items. Verified by API test.",
+    "Report query params lack defaults (daily/monthly/yearly require date/year/month) — frontend must always pass; worth considering FastAPI default=today."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter17_integration.py (new, 16 tests)"
+  ],
+  "success_rate": {"backend": "100% (16/16 integration + 36/36 smoke = 52/52)", "frontend": "100% (POS + WhatsApp receipt end-to-end verified)"},
+  "test_credentials": "Admin: nannsond@gmail.com / admin123 (from /app/memory/test_credentials.md and backend/.env — confirmed working)",
+  "seed_data_creation": "All test artifacts prefixed with TEST_ and auto-cleaned by pytest teardown + Playwright cleanup block. No residual TEST_ data expected. Confirmed via admin API deletion of created products/transactions.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "iter_17 established a reusable integration suite at /app/backend/tests/test_iter17_integration.py — rerun with `pytest backend/tests/test_iter17_integration.py -v` for regression. Smoke suite still at test_smoke.py. All currently-advertised features work end-to-end; main agent is clear to proceed with deploy-readiness checks (CORS, env vars, prod MongoDB connection string, PDF/Excel export regression — the frontend export buttons use /app/frontend/src/lib/exporter.js and were not individually clicked in this iteration, but their presence is confirmed and prior iterations tested them).",
+  "rca of the issue": "No bugs reproduced in this iteration. All reported feature paths work. New WhatsAppReceipt component correctly: (1) prefills phone from tx.telepon via tx key reset, (2) disables Kirim WA when sanitized number <9 digits, (3) builds wa.me/62XXX URL with 0→62 conversion, (4) encodes full receipt text including invoice no, items, totals, payment method."
+}
