@@ -138,3 +138,12 @@ Aplikasi laporan penjualan sederhana untuk bisnis toko pertanian: laporan harian
 ## Implemented (2026-10-09) — Harga Jual Saran & Ringkasan Periode
 - Daftar Harga (tab Online): tombol "Harga Saran" → hitung harga per platform agar untung bersih (% modal atau Rp/unit) tercapai setelah potongan channel (bulat ke atas Rp100), preview + terapkan massal. Modal produk: "Isi Harga Saran".
 - Riwayat Transaksi: kartu ringkasan Total Omzet, Jumlah Transaksi, Item Terjual, Rata-rata untuk periode terpilih (limit periode 10.000). Tested iter 15: 100%
+
+## Implemented (2026-10-09) — Pembelian: Search Manual, Supplier Tersimpan, Harga Terakhir, Scan Barcode + Login Logo
+- Input Pembelian & Edit Pembelian: dropdown "+ Tambah produk" diganti kotak pencarian ketik-manual (komponen ProductSearch). Hanya produk terdaftar yang cocok (nama/SKU/barcode) bisa dipilih; produk yang sudah di daftar dikecualikan.
+- Supplier Tersimpan: input supplier pakai datalist dari GET /purchases/suppliers (distinct supplier).
+- Riwayat Harga Beli: dropdown menampilkan "Terakhir: Rp…" dari GET /purchases/last-prices (harga_beli pembelian terakhir per produk) & otomatis dipakai saat item ditambahkan.
+- Scan Barcode (scanner fisik USB/Bluetooth): produk punya field `barcode` (Product/ProductInput backend + input Barcode di form Daftar Harga). Scanner mengetik kode + Enter → ProductSearch mencocokkan persis barcode/SKU lalu menambah produk otomatis (qty 1, harga terakhir). Diverifikasi UI (scan 8991234567890 → Gramoxone 1L masuk).
+- Input Qty Cepat: SUDAH DIHAPUS sesuai permintaan (tidak ada field qty di kotak pencarian).
+- Login: foto hero diganti logo MULYA TANI (/mulyatani-logo.png) di panel kiri + ikon header.
+- Fix setup: reset password admin/kasir agar cocok dengan backend/.env (hash DB lama tidak cocok → login 401).
