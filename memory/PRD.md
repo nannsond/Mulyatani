@@ -168,3 +168,8 @@ Aplikasi laporan penjualan sederhana untuk bisnis toko pertanian: laporan harian
 - Modal Edit Transaksi: tambah input "Ongkos Kirim (Rp)" & "Alamat Pengiriman" (editable); editTotal kini = subtotal − diskon + ongkir; ringkasan menampilkan baris Ongkos Kirim.
 - Modal Detail Transaksi: tampilkan "Ongkos Kirim" (jika >0) & "Alamat Antar" (jika ada) agar mudah dilihat saat pengantaran.
 - Diverifikasi UI: Detail menampilkan ongkir 8rb & alamat; Edit terisi & ubah ongkir 20rb → Total Rp98rb.
+
+## Implemented (2026-10-09) — No. HP Pembeli
+- Field `telepon` di TransactionInput + disimpan (create & update). Input "No. HP pembeli" di Kasir (POS); dicetak di struk (baris "HP:").
+- Riwayat: input "No. HP Pembeli" di modal Edit (passthrough openEdit/saveEdit) & baris "No. HP" di modal Detail.
+- Diverifikasi: backend simpan+preserve '081234567890'; UI input POS & Edit tampil.

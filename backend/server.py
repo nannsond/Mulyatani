@@ -279,6 +279,7 @@ class TransactionInput(BaseModel):
     discount_reason: str = ""
     customer_name: str = ""
     alamat: str = ""
+    telepon: str = ""
     ongkir: float = 0
     amount_paid: Optional[float] = None
 
@@ -484,7 +485,7 @@ async def create_transaction(data: TransactionInput, user: dict = Depends(get_cu
     status = "lunas" if amount_paid >= total else ("sebagian" if amount_paid > 0 else "belum")
     doc = {"invoice_no": await gen_invoice(), "items": items, "subtotal": subtotal,
            "discount": discount, "discount_reason": data.discount_reason, "ongkir": ongkir, "total": total,
-           "payment_method": data.payment_method, "customer_name": data.customer_name, "alamat": data.alamat,
+           "payment_method": data.payment_method, "customer_name": data.customer_name, "alamat": data.alamat, "telepon": data.telepon,
            "amount_paid": amount_paid, "status": status, "payments": [],
            "cashier_id": user["id"], "cashier_name": user["name"], "created_at": now_iso()}
     res = await db.transactions.insert_one(doc)
@@ -521,7 +522,7 @@ async def update_transaction(tid: str, data: TransactionInput, admin: dict = Dep
     status = "lunas" if amount_paid >= total else ("sebagian" if amount_paid > 0 else "belum")
     await db.transactions.update_one({"_id": ObjectId(tid)}, {"$set": {
         "items": items, "subtotal": subtotal, "discount": discount, "discount_reason": data.discount_reason,
-        "ongkir": ongkir, "total": total, "payment_method": data.payment_method, "customer_name": data.customer_name, "alamat": data.alamat,
+        "ongkir": ongkir, "total": total, "payment_method": data.payment_method, "customer_name": data.customer_name, "alamat": data.alamat, "telepon": data.telepon,
         "amount_paid": amount_paid, "status": status, "edited_at": now_iso(), "edited_by": admin["name"]}})
     doc = await db.transactions.find_one({"_id": ObjectId(tid)})
     doc["id"] = str(doc["_id"]); doc.pop("_id", None)

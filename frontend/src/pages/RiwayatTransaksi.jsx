@@ -54,7 +54,7 @@ export default function RiwayatTransaksi() {
     items: t.items.map((i) => ({ product_id: i.product_id, name: i.name, qty: i.qty, harga: i.harga })),
     discount: t.discount || 0, discount_reason: t.discount_reason || "",
     payment_method: t.payment_method || "Tunai", customer_name: t.customer_name || "",
-    ongkir: t.ongkir || 0, alamat: t.alamat || "",
+    ongkir: t.ongkir || 0, alamat: t.alamat || "", telepon: t.telepon || "",
     amount_paid: t.amount_paid ?? t.total,
   });
   const editSubtotal = edit ? edit.items.reduce((s, i) => s + (Number(i.qty) || 0) * (Number(i.harga) || 0), 0) : 0;
@@ -74,7 +74,7 @@ export default function RiwayatTransaksi() {
       await api.put(`/transactions/${edit.id}`, {
         items: edit.items.map((i) => ({ product_id: i.product_id, name: i.name, qty: Number(i.qty), harga: Number(i.harga) })),
         payment_method: edit.payment_method, discount: Number(edit.discount) || 0, discount_reason: edit.discount_reason,
-        customer_name: edit.customer_name, ongkir: Number(edit.ongkir) || 0, alamat: edit.alamat || "", amount_paid: Number(edit.amount_paid),
+        customer_name: edit.customer_name, ongkir: Number(edit.ongkir) || 0, alamat: edit.alamat || "", telepon: edit.telepon || "", amount_paid: Number(edit.amount_paid),
       });
       toast.success("Transaksi diperbarui"); setEdit(null); load(q);
     } catch (err) { toast.error(apiError(err.response?.data?.detail)); }
@@ -222,6 +222,7 @@ export default function RiwayatTransaksi() {
               <div className="flex justify-between"><span className="text-muted-foreground">Pembayaran</span><span>{detail.payment_method}</span></div>
               {detail.ongkir > 0 && <div className="flex justify-between"><span className="text-muted-foreground">Ongkos Kirim</span><span className="font-mono">{rupiah(detail.ongkir)}</span></div>}
               {detail.alamat && <div className="flex justify-between gap-3"><span className="text-muted-foreground shrink-0">Alamat Antar</span><span className="text-right font-medium text-[#0F281E]" data-testid="detail-alamat">{detail.alamat}</span></div>}
+              {detail.telepon && <div className="flex justify-between"><span className="text-muted-foreground">No. HP</span><span className="font-medium text-[#0F281E]" data-testid="detail-telepon">{detail.telepon}</span></div>}
             </div>
             <div className="mt-3 space-y-2">
               {detail.items.map((i, idx) => (
@@ -302,6 +303,12 @@ export default function RiwayatTransaksi() {
                 <label className="text-sm font-medium">Ongkos Kirim (Rp)</label>
                 <input type="number" min="0" value={edit.ongkir} onChange={(e) => setEdit({ ...edit, ongkir: e.target.value })} data-testid="edit-ongkir-input"
                   className="mt-1 w-full px-3 py-2 rounded-lg border border-input text-sm font-mono" />
+              </div>
+              <div>
+                <label className="text-sm font-medium">No. HP Pembeli</label>
+                <input value={edit.telepon} onChange={(e) => setEdit({ ...edit, telepon: e.target.value })} data-testid="edit-telepon-input"
+                  placeholder="08xxxxxxxxxx"
+                  className="mt-1 w-full px-3 py-2 rounded-lg border border-input text-sm" />
               </div>
               <div className="col-span-2">
                 <label className="text-sm font-medium">Alamat Pengiriman</label>
