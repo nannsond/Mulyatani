@@ -6,9 +6,10 @@ import { useAuth } from "@/context/AuthContext";
 import { Plus, Trash2, Truck, FileDown, FileSpreadsheet, Pencil, X, Search } from "lucide-react";
 import { toast } from "sonner";
 
-// Pencarian produk ketik manual (typeahead) — hanya produk terdaftar yang cocok bisa dipilih
-function ProductSearch({ products, exclude = [], onPick, placeholder = "Cari produk...", testid }) {
+// Pencarian produk ketik manual (typeahead) dengan qty cepat & harga beli terakhir
+function ProductSearch({ products, exclude = [], onPick, placeholder = "Cari produk...", testid, lastPrices = {} }) {
   const [q, setQ] = useState("");
+  const [qty, setQty] = useState("1");
   const [open, setOpen] = useState(false);
   const boxRef = useRef(null);
 
@@ -21,45 +22,71 @@ function ProductSearch({ products, exclude = [], onPick, placeholder = "Cari pro
   const term = q.trim().toLowerCase();
   const matches = term
     ? products
-        .filter((p) => !exclude.includes(p.id) && p.name.toLowerCase().includes(term))
+        .filter((p) => !exclude.includes(p.id) && (p.name.toLowerCase().includes(term) || (p.sku || "").toLowerCase().includes(term)))
         .slice(0, 8)
     : [];
 
-  const choose = (p) => { onPick(p.id); setQ(""); setOpen(false); };
+  const priceOf = (p) => (lastPrices[p.id]?.harga_beli ?? p.harga_beli);
+  const choose = (p) => {
+    onPick(p.id, Number(qty) || 1, priceOf(p));
+    setQ(""); setQty("1"); setOpen(false);
+  };
+  const onKeyDown = (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      if (matches.length > 0) choose(matches[0]);
+    }
+  };
 
   return (
-    <div className="relative" ref={boxRef}>
-      <div className="relative">
+    <div className="relative flex gap-2" ref={boxRef}>
+      <div className="relative flex-1">
         <Search className="w-4 h-4 text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
         <input
           value={q}
           onChange={(e) => { setQ(e.target.value); setOpen(true); }}
           onFocus={() => setOpen(true)}
+          onKeyDown={onKeyDown}
           placeholder={placeholder}
           data-testid={testid}
           className="w-full pl-9 pr-3 py-2.5 rounded-xl border border-input text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#1B5E3B]"
         />
+        {open && term && (
+          <div className="absolute z-20 mt-1 w-full bg-white border border-slate-200 rounded-xl shadow-lg max-h-56 overflow-y-auto" data-testid={testid ? `${testid}-results` : undefined}>
+            {matches.length === 0 ? (
+              <div className="px-3 py-2.5 text-sm text-muted-foreground">Produk tidak ditemukan</div>
+            ) : (
+              matches.map((p) => {
+                const last = lastPrices[p.id]?.harga_beli;
+                return (
+                  <button
+                    key={p.id}
+                    type="button"
+                    onClick={() => choose(p)}
+                    data-testid={testid ? `${testid}-option-${p.id}` : undefined}
+                    className="w-full text-left px-3 py-2.5 text-sm hover:bg-secondary flex items-center justify-between gap-2"
+                  >
+                    <span className="truncate">{p.name}</span>
+                    <span className="text-xs shrink-0 text-right">
+                      {last != null
+                        ? <span className="text-[#1B5E3B] font-mono">Terakhir: {rupiah(last)}</span>
+                        : <span className="text-muted-foreground font-mono">{rupiah(p.harga_beli)}</span>}
+                    </span>
+                  </button>
+                );
+              })
+            )}
+          </div>
+        )}
       </div>
-      {open && term && (
-        <div className="absolute z-20 mt-1 w-full bg-white border border-slate-200 rounded-xl shadow-lg max-h-56 overflow-y-auto" data-testid={testid ? `${testid}-results` : undefined}>
-          {matches.length === 0 ? (
-            <div className="px-3 py-2.5 text-sm text-muted-foreground">Produk tidak ditemukan</div>
-          ) : (
-            matches.map((p) => (
-              <button
-                key={p.id}
-                type="button"
-                onClick={() => choose(p)}
-                data-testid={testid ? `${testid}-option-${p.id}` : undefined}
-                className="w-full text-left px-3 py-2.5 text-sm hover:bg-secondary flex items-center justify-between gap-2"
-              >
-                <span className="truncate">{p.name}</span>
-                <span className="text-xs text-muted-foreground font-mono shrink-0">{rupiah(p.harga_beli)}</span>
-              </button>
-            ))
-          )}
-        </div>
-      )}
+      <input
+        type="number" min="1" value={qty}
+        onChange={(e) => setQty(e.target.value)}
+        onKeyDown={onKeyDown}
+        title="Jumlah (Qty)"
+        data-testid={testid ? `${testid}-qty` : undefined}
+        className="w-16 px-2 py-2.5 rounded-xl border border-input text-sm text-center bg-white focus:outline-none focus:ring-2 focus:ring-[#1B5E3B]"
+      />
     </div>
   );
 }
@@ -73,19 +100,23 @@ export default function Pembelian() {
   const [note, setNote] = useState("");
   const [hutang, setHutang] = useState(false);
   const [amountPaid, setAmountPaid] = useState("");
+  const [suppliers, setSuppliers] = useState([]);
+  const [lastPrices, setLastPrices] = useState({});
   const { user } = useAuth();
   const isAdmin = user?.role === "admin";
   const [edit, setEdit] = useState(null);
 
   const loadProducts = () => api.get("/products").then((r) => setProducts(r.data));
   const loadPurchases = () => api.get(`/purchases?month=${month}`).then((r) => setPurchases(r.data));
-  useEffect(() => { loadProducts(); }, []);
+  const loadSuppliers = () => api.get("/purchases/suppliers").then((r) => setSuppliers(r.data)).catch(() => {});
+  const loadLastPrices = () => api.get("/purchases/last-prices").then((r) => setLastPrices(r.data)).catch(() => {});
+  useEffect(() => { loadProducts(); loadSuppliers(); loadLastPrices(); }, []);
   useEffect(() => { loadPurchases(); }, [month]);
 
-  const addLine = (pid) => {
+  const addLine = (pid, qty = 1, harga = null) => {
     const p = products.find((x) => x.id === pid);
     if (!p || lines.find((l) => l.product_id === pid)) return;
-    setLines([...lines, { product_id: p.id, name: p.name, qty: 1, harga_beli: p.harga_beli }]);
+    setLines([...lines, { product_id: p.id, name: p.name, qty: Number(qty) || 1, harga_beli: harga ?? p.harga_beli }]);
   };
   const upd = (pid, k, v) => setLines(lines.map((l) => l.product_id === pid ? { ...l, [k]: v } : l));
   const total = lines.reduce((s, l) => s + Number(l.qty) * Number(l.harga_beli), 0);
@@ -98,12 +129,12 @@ export default function Pembelian() {
   const eTotal = edit ? edit.items.reduce((s, l) => s + (Number(l.qty) || 0) * (Number(l.harga_beli) || 0), 0) : 0;
   const eSet = (idx, patch) => setEdit((e) => ({ ...e, items: e.items.map((it, k) => (k === idx ? { ...it, ...patch } : it)) }));
   const eRemove = (idx) => setEdit((e) => ({ ...e, items: e.items.filter((_, k) => k !== idx) }));
-  const eAdd = (pid) => {
+  const eAdd = (pid, qty = 1, harga = null) => {
     const p = products.find((x) => x.id === pid);
     if (!p) return;
     setEdit((e) => (e.items.some((i) => i.product_id === pid)
-      ? { ...e, items: e.items.map((i) => (i.product_id === pid ? { ...i, qty: Number(i.qty) + 1 } : i)) }
-      : { ...e, items: [...e.items, { product_id: p.id, name: p.name, qty: 1, harga_beli: p.harga_beli }] }));
+      ? { ...e, items: e.items.map((i) => (i.product_id === pid ? { ...i, qty: Number(i.qty) + (Number(qty) || 1) } : i)) }
+      : { ...e, items: [...e.items, { product_id: p.id, name: p.name, qty: Number(qty) || 1, harga_beli: harga ?? p.harga_beli }] }));
   };
   const saveEdit = async () => {
     if (!edit.supplier || edit.items.length === 0) { toast.error("Lengkapi supplier & item"); return; }
@@ -129,7 +160,7 @@ export default function Pembelian() {
       });
       toast.success("Pembelian disimpan & stok ditambah");
       setSupplier(""); setLines([]); setNote(""); setHutang(false); setAmountPaid("");
-      loadProducts(); loadPurchases();
+      loadProducts(); loadPurchases(); loadSuppliers(); loadLastPrices();
     } catch (err) { toast.error(apiError(err.response?.data?.detail)); }
   };
 
@@ -143,8 +174,12 @@ export default function Pembelian() {
         <h3 className="font-heading font-semibold text-lg mb-4 flex items-center gap-2"><Truck className="w-5 h-5 text-[#1B5E3B]" /> Input Pembelian</h3>
         <div className="grid sm:grid-cols-2 gap-3 mb-3">
           <input value={supplier} onChange={(e) => setSupplier(e.target.value)} placeholder="Nama supplier" data-testid="purchase-supplier-input"
+            list="supplier-list" autoComplete="off"
             className="px-3 py-2.5 rounded-xl border border-input text-sm focus:outline-none focus:ring-2 focus:ring-[#1B5E3B]" />
-          <ProductSearch products={products} exclude={lines.map((l) => l.product_id)} onPick={addLine}
+          <datalist id="supplier-list">
+            {suppliers.map((s) => <option key={s} value={s} />)}
+          </datalist>
+          <ProductSearch products={products} exclude={lines.map((l) => l.product_id)} onPick={addLine} lastPrices={lastPrices}
             placeholder="Cari & tambah produk..." testid="purchase-add-product" />
         </div>
         {lines.length > 0 && (
@@ -238,7 +273,7 @@ export default function Pembelian() {
             </div>
 
             <div className="mt-3">
-              <ProductSearch products={products} exclude={edit.items.map((i) => i.product_id)} onPick={eAdd}
+              <ProductSearch products={products} exclude={edit.items.map((i) => i.product_id)} onPick={eAdd} lastPrices={lastPrices}
                 placeholder="Cari & tambah produk..." testid="edit-purchase-add-select" />
             </div>
 

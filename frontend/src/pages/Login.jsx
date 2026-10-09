@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import { apiError } from "@/lib/api";
-import { Sprout, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
 export default function Login() {
@@ -32,24 +32,23 @@ export default function Login() {
 
   return (
     <div className="min-h-screen grid lg:grid-cols-2">
-      <div className="hidden lg:block relative">
+      <div className="hidden lg:flex relative flex-col items-center justify-center p-12 bg-gradient-to-br from-white via-emerald-50 to-[#E6F0E9]">
         <img
-          src="https://images.unsplash.com/photo-1691229219606-f9aa47d9cdef?crop=entropy&cs=srgb&fm=jpg&q=85&w=1200"
-          alt="Toko Pertanian"
-          className="absolute inset-0 w-full h-full object-cover"
+          src="/mulyatani-logo.png"
+          alt="Mulya Tani"
+          className="w-72 h-72 object-contain drop-shadow-sm"
         />
-        <div className="absolute inset-0 bg-gradient-to-t from-[#0E241B] via-[#0E241B]/60 to-[#0E241B]/20" />
-        <div className="absolute bottom-0 p-12 text-white">
-          <h1 className="font-heading text-4xl font-extrabold mb-3 leading-tight">Kelola Toko Pertanian<br/>Lebih Cerdas</h1>
-          <p className="text-emerald-100/80 max-w-md">Pencatatan penjualan, stok opname, dan laporan harian, bulanan & tahunan dalam satu sistem.</p>
+        <div className="mt-8 text-center">
+          <h1 className="font-heading text-3xl font-extrabold mb-3 leading-tight text-[#0F281E]">Kelola Toko Pertanian<br/>Lebih Cerdas</h1>
+          <p className="text-[#334E42]/80 max-w-md mx-auto">Pencatatan penjualan, stok opname, dan laporan harian, bulanan & tahunan dalam satu sistem.</p>
         </div>
       </div>
 
       <div className="flex items-center justify-center p-6 bg-background">
         <div className="w-full max-w-sm">
           <div className="flex items-center gap-3 mb-8">
-            <div className="w-12 h-12 rounded-2xl bg-[#1B5E3B] flex items-center justify-center">
-              <Sprout className="w-7 h-7 text-white" />
+            <div className="w-12 h-12 rounded-2xl bg-white border border-slate-200 flex items-center justify-center overflow-hidden">
+              <img src="/mulyatani-logo.png" alt="Mulya Tani" className="w-11 h-11 object-contain" />
             </div>
             <div>
               <h2 className="font-heading font-bold text-xl text-[#0F281E]">Toko Pe-i Mulya Tani Caruban</h2>

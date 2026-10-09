@@ -883,6 +883,26 @@ async def list_purchases(month: Optional[str] = None, user: dict = Depends(get_c
         d["id"] = str(d["_id"]); d.pop("_id", None)
     return docs
 
+@api_router.get("/purchases/suppliers")
+async def purchase_suppliers(user: dict = Depends(get_current_user)):
+    names = await db.purchases.distinct("supplier")
+    uniq = {}
+    for n in names:
+        if n and n.strip():
+            uniq[n.strip().lower()] = n.strip()
+    return sorted(uniq.values(), key=lambda s: s.lower())
+
+@api_router.get("/purchases/last-prices")
+async def purchase_last_prices(user: dict = Depends(get_current_user)):
+    out = {}
+    docs = await db.purchases.find({}, {"items": 1, "created_at": 1}).sort("created_at", -1).to_list(2000)
+    for d in docs:
+        for it in d.get("items", []):
+            pid = it.get("product_id")
+            if pid and pid not in out:
+                out[pid] = {"harga_beli": it.get("harga_beli"), "date": d.get("created_at")}
+    return out
+
 @api_router.get("/hutang")
 async def list_hutang(user: dict = Depends(get_current_user)):
     docs = await db.purchases.find({"status": {"$in": ["belum", "sebagian"]}}).sort("created_at", -1).to_list(500)
