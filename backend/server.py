@@ -140,6 +140,7 @@ def compute_profit(txs: List[dict], cost: dict) -> float:
         f = tx_fraction(t)
         for i in t["items"]:
             laba += f * i["qty"] * (i["harga"] - cost.get(i["product_id"], i.get("hpp", 0)))
+        laba += f * (t.get("ongkir", 0) or 0)  # ongkir toko fisik = pendapatan (tanpa HPP)
     return laba
 
 # ---------------- Online channels & merge helpers ----------------
@@ -277,6 +278,7 @@ class TransactionInput(BaseModel):
     discount: float = 0
     discount_reason: str = ""
     customer_name: str = ""
+    ongkir: float = 0
     amount_paid: Optional[float] = None
 
 class PaymentInput(BaseModel):
@@ -475,11 +477,12 @@ async def create_transaction(data: TransactionInput, user: dict = Depends(get_cu
         raise HTTPException(status_code=400, detail="Keranjang kosong")
     items, subtotal = await _apply_sale_items(data.items)
     discount = max(0.0, min(data.discount, subtotal))
-    total = subtotal - discount
+    ongkir = max(0.0, data.ongkir)
+    total = subtotal - discount + ongkir
     amount_paid = total if data.amount_paid is None else max(0.0, min(data.amount_paid, total))
     status = "lunas" if amount_paid >= total else ("sebagian" if amount_paid > 0 else "belum")
     doc = {"invoice_no": await gen_invoice(), "items": items, "subtotal": subtotal,
-           "discount": discount, "discount_reason": data.discount_reason, "total": total,
+           "discount": discount, "discount_reason": data.discount_reason, "ongkir": ongkir, "total": total,
            "payment_method": data.payment_method, "customer_name": data.customer_name,
            "amount_paid": amount_paid, "status": status, "payments": [],
            "cashier_id": user["id"], "cashier_name": user["name"], "created_at": now_iso()}
@@ -511,12 +514,13 @@ async def update_transaction(tid: str, data: TransactionInput, admin: dict = Dep
     await _restore_sale_items(old.get("items", []))
     items, subtotal = await _apply_sale_items(data.items)
     discount = max(0.0, min(data.discount, subtotal))
-    total = subtotal - discount
+    ongkir = max(0.0, data.ongkir)
+    total = subtotal - discount + ongkir
     amount_paid = total if data.amount_paid is None else max(0.0, min(data.amount_paid, total))
     status = "lunas" if amount_paid >= total else ("sebagian" if amount_paid > 0 else "belum")
     await db.transactions.update_one({"_id": ObjectId(tid)}, {"$set": {
         "items": items, "subtotal": subtotal, "discount": discount, "discount_reason": data.discount_reason,
-        "total": total, "payment_method": data.payment_method, "customer_name": data.customer_name,
+        "ongkir": ongkir, "total": total, "payment_method": data.payment_method, "customer_name": data.customer_name,
         "amount_paid": amount_paid, "status": status, "edited_at": now_iso(), "edited_by": admin["name"]}})
     doc = await db.transactions.find_one({"_id": ObjectId(tid)})
     doc["id"] = str(doc["_id"]); doc.pop("_id", None)

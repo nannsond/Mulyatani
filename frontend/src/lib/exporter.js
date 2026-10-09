@@ -87,10 +87,15 @@ export async function printReceipt(tx, logoUrl, info = {}) {
     doc.text(rp(i.subtotal), 75, y, { align: "right" }); y += lineH;
   });
   doc.text("--------------------------------", 5, y); y += lineH;
-  if (tx.discount && tx.discount > 0) {
+  if ((tx.discount && tx.discount > 0) || (tx.ongkir && tx.ongkir > 0)) {
     doc.setFont("courier", "normal"); doc.setFontSize(8);
     doc.text("Subtotal", 5, y); doc.text(rp(tx.subtotal || tx.total), 75, y, { align: "right" }); y += 4;
-    doc.text("Diskon", 5, y); doc.text("-" + rp(tx.discount), 75, y, { align: "right" }); y += 4;
+    if (tx.discount && tx.discount > 0) {
+      doc.text("Diskon", 5, y); doc.text("-" + rp(tx.discount), 75, y, { align: "right" }); y += 4;
+    }
+    if (tx.ongkir && tx.ongkir > 0) {
+      doc.text("Ongkir", 5, y); doc.text("+" + rp(tx.ongkir), 75, y, { align: "right" }); y += 4;
+    }
   }
   doc.setFont("courier", "bold");
   doc.setFontSize(10);

@@ -24,6 +24,7 @@ export default function POS() {
   const [discReason, setDiscReason] = useState("");
   const [isHutang, setIsHutang] = useState(false);
   const [amountPaid, setAmountPaid] = useState("");
+  const [ongkir, setOngkir] = useState("");
 
   const priceOf = (p) => (priceMode === "reseller" ? (p.harga_reseller || p.harga_jual) : p.harga_jual);
 
@@ -66,7 +67,8 @@ export default function POS() {
 
   const subtotal = cart.reduce((s, i) => s + i.qty * i.harga, 0);
   const discount = Math.min(subtotal, (Number(discRp) || 0) + Math.round(subtotal * (Number(discPct) || 0) / 100));
-  const total = subtotal - discount;
+  const ongkirNum = Math.max(0, Number(ongkir) || 0);
+  const total = subtotal - discount + ongkirNum;
   const paid = isHutang ? (Number(amountPaid) || 0) : total;
 
   const checkout = async () => {
@@ -79,11 +81,12 @@ export default function POS() {
         discount,
         discount_reason: discReason,
         customer_name: customerName,
+        ongkir: ongkirNum,
         amount_paid: isHutang ? paid : null,
       });
       setLastInvoice(data);
       toast.success(`Transaksi ${data.invoice_no} berhasil!`);
-      setCart([]); setCustomerName(""); setDiscRp(""); setDiscPct(""); setDiscReason(""); setIsHutang(false); setAmountPaid("");
+      setCart([]); setCustomerName(""); setDiscRp(""); setDiscPct(""); setDiscReason(""); setIsHutang(false); setAmountPaid(""); setOngkir("");
       load();
     } catch (err) {
       toast.error(apiError(err.response?.data?.detail));
@@ -179,6 +182,8 @@ export default function POS() {
             <input value={discReason} onChange={(e) => setDiscReason(e.target.value)} data-testid="pos-discount-reason" placeholder="Alasan diskon"
               className="w-full px-3 py-2 rounded-lg border border-input text-sm" />
           )}
+          <input type="number" min="0" value={ongkir} onChange={(e) => setOngkir(e.target.value)} data-testid="pos-ongkir" placeholder="Ongkos kirim (Rp) - jika diantar"
+            className="w-full px-3 py-2 rounded-lg border border-input text-sm focus:outline-none focus:ring-2 focus:ring-[#1B5E3B]" />
           <div className="flex gap-2">
             {["Tunai", "Transfer", "QRIS"].map((m) => (
               <button key={m} onClick={() => setPayment(m)}
@@ -193,10 +198,11 @@ export default function POS() {
             <input type="number" value={amountPaid} onChange={(e) => setAmountPaid(e.target.value)} data-testid="pos-amount-paid" placeholder="Jumlah dibayar sekarang"
               className="w-full px-3 py-2 rounded-lg border border-input text-sm" />
           )}
-          {discount > 0 && (
+          {(discount > 0 || ongkirNum > 0) && (
             <div className="text-sm text-muted-foreground space-y-0.5">
               <div className="flex justify-between"><span>Subtotal</span><span className="font-mono">{rupiah(subtotal)}</span></div>
-              <div className="flex justify-between text-destructive"><span>Diskon</span><span className="font-mono">-{rupiah(discount)}</span></div>
+              {discount > 0 && <div className="flex justify-between text-destructive"><span>Diskon</span><span className="font-mono">-{rupiah(discount)}</span></div>}
+              {ongkirNum > 0 && <div className="flex justify-between"><span>Ongkos Kirim</span><span className="font-mono">+{rupiah(ongkirNum)}</span></div>}
             </div>
           )}
           <div className="flex items-center justify-between">
