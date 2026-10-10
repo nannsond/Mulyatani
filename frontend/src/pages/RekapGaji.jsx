@@ -3,8 +3,9 @@ import { api, apiError } from "@/lib/api";
 import { rupiah, MONTHS, todayStr } from "@/lib/format";
 import { printPayslip } from "@/lib/exporter";
 import { useSettings } from "@/context/SettingsContext";
-import { Wallet, Save, Loader2, Printer, RotateCcw, AlarmClock, Archive, FolderOpen, ListPlus } from "lucide-react";
+import { Wallet, Save, Loader2, Printer, RotateCcw, AlarmClock, Archive, FolderOpen, ListPlus, MessageCircle, Trash2 } from "lucide-react";
 import { PayrollDetailDialog } from "@/components/PayrollDetailDialog";
+import { PayslipWhatsAppDialog } from "@/components/PayslipWhatsAppDialog";
 import { toast } from "sonner";
 
 export default function RekapGaji() {
@@ -23,6 +24,7 @@ export default function RekapGaji() {
   const [kota, setKota] = useState("");
   const [ttd, setTtd] = useState("");
   const [detailRow, setDetailRow] = useState(null);
+  const [waRow, setWaRow] = useState(null);
 
   const loadArchives = () => api.get("/payroll/archives").then((r) => setArchives(r.data));
 
@@ -34,7 +36,7 @@ export default function RekapGaji() {
       setHariKerja(String(r.data.hari_kerja || 26));
       setKota(r.data.kota || ""); setTtd(r.data.penandatangan || "");
       const e = {};
-      r.data.rows.forEach((row) => { e[row.user_id] = { gaji_pokok: row.gaji_pokok, komisi: row.komisi, potongan: row.potongan, bonus_items: row.bonus_items || [], potongan_lain: row.potongan_lain || 0, potongan_lain_ket: row.potongan_lain_ket || "" }; });
+      r.data.rows.forEach((row) => { e[row.user_id] = { gaji_pokok: row.gaji_pokok, komisi: row.komisi, potongan: row.potongan, bonus_items: row.bonus_items || [], potongan_items: row.potongan_items || [], potongan_lain: row.potongan_lain || 0, hadir: row.hadir, telat: row.telat, alpha: row.alpha, izin: row.izin }; });
       setEdits(e);
     });
   };
@@ -52,6 +54,15 @@ export default function RekapGaji() {
   const setField = (uid, field, v) => setEdits((e) => ({ ...e, [uid]: { ...e[uid], [field]: Number(v) || 0 } }));
   const bonusSum = (e) => (e.bonus_items || []).reduce((s, b) => s + (Number(b.jumlah) || 0), 0);
   const rowTotal = (uid) => { const e = edits[uid] || {}; return (e.gaji_pokok || 0) + (e.komisi || 0) + bonusSum(e) - (e.potongan || 0) - (e.potongan_lain || 0); };
+  const setCount = (uid, field, v) => setEdits((all) => {
+    const e = { ...all[uid], [field]: Math.max(0, parseInt(v, 10) || 0) };
+    if (field === "telat" || field === "alpha") {
+      const hk = report?.hari_kerja || 26;
+      e.potongan = (e.telat || 0) * (report?.potongan_telat || 0) + Math.round((e.alpha || 0) * (e.gaji_pokok || 0) / hk);
+    }
+    return { ...all, [uid]: e };
+  });
+  const countChanged = (row, e) => ["hadir", "telat", "alpha", "izin"].some((k) => e[k] !== row.counts_auto?.[k]);
   const applyDetail = (uid, v) => setEdits((e) => ({ ...e, [uid]: { ...e[uid], ...v } }));
 
   const savePotongan = async () => {
@@ -65,7 +76,7 @@ export default function RekapGaji() {
     const e = edits[row.user_id];
     setSavingRow(row.user_id);
     try {
-      await api.post("/payroll/save", { user_id: row.user_id, month, gaji_pokok: e.gaji_pokok || 0, komisi: e.komisi || 0, potongan: e.potongan || 0, bonus_items: e.bonus_items || [], potongan_lain: e.potongan_lain || 0, potongan_lain_ket: e.potongan_lain_ket || "" });
+      await api.post("/payroll/save", { user_id: row.user_id, month, gaji_pokok: e.gaji_pokok || 0, komisi: e.komisi || 0, potongan: e.potongan || 0, bonus_items: e.bonus_items || [], potongan_items: e.potongan_items || [], hadir: e.hadir, telat: e.telat, alpha: e.alpha, izin: e.izin });
       toast.success(`Gaji ${row.user_name} disimpan`);
       load();
     } catch (err) { toast.error(apiError(err.response?.data?.detail)); }
@@ -77,9 +88,18 @@ export default function RekapGaji() {
     catch (err) { toast.error(apiError(err.response?.data?.detail)); }
   };
 
+  const deleteArchive = async (m, label) => {
+    if (!window.confirm(`Hapus arsip slip gaji ${label}? Data gaji bulan itu kembali ke perhitungan otomatis.`)) return;
+    try { const { data } = await api.delete(`/payroll/archive/${m}`); toast.success(`Arsip ${label} dihapus (${data.deleted} slip)`); loadArchives(); if (m === month) load(); }
+    catch (err) { toast.error(apiError(err.response?.data?.detail)); }
+  };
+
+  const slipRow = (row) => { const e = edits[row.user_id] || {}; return { ...row, ...e, gaji_pokok: e.gaji_pokok || 0, komisi: e.komisi || 0, potongan: e.potongan || 0, total: rowTotal(row.user_id) }; };
+  const setPhone = (uid, tel) => setReport((r) => ({ ...r, rows: r.rows.map((x) => (x.user_id === uid ? { ...x, telepon: tel } : x)) }));
+
   const printRow = (row) => {
     const e = edits[row.user_id] || {};
-    printPayslip({ row: { ...row, ...e, gaji_pokok: e.gaji_pokok || 0, komisi: e.komisi || 0, potongan: e.potongan || 0, total: rowTotal(row.user_id) }, monthLabel, info: storeInfo, logoUrl,
+    return printPayslip({ row: { ...row, ...e, gaji_pokok: e.gaji_pokok || 0, komisi: e.komisi || 0, potongan: e.potongan || 0, total: rowTotal(row.user_id) }, monthLabel, info: storeInfo, logoUrl,
       payroll: { hari_kerja: report.hari_kerja, potongan_telat: report.potongan_telat, kota: report.kota, penandatangan: report.penandatangan } });
   };
 
@@ -118,12 +138,13 @@ export default function RekapGaji() {
         </div>
         {!report ? <div className="flex justify-center py-16"><Loader2 className="w-8 h-8 animate-spin text-[#1B5E3B]" /></div> : (
           <div className="overflow-x-auto">
-            <table className="w-full text-sm min-w-[900px]">
+            <table className="w-full text-sm min-w-[1000px]">
               <thead><tr className="border-b border-slate-200 bg-secondary/50 text-left">
                 <th className="px-3 py-2.5 font-semibold">Karyawan</th>
                 <th className="px-3 py-2.5 font-semibold text-center">Hadir</th>
                 <th className="px-3 py-2.5 font-semibold text-center">Telat</th>
                 <th className="px-3 py-2.5 font-semibold text-center">Alpha</th>
+                <th className="px-3 py-2.5 font-semibold text-center">Izin/Sakit</th>
                 <th className="px-3 py-2.5 font-semibold text-right">Gaji Pokok</th>
                 <th className="px-3 py-2.5 font-semibold text-right">Komisi</th>
                 <th className="px-3 py-2.5 font-semibold text-right">Potongan</th>
@@ -140,12 +161,16 @@ export default function RekapGaji() {
                         <div className="font-medium">{row.user_name}</div>
                         <div className="flex items-center gap-1.5">
                           <span className="text-[10px] uppercase tracking-wider text-muted-foreground">{row.role}</span>
-                          {row.edited && <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 font-semibold">diedit</span>}
+                          {(row.edited || countChanged(row, e)) && <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 font-semibold">diedit</span>}
                         </div>
                       </td>
-                      <td className="px-3 py-2.5 text-center">{row.hadir}</td>
-                      <td className="px-3 py-2.5 text-center">{row.telat > 0 ? <span className="text-red-700 font-semibold">{row.telat}</span> : 0}</td>
-                      <td className="px-3 py-2.5 text-center">{row.alpha > 0 ? <span className="text-red-700 font-semibold">{row.alpha}</span> : 0}</td>
+                      {["hadir", "telat", "alpha", "izin"].map((k) => (
+                        <td key={k} className="px-2 py-2.5 text-center">
+                          <input type="number" min="0" value={e[k] ?? 0} onChange={(ev) => setCount(row.user_id, k, ev.target.value)} data-testid={`payroll-${k}-${row.user_id}`}
+                            title={`Otomatis: ${row.counts_auto?.[k] ?? 0}`}
+                            className={`w-14 px-1.5 py-1 rounded-lg border text-xs text-center font-mono ${e[k] !== row.counts_auto?.[k] ? "border-amber-400 bg-amber-50" : "border-input"} ${(k === "telat" || k === "alpha") && e[k] > 0 ? "text-red-700 font-semibold" : ""}`} />
+                        </td>
+                      ))}
                       <td className="px-3 py-2.5 text-right"><input type="number" value={e.gaji_pokok ?? ""} onChange={(ev) => setField(row.user_id, "gaji_pokok", ev.target.value)} data-testid={`payroll-gaji-${row.user_id}`} className="w-28 px-2 py-1 rounded-lg border border-input text-xs font-mono text-right" /></td>
                       <td className="px-3 py-2.5 text-right"><input type="number" value={e.komisi ?? ""} onChange={(ev) => setField(row.user_id, "komisi", ev.target.value)} data-testid={`payroll-komisi-${row.user_id}`} className="w-28 px-2 py-1 rounded-lg border border-input text-xs font-mono text-right" /></td>
                       <td className="px-3 py-2.5 text-right"><input type="number" value={e.potongan ?? ""} onChange={(ev) => setField(row.user_id, "potongan", ev.target.value)} data-testid={`payroll-potongan-row-${row.user_id}`} className="w-28 px-2 py-1 rounded-lg border border-input text-xs font-mono text-right" /></td>
@@ -160,6 +185,7 @@ export default function RekapGaji() {
                         <div className="flex items-center justify-center gap-1">
                           <button onClick={() => saveRow(row)} disabled={savingRow === row.user_id} data-testid={`payroll-save-${row.user_id}`} title="Simpan" className="p-1.5 rounded-lg bg-[#1B5E3B] text-white hover:bg-[#143D2B] disabled:opacity-50">{savingRow === row.user_id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}</button>
                           <button onClick={() => printRow(row)} data-testid={`payroll-print-${row.user_id}`} title="Cetak slip PDF" className="p-1.5 rounded-lg border border-input hover:bg-secondary"><Printer className="w-3.5 h-3.5" /></button>
+                          <button onClick={() => setWaRow(row)} data-testid={`payroll-wa-${row.user_id}`} title="Kirim slip via WhatsApp" className="p-1.5 rounded-lg border border-green-300 text-[#1EBE5A] hover:bg-green-50"><MessageCircle className="w-3.5 h-3.5" /></button>
                           {row.edited && <button onClick={() => resetRow(row)} data-testid={`payroll-reset-${row.user_id}`} title="Reset ke otomatis" className="p-1.5 rounded-lg border border-input hover:bg-secondary text-muted-foreground"><RotateCcw className="w-3.5 h-3.5" /></button>}
                         </div>
                       </td>
@@ -167,38 +193,47 @@ export default function RekapGaji() {
                   );
                 })}
                 <tr className="bg-secondary/40 font-semibold">
-                  <td className="px-3 py-2.5" colSpan={8}>TOTAL GAJI SEMUA KARYAWAN</td>
+                  <td className="px-3 py-2.5" colSpan={9}>TOTAL GAJI SEMUA KARYAWAN</td>
                   <td className="px-3 py-2.5 text-right font-mono text-[#1B5E3B]" data-testid="payroll-grand-total">{rupiah(grand)}</td>
                   <td></td>
                 </tr>
               </tbody>
             </table>
-            <p className="text-xs text-muted-foreground mt-3">Total = Gaji Pokok + Komisi + Bonus − Potongan − Potongan Lain. Potongan = (telat × tarif) + (Alpha × gaji harian), gaji harian = gaji pokok ÷ hari kerja. Nilai bisa diedit; simpan untuk menyimpan slip bulan ini (gaji pokok dipakai ulang bulan berikutnya).</p>
+            <p className="text-xs text-muted-foreground mt-3">Total = Gaji Pokok + Komisi + Bonus − Potongan − Potongan Lain. Potongan = (telat × tarif) + (Alpha × gaji harian), gaji harian = gaji pokok ÷ hari kerja. Hadir/Telat/Alpha/Izin bisa diedit (kotak kuning = beda dari absensi; mengubah Telat/Alpha menghitung ulang potongan). Nilai lain juga bisa diedit; simpan untuk menyimpan slip bulan ini (gaji pokok dipakai ulang bulan berikutnya).</p>
           </div>
         )}
       </div>
 
       <PayrollDetailDialog open={!!detailRow} onOpenChange={(o) => !o && setDetailRow(null)} row={detailRow}
         value={detailRow ? edits[detailRow.user_id] : null} onApply={(v) => applyDetail(detailRow.user_id, v)} />
+      <PayslipWhatsAppDialog open={!!waRow} onOpenChange={(o) => !o && setWaRow(null)} row={waRow ? slipRow(waRow) : null}
+        monthLabel={monthLabel} storeName={storeInfo.store_name} onPrint={() => printRow(waRow)} onPhoneSaved={setPhone} />
 
       <div className="bg-card rounded-2xl border border-slate-200 p-6" data-testid="payroll-archives">
         <h3 className="font-heading font-semibold text-lg mb-4 flex items-center gap-2"><FolderOpen className="w-5 h-5 text-[#1B5E3B]" /> Arsip Slip Gaji</h3>
         {archives.length === 0 ? <p className="text-sm text-muted-foreground">Belum ada arsip. Klik "Arsipkan Bulan Ini" untuk menyimpan slip gaji bulan berjalan.</p> : (
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            {archives.map((a) => (
-              <button key={a.month} onClick={() => setMonth(a.month)} data-testid={`payroll-archive-${a.month}`}
-                className={`text-left p-4 rounded-xl border transition-all hover:shadow-md ${a.month === month ? "border-[#1B5E3B] bg-green-50" : "border-slate-200 hover:border-[#1B5E3B]"}`}>
-                <div className="flex items-center justify-between">
-                  <span className="font-semibold text-[#0F281E]">{MONTHS[Number(a.month.slice(5, 7)) - 1]} {a.month.slice(0, 4)}</span>
-                  <Archive className="w-4 h-4 text-muted-foreground" />
+            {archives.map((a) => {
+              const label = `${MONTHS[Number(a.month.slice(5, 7)) - 1]} ${a.month.slice(0, 4)}`;
+              return (
+                <div key={a.month} role="button" tabIndex={0} onClick={() => setMonth(a.month)} onKeyDown={(ev) => ev.key === "Enter" && setMonth(a.month)} data-testid={`payroll-archive-${a.month}`}
+                  className={`group cursor-pointer text-left p-4 rounded-xl border transition-all hover:shadow-md ${a.month === month ? "border-[#1B5E3B] bg-green-50" : "border-slate-200 hover:border-[#1B5E3B]"}`}>
+                  <div className="flex items-center justify-between">
+                    <span className="font-semibold text-[#0F281E]">{label}</span>
+                    <div className="flex items-center gap-1">
+                      <Archive className="w-4 h-4 text-muted-foreground" />
+                      <button onClick={(ev) => { ev.stopPropagation(); deleteArchive(a.month, label); }} data-testid={`payroll-archive-delete-${a.month}`} title="Hapus arsip"
+                        className="p-1 rounded-md text-muted-foreground hover:text-destructive hover:bg-red-50 transition-colors"><Trash2 className="w-4 h-4" /></button>
+                    </div>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">{a.count} karyawan</p>
+                  <p className="font-mono font-bold text-[#1B5E3B] mt-1">{rupiah(a.total)}</p>
                 </div>
-                <p className="text-xs text-muted-foreground mt-1">{a.count} karyawan</p>
-                <p className="font-mono font-bold text-[#1B5E3B] mt-1">{rupiah(a.total)}</p>
-              </button>
-            ))}
+              );
+            })}
           </div>
         )}
-        <p className="text-xs text-muted-foreground mt-3">Klik bulan untuk membuka kembali rekapnya, lalu cetak ulang slip tiap karyawan.</p>
+        <p className="text-xs text-muted-foreground mt-3">Klik bulan untuk membuka kembali rekapnya, lalu cetak ulang slip tiap karyawan. Ikon tempat sampah menghapus arsip bulan tersebut.</p>
       </div>
     </div>
   );

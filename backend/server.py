@@ -1625,8 +1625,15 @@ class PayrollSave(BaseModel):
     potongan: float
     note: str = ""
     bonus_items: List[Dict[str, Any]] = []
-    potongan_lain: float = 0
-    potongan_lain_ket: str = ""
+    potongan_items: List[Dict[str, Any]] = []
+    hadir: Optional[int] = None
+    telat: Optional[int] = None
+    alpha: Optional[int] = None
+    izin: Optional[int] = None
+
+class PayrollPhone(BaseModel):
+    user_id: str
+    telepon: str
 
 def _clean_bonus(items):
     return [{"keterangan": str(b.get("keterangan", "")).strip(), "jumlah": max(0.0, float(b.get("jumlah") or 0))}
@@ -1655,7 +1662,7 @@ async def _compute_payroll(month: str):
     sales = await db.ecommerce_sales.find({"status": "Selesai", "created_at": {"$regex": f"^{re.escape(month)}"}}).to_list(20000)
     komisi_agg = laba_by_user(sales, users)
     att = await db.attendance.find({"date": {"$regex": f"^{re.escape(month)}"}}).to_list(5000)
-    telat_by_uid = {}; hadir_by_uid = {}; alpha_by_uid = {}
+    telat_by_uid = {}; hadir_by_uid = {}; alpha_by_uid = {}; izin_by_uid = {}
     for a in att:
         st = a.get("status", "Hadir")
         if st == "Hadir":
@@ -1664,29 +1671,38 @@ async def _compute_payroll(month: str):
                 telat_by_uid[a["user_id"]] = telat_by_uid.get(a["user_id"], 0) + 1
         elif st == "Alpha":
             alpha_by_uid[a["user_id"]] = alpha_by_uid.get(a["user_id"], 0) + 1
-    bases = {b["user_id"]: b.get("gaji_pokok", 0) for b in await db.employee_salary.find().to_list(500)}
+        elif st in ("Izin", "Sakit"):
+            izin_by_uid[a["user_id"]] = izin_by_uid.get(a["user_id"], 0) + 1
+    sal_docs = await db.employee_salary.find().to_list(500)
+    bases = {b["user_id"]: b.get("gaji_pokok", 0) for b in sal_docs}
+    phones = {b["user_id"]: b.get("telepon", "") for b in sal_docs}
     overrides = {o["user_id"]: o for o in await db.payroll.find({"month": month}).to_list(500)}
     rows = []
     for u in users:
         uid = str(u["_id"]); name = u["name"]
-        telat = telat_by_uid.get(uid, 0); hadir = hadir_by_uid.get(uid, 0); alpha = alpha_by_uid.get(uid, 0)
+        ov = overrides.get(uid)
+        counts_auto = {"hadir": hadir_by_uid.get(uid, 0), "telat": telat_by_uid.get(uid, 0),
+                       "alpha": alpha_by_uid.get(uid, 0), "izin": izin_by_uid.get(uid, 0)}
+        counts = {k: v if (ov or {}).get(k) is None else ov[k] for k, v in counts_auto.items()}
+        hadir, telat, alpha, izin = counts["hadir"], counts["telat"], counts["alpha"], counts["izin"]
         komisi_calc = komisi_agg.get(uid, {}).get("laba_kotor", 0) * comm / 100
         base = bases.get(uid, 0)
         potongan_alpha = round(alpha * base / hari_kerja) if hari_kerja else 0
         potongan_calc = telat * pot_rate + potongan_alpha
-        ov = overrides.get(uid)
         if ov:
             gaji_pokok = ov.get("gaji_pokok", base); komisi = ov.get("komisi", komisi_calc); potongan = ov.get("potongan", potongan_calc)
             edited = True
         else:
             gaji_pokok = base; komisi = komisi_calc; potongan = potongan_calc; edited = False
         bonus_items = (ov or {}).get("bonus_items", [])
-        potongan_lain = (ov or {}).get("potongan_lain", 0)
+        potongan_items = (ov or {}).get("potongan_items", [])
+        potongan_lain = sum(p["jumlah"] for p in potongan_items)
         total = gaji_pokok + komisi + sum(b["jumlah"] for b in bonus_items) - potongan - potongan_lain
         rows.append({"user_id": uid, "user_name": name, "role": u["role"], "hadir": hadir, "telat": telat, "alpha": alpha,
+                     "izin": izin, "counts_auto": counts_auto,
                      "gaji_pokok": gaji_pokok, "komisi": komisi, "potongan": potongan,
-                     "bonus_items": bonus_items, "potongan_lain": potongan_lain,
-                     "potongan_lain_ket": (ov or {}).get("potongan_lain_ket", ""),
+                     "bonus_items": bonus_items, "potongan_items": potongan_items, "potongan_lain": potongan_lain,
+                     "telepon": phones.get(uid, ""),
                      "total": total, "komisi_calc": komisi_calc, "potongan_telat_calc": telat * pot_rate,
                      "potongan_calc": potongan_calc, "potongan_alpha": potongan_alpha, "edited": edited, "note": (ov or {}).get("note", "")})
     return {"month": month, "commission_rate": comm, "potongan_telat": pot_rate, "hari_kerja": hari_kerja,
@@ -1705,6 +1721,7 @@ async def payroll_archive(data: PayrollArchive, admin: dict = Depends(require_ad
     for r in rep["rows"]:
         await db.payroll.update_one({"user_id": r["user_id"], "month": data.month},
             {"$set": {"gaji_pokok": r["gaji_pokok"], "komisi": r["komisi"], "potongan": r["potongan"],
+                      "hadir": r["hadir"], "telat": r["telat"], "alpha": r["alpha"], "izin": r["izin"],
                       "total": r["total"], "note": r.get("note", "")}}, upsert=True)
     return {"ok": True, "archived": len(rep["rows"])}
 
@@ -1717,14 +1734,27 @@ async def payroll_archives(admin: dict = Depends(require_admin)):
 @api_router.post("/payroll/save")
 async def payroll_save(data: PayrollSave, admin: dict = Depends(require_admin)):
     bonus = _clean_bonus(data.bonus_items)
-    pot_lain = max(0.0, data.potongan_lain)
+    pot_items = _clean_bonus(data.potongan_items)
+    pot_lain = sum(p["jumlah"] for p in pot_items)
     total = data.gaji_pokok + data.komisi + sum(b["jumlah"] for b in bonus) - data.potongan - pot_lain
     await db.payroll.update_one({"user_id": data.user_id, "month": data.month},
         {"$set": {"gaji_pokok": data.gaji_pokok, "komisi": data.komisi, "potongan": data.potongan, "note": data.note,
-                  "bonus_items": bonus, "potongan_lain": pot_lain, "potongan_lain_ket": data.potongan_lain_ket.strip(),
+                  "bonus_items": bonus, "potongan_items": pot_items, "potongan_lain": pot_lain,
+                  **{k: max(0, getattr(data, k)) for k in ("hadir", "telat", "alpha", "izin") if getattr(data, k) is not None},
                   "total": total}}, upsert=True)
     await db.employee_salary.update_one({"user_id": data.user_id}, {"$set": {"gaji_pokok": data.gaji_pokok}}, upsert=True)
     return {"ok": True, "total": total}
+
+@api_router.delete("/payroll/archive/{month}")
+async def payroll_archive_delete(month: str, admin: dict = Depends(require_admin)):
+    r = await db.payroll.delete_many({"month": month})
+    return {"ok": True, "deleted": r.deleted_count}
+
+@api_router.post("/payroll/phone")
+async def payroll_phone(data: PayrollPhone, admin: dict = Depends(require_admin)):
+    tel = data.telepon.strip()
+    await db.employee_salary.update_one({"user_id": data.user_id}, {"$set": {"telepon": tel}}, upsert=True)
+    return {"ok": True, "telepon": tel}
 
 @api_router.delete("/payroll/override")
 async def payroll_reset(user_id: str, month: str, admin: dict = Depends(require_admin)):

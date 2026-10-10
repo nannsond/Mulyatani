@@ -180,7 +180,7 @@ export async function printPayslip({ row, monthLabel, info, logoUrl, payroll = {
   sectionTitle(doc, "DATA KARYAWAN", y); y += 6;
   doc.setFont("helvetica", "normal"); doc.setFontSize(10); doc.setTextColor(30, 30, 30);
   [["Nama Karyawan", row.user_name], ["Jabatan", row.role === "admin" ? "Admin" : "Kasir"],
-   ["Kehadiran", `Hadir ${row.hadir || 0} hari • Telat ${row.telat || 0} kali • Alpha ${row.alpha || 0} hari`]]
+   ["Kehadiran", `Hadir ${row.hadir || 0} hari • Telat ${row.telat || 0} kali • Alpha ${row.alpha || 0} hari • Izin/Sakit ${row.izin || 0} hari`]]
     .forEach(([k, v]) => { doc.text(k, 14, y); doc.text(`: ${v}`, 52, y); y += 5.5; });
   y += 4;
 
@@ -193,16 +193,20 @@ export async function printPayslip({ row, monthLabel, info, logoUrl, payroll = {
   y = slipTable(doc, y + 3, "Komponen Pendapatan", pend, "TOTAL PENDAPATAN KOTOR", rp(bruto)) + 9;
 
   const harian = Math.round((row.gaji_pokok || 0) / hk);
-  const autoPot = Math.round(row.potongan_alpha || 0) + Math.round(row.potongan_telat_calc || 0);
+  const potAlpha = Math.round((row.alpha || 0) * (row.gaji_pokok || 0) / hk);
+  const potTelat = (row.telat || 0) * (payroll.potongan_telat || 0);
+  const autoPot = potAlpha + Math.round(potTelat);
   const pot = [];
   if (Math.round(row.potongan || 0) === autoPot) {
-    pot.push(["Potongan Absensi", `${row.alpha || 0} Hari x ${rp(harian)}`, row.potongan_alpha ? rp(row.potongan_alpha) : "-"]);
-    if (row.telat > 0 || row.potongan_telat_calc > 0)
-      pot.push(["Potongan Keterlambatan", `${row.telat || 0} Kali x ${rp(payroll.potongan_telat || 0)}`, rp(row.potongan_telat_calc)]);
+    pot.push(["Potongan Absensi", `${row.alpha || 0} Hari x ${rp(harian)}`, potAlpha ? rp(potAlpha) : "-"]);
+    if (potTelat > 0)
+      pot.push(["Potongan Keterlambatan", `${row.telat || 0} Kali x ${rp(payroll.potongan_telat || 0)}`, rp(potTelat)]);
   } else {
     pot.push(["Potongan Absensi", `Alpha ${row.alpha || 0} hari, Telat ${row.telat || 0} kali`, row.potongan ? rp(row.potongan) : "-"]);
   }
-  pot.push(["Potongan Lain-lain", row.potongan_lain_ket || "", row.potongan_lain ? rp(row.potongan_lain) : "-"]);
+  const lain = row.potongan_items || [];
+  if (lain.length) lain.forEach((p) => pot.push(["Potongan Lain-lain", p.keterangan || "-", rp(p.jumlah)]));
+  else pot.push(["Potongan Lain-lain", "", "-"]);
   const totPot = (row.potongan || 0) + (row.potongan_lain || 0);
   sectionTitle(doc, "RINCIAN POTONGAN", y);
   y = slipTable(doc, y + 3, "Komponen Potongan", pot, "TOTAL POTONGAN", rp(totPot)) + 9;
