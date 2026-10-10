@@ -9,7 +9,7 @@ from fastapi import FastAPI, APIRouter, HTTPException, Request, Depends, Respons
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 from pydantic import BaseModel, Field, EmailStr, BeforeValidator, ConfigDict
-from typing import List, Optional, Annotated, Any, Dict
+from typing import List, Optional, Annotated, Any, Dict, Literal
 from bson import ObjectId
 from datetime import datetime, timezone, timedelta
 import logging
@@ -1476,6 +1476,21 @@ async def set_commission(data: CommissionSetting, admin: dict = Depends(require_
     rate = max(0.0, data.rate)
     await db.settings.update_one({"key": "commission"}, {"$set": {"rate": rate}}, upsert=True)
     return {"ok": True, "rate": rate}
+
+class PricingTarget(BaseModel):
+    mode: Literal["percent", "fixed"] = "percent"
+    value: float = 20
+
+@api_router.get("/pricing/settings")
+async def get_pricing(user: dict = Depends(get_current_user)):
+    s = await db.settings.find_one({"key": "pricing"}) or {}
+    return {"mode": s.get("mode", "percent"), "value": s.get("value", 20)}
+
+@api_router.post("/pricing/settings")
+async def set_pricing(data: PricingTarget, admin: dict = Depends(require_admin)):
+    val = max(0.0, data.value)
+    await db.settings.update_one({"key": "pricing"}, {"$set": {"mode": data.mode, "value": val}}, upsert=True)
+    return {"ok": True, "mode": data.mode, "value": val}
 
 @api_router.get("/commission/report")
 async def commission_report(month: str, admin: dict = Depends(require_admin)):

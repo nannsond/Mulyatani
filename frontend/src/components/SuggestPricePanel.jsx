@@ -18,9 +18,9 @@ export function TargetInput({ mode, value, onMode, onValue, prefix }) {
   );
 }
 
-export default function SuggestPricePanel({ products, channels, onClose, onApplied }) {
-  const [mode, setMode] = useState("percent");
-  const [value, setValue] = useState(20);
+export default function SuggestPricePanel({ products, channels, onClose, onApplied, defaultMode = "percent", defaultValue = 20 }) {
+  const [mode, setMode] = useState(defaultMode);
+  const [value, setValue] = useState(defaultValue);
   const [picked, setPicked] = useState(channels.map((c) => c.name));
   const [saving, setSaving] = useState(false);
   const used = channels.filter((c) => picked.includes(c.name));

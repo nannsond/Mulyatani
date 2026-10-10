@@ -9,6 +9,7 @@ import { exportPDF, exportExcel, printPriceList } from "@/lib/exporter";
 import { toast } from "sonner";
 import { calcFees, suggestPrice, targetProfit } from "@/lib/fees";
 import SuggestPricePanel, { TargetInput } from "@/components/SuggestPricePanel";
+import { usePricingTarget } from "@/lib/usePricingTarget";
 
 const EMPTY = { sku: "", name: "", category: "Pupuk", unit: "pcs", harga_beli: 0, harga_jual: 0, harga_reseller: 0, harga_online: 0, harga_channel: {}, stok: 0, stok_minimal: 10 };
 const CATS = ["Pupuk", "Benih", "Pestisida", "Alat Tani", "Lainnya"];
@@ -28,8 +29,11 @@ export default function DaftarHarga() {
   const [view, setView] = useState("satuan");
   const [channels, setChannels] = useState([]);
   const [suggestOpen, setSuggestOpen] = useState(false);
+  const target = usePricingTarget();
   const [tMode, setTMode] = useState("percent");
   const [tValue, setTValue] = useState(20);
+  useEffect(() => { if (target.loaded) { setTMode(target.mode); setTValue(target.value); } }, [target]);
+  const saranFor = (p, c) => suggestPrice(c.fees, p.harga_beli, targetProfit(p.harga_beli, target.mode, target.value));
   const fillSuggest = () => {
     const target = targetProfit(modal.harga_beli, tMode, tValue);
     setModal({ ...modal, harga_channel: Object.fromEntries(channels.map((c) => [c.name, suggestPrice(c.fees, modal.harga_beli, target)])) });
@@ -198,6 +202,9 @@ export default function DaftarHarga() {
                       const net = price - calcFees(c.fees, price).total;
                       return <div className={`text-[10px] ${net < p.harga_beli ? "text-destructive font-semibold" : "text-muted-foreground"}`}>bersih {rupiah(net)}</div>;
                     })()}
+                    {p.harga_beli > 0 && (
+                      <div className="text-[10px] text-[#2563EB] font-semibold" data-testid={`channel-saran-${p.id}-${c.name.replace(/\s+/g, "-").toLowerCase()}`}>saran {rupiah(saranFor(p, c))}</div>
+                    )}
                   </td>
                 ))}
                 <td className="px-4 py-3 text-right font-mono"><span className={p.stok <= p.stok_minimal ? "text-destructive font-semibold" : ""}>{p.stok} {p.unit}</span></td>
@@ -217,7 +224,7 @@ export default function DaftarHarga() {
       </>
       )}
 
-      {suggestOpen && <SuggestPricePanel products={sorted} channels={channels} onClose={() => setSuggestOpen(false)} onApplied={() => { setSuggestOpen(false); load(); }} />}
+      {suggestOpen && <SuggestPricePanel products={sorted} channels={channels} defaultMode={target.mode} defaultValue={target.value} onClose={() => setSuggestOpen(false)} onApplied={() => { setSuggestOpen(false); load(); }} />}
 
       {modal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
