@@ -220,3 +220,7 @@ Aplikasi laporan penjualan sederhana untuk bisnis toko pertanian: laporan harian
 
 ## 2026-10-11 — Revisi
 - Tombol "Ganti Password" di sidebar dihapus (endpoint backend tetap ada). Kelola Kasir: tombol mata untuk lihat/sembunyikan password di form.
+
+## 2026-10-11 — Nilai Aset Barang
+- GET /api/inventory/value (admin): total modal (stok×harga beli), nilai jual, potensi laba, per kategori & per produk.
+- Kartu di Dashboard (admin) + panel di Stok Opname dengan ekspor PDF/Excel. Tes iteration_23: 100%.
