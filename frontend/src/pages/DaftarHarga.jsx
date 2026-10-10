@@ -11,7 +11,7 @@ import { calcFees, suggestPrice, targetProfit, catTarget, saranOf } from "@/lib/
 import SuggestPricePanel, { TargetInput } from "@/components/SuggestPricePanel";
 import { usePricingTarget } from "@/lib/usePricingTarget";
 
-const EMPTY = { sku: "", name: "", category: "Pupuk", unit: "pcs", harga_beli: 0, harga_jual: 0, harga_reseller: 0, harga_online: 0, harga_channel: {}, stok: 0, stok_minimal: 10 };
+const EMPTY = { sku: "", name: "", category: "Pupuk", unit: "pcs", harga_beli: 0, harga_jual: 0, harga_reseller: 0, harga_online: 0, harga_channel: {}, stok: 0, stok_minimal: 10, berat: 0 };
 const CATS = ["Pupuk", "Benih", "Pestisida", "Alat Tani", "Lainnya"];
 
 export default function DaftarHarga() {
@@ -65,7 +65,7 @@ export default function DaftarHarga() {
     e.preventDefault();
     const body = { ...modal };
     delete body.id;
-    ["harga_beli", "harga_jual", "harga_reseller", "harga_online", "stok", "stok_minimal"].forEach((k) => (body[k] = Number(body[k])));
+    ["harga_beli", "harga_jual", "harga_reseller", "harga_online", "stok", "stok_minimal", "berat"].forEach((k) => (body[k] = Number(body[k])));
     body.harga_channel = Object.fromEntries(Object.entries(modal.harga_channel || {}).map(([k, v]) => [k, Number(v)]).filter(([, v]) => v > 0));
     try {
       if (modal.id) await api.put(`/products/${modal.id}`, body);
@@ -273,6 +273,7 @@ export default function DaftarHarga() {
               )}
               <Field label="Stok" type="number" testid="product-stok-input" value={modal.stok} onChange={(v) => setModal({ ...modal, stok: v })} />
               <Field label="Stok Minimal" type="number" testid="product-stok-min-input" value={modal.stok_minimal} onChange={(v) => setModal({ ...modal, stok_minimal: v })} />
+              <Field label="Berat per unit (kg)" type="number" testid="product-berat-input" value={modal.berat ?? 0} onChange={(v) => setModal({ ...modal, berat: v })} />
             </div>
             <button type="submit" data-testid="product-save-button" className="mt-5 w-full bg-[#1B5E3B] text-white py-3 rounded-xl font-semibold hover:bg-[#143D2B]">Simpan</button>
           </form>

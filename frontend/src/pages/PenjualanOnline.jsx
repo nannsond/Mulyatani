@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { useAuth } from "@/context/AuthContext";
 import { calcFees, saranOf } from "@/lib/fees";
 import { usePricingTarget } from "@/lib/usePricingTarget";
+import { OngkirCell, estimateOngkir } from "@/components/OngkirCell";
 
 const STATUSES = ["Diproses", "Dikirim", "Selesai", "Dikembalikan"];
 const STATUS_STYLE = {
@@ -37,6 +38,8 @@ export default function PenjualanOnline() {
   const [recent, setRecent] = useState([]);
   const [filterMonth, setFilterMonth] = useState(todayStr().slice(0, 7));
   const [filterChannel, setFilterChannel] = useState("");
+  const [shipping, setShipping] = useState({ rates: [], min_kg: 1 });
+  const [daerah, setDaerah] = useState("");
 
   const colorOf = (n) => channels.find((c) => c.name === n)?.color || CHANNEL_COLORS[n] || "#64748b";
   const activeChannels = channels.filter((c) => c.active);
@@ -46,13 +49,14 @@ export default function PenjualanOnline() {
   const loadRecent = () => api.get(`/ecommerce/sales?month=${filterMonth}${filterChannel ? `&channel=${encodeURIComponent(filterChannel)}` : ""}`).then((r) => setRecent(r.data));
   useEffect(() => {
     loadProducts(); loadBundles();
+    api.get("/shipping/rates").then((r) => setShipping(r.data));
     api.get("/channels").then((r) => { setChannels(r.data); const act = r.data.filter((c) => c.active); if (act.length) setChannel(act[0].name); });
   }, []);
   useEffect(() => { loadRecent(); }, [filterMonth, filterChannel]);
 
   const sellable = [
     ...products,
-    ...bundles.map((b) => ({ id: b.id, name: b.name, category: "Paket", harga_online: b.harga_online, harga_channel: b.harga_channel, hpp: b.hpp, stok: b.stok, stok_minimal: 0, is_bundle: true, hemat: b.hemat })),
+    ...bundles.map((b) => ({ id: b.id, name: b.name, category: "Paket", berat: b.berat, harga_online: b.harga_online, harga_channel: b.harga_channel, hpp: b.hpp, stok: b.stok, stok_minimal: 0, is_bundle: true, hemat: b.hemat })),
   ];
   const priceFor = (p) => p.harga_channel?.[channel] || p.harga_online || 0;
   const target = usePricingTarget();
@@ -73,7 +77,7 @@ export default function PenjualanOnline() {
         if (ex.qty >= p.stok) { toast.error("Melebihi stok"); return c; }
         return c.map((i) => i.product_id === p.id ? { ...i, qty: i.qty + 1 } : i);
       }
-      return [...c, { product_id: p.id, name: p.name, harga: priceFor(p), qty: 1, stok: p.stok, is_bundle: !!p.is_bundle }];
+      return [...c, { product_id: p.id, name: p.name, harga: priceFor(p), qty: 1, stok: p.stok, berat: Number(p.berat) || 0, is_bundle: !!p.is_bundle }];
     });
   };
   const setQty = (id, delta) => setCart((c) =>
@@ -85,7 +89,11 @@ export default function PenjualanOnline() {
   const autoFee = calcFees(channels.find((c) => c.name === channel)?.fees || [], omzet);
   const isAutoFee = adminFee === "";
   const effAdmin = isAutoFee ? autoFee.total : Number(adminFee) || 0;
-  const totalFee = effAdmin + (Number(ongkir) || 0) + (Number(biayaLain) || 0);
+  const beratTotal = Math.round(cart.reduce((s, i) => s + i.qty * (i.berat || 0), 0) * 1000) / 1000;
+  const rate = shipping.rates.find((r) => r.daerah === daerah);
+  const estOngkir = estimateOngkir(beratTotal, rate, shipping.min_kg);
+  const effOngkir = ongkir === "" ? estOngkir : Number(ongkir) || 0;
+  const totalFee = effAdmin + effOngkir + (Number(biayaLain) || 0);
   const estNet = omzet - totalFee;
 
   const submit = async () => {
@@ -98,14 +106,16 @@ export default function PenjualanOnline() {
         items: cart.map((i) => ({ product_id: i.product_id, name: i.name, qty: i.qty, harga: i.harga, is_bundle: !!i.is_bundle })),
         admin_fee: effAdmin,
         fee_breakdown: isAutoFee ? autoFee.items : [{ label: "Biaya admin (manual)", amount: effAdmin }],
-        ongkir: Number(ongkir) || 0,
+        ongkir: effOngkir,
+        daerah,
+        berat_total: beratTotal,
         biaya_lain: Number(biayaLain) || 0,
         customer_name: customerName,
         order_no: orderNo,
         date,
       });
       toast.success(`Penjualan ${channel} ${data.ecom_no} tersimpan (status: Diproses)`);
-      setCart([]); setAdminFee(""); setOngkir(""); setBiayaLain(""); setCustomerName(""); setOrderNo("");
+      setCart([]); setAdminFee(""); setOngkir(""); setDaerah(""); setBiayaLain(""); setCustomerName(""); setOrderNo("");
       loadProducts(); loadBundles(); loadRecent();
     } catch (err) {
       toast.error(apiError(err.response?.data?.detail));
@@ -233,8 +243,24 @@ export default function PenjualanOnline() {
             </div>
             <div className="grid grid-cols-3 gap-2">
               <input type="number" value={adminFee} onChange={(e) => setAdminFee(e.target.value)} data-testid="ecom-admin-fee" placeholder={`Potongan: ${autoFee.total}`} title="Kosongkan untuk potongan otomatis" className="px-2 py-2 rounded-lg border border-input text-xs" />
-              <input type="number" value={ongkir} onChange={(e) => setOngkir(e.target.value)} data-testid="ecom-ongkir" placeholder="Ongkir" className="px-2 py-2 rounded-lg border border-input text-xs" />
+              <input type="number" value={ongkir} onChange={(e) => setOngkir(e.target.value)} data-testid="ecom-ongkir" placeholder={`Ongkir: ${estOngkir}`} title="Kosongkan untuk estimasi otomatis" className="px-2 py-2 rounded-lg border border-input text-xs" />
               <input type="number" value={biayaLain} onChange={(e) => setBiayaLain(e.target.value)} data-testid="ecom-biaya-lain" placeholder="Biaya lain" className="px-2 py-2 rounded-lg border border-input text-xs" />
+            </div>
+            <div className="rounded-lg border border-dashed border-amber-300 bg-amber-50/60 p-2.5 text-xs space-y-1.5" data-testid="ecom-ongkir-estimate">
+              <div className="flex items-center gap-2">
+                <span className="font-semibold text-[#0F281E] whitespace-nowrap">Daerah tujuan</span>
+                <select value={daerah} onChange={(e) => setDaerah(e.target.value)} data-testid="ecom-daerah-select" className="flex-1 min-w-0 px-2 py-1.5 rounded-lg border border-input bg-white text-xs">
+                  <option value="">-- Pilih daerah --</option>
+                  {shipping.rates.map((r) => <option key={r.daerah} value={r.daerah}>{`${r.daerah} (${rupiah(r.tarif_per_kg)}/kg)`}</option>)}
+                </select>
+              </div>
+              <div className="flex justify-between text-muted-foreground"><span>Berat total</span><span className="font-mono" data-testid="ecom-berat-total">{beratTotal} kg</span></div>
+              <div className="flex justify-between text-muted-foreground">
+                <span>Ongkir {ongkir === "" ? "(estimasi)" : "(manual)"}</span>
+                <span className="font-mono" data-testid="ecom-ongkir-est">-{rupiah(effOngkir)}</span>
+              </div>
+              {shipping.rates.length === 0 && <p className="text-amber-700">Atur tarif ongkir per daerah di Pengaturan.</p>}
+              <p className="text-amber-700">Ongkir final ditentukan platform saat dana cair, perbarui di tabel di bawah.</p>
             </div>
             <input value={customerName} onChange={(e) => setCustomerName(e.target.value)} data-testid="ecom-customer" placeholder="Nama pembeli (opsional)" className="w-full px-3 py-2 rounded-lg border border-input text-sm" />
             <div className="flex gap-2">
@@ -278,17 +304,18 @@ export default function PenjualanOnline() {
           <table className="w-full text-sm">
             <thead><tr className="border-b border-slate-200 bg-secondary/50 text-left">
               <th className="px-3 py-2.5 font-semibold">No</th><th className="px-3 py-2.5 font-semibold">Channel</th><th className="px-3 py-2.5 font-semibold">Tanggal</th>
-              <th className="px-3 py-2.5 font-semibold text-right">Omzet</th><th className="px-3 py-2.5 font-semibold text-right">Biaya</th>
+              <th className="px-3 py-2.5 font-semibold text-right">Omzet</th><th className="px-3 py-2.5 font-semibold text-right">Ongkir</th><th className="px-3 py-2.5 font-semibold text-right">Total Biaya</th>
               <th className="px-3 py-2.5 font-semibold text-right">Laba Bersih</th><th className="px-3 py-2.5 font-semibold text-center">Status</th>{isAdmin && <th className="px-3 py-2.5 font-semibold text-center">Aksi</th>}
             </tr></thead>
             <tbody>
-              {recent.length === 0 && <tr><td colSpan={isAdmin ? 8 : 7} className="px-3 py-8 text-center text-muted-foreground">Belum ada penjualan online.</td></tr>}
+              {recent.length === 0 && <tr><td colSpan={isAdmin ? 9 : 8} className="px-3 py-8 text-center text-muted-foreground">Belum ada penjualan online.</td></tr>}
               {recent.map((s) => (
                 <tr key={s.id} className="border-b border-slate-100" data-testid={`ecom-row-${s.id}`}>
                   <td className="px-3 py-2.5 font-mono text-xs">{s.ecom_no}</td>
                   <td className="px-3 py-2.5"><span className="text-xs px-2 py-1 rounded-lg text-white font-semibold" style={{ backgroundColor: colorOf(s.channel) }}>{s.channel}</span></td>
                   <td className="px-3 py-2.5 text-xs text-muted-foreground">{fmtDate(s.created_at)}</td>
                   <td className="px-3 py-2.5 text-right font-mono">{rupiah(s.omzet)}</td>
+                  <td className="px-3 py-2.5 text-right text-xs"><OngkirCell sale={s} isAdmin={isAdmin} onSaved={loadRecent} /></td>
                   <td className="px-3 py-2.5 text-right font-mono text-destructive">{rupiah(s.total_fee)}</td>
                   <td className="px-3 py-2.5 text-right font-mono font-semibold text-[#1B5E3B]">{rupiah(s.laba_bersih)}</td>
                   <td className="px-3 py-2.5 text-center">

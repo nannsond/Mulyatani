@@ -156,25 +156,23 @@ DEFAULT_CHANNELS = [
 DEFAULT_CHANNEL_FEES = {
     "Shopee": [
         {"label": "Biaya Administrasi", "type": "percent", "value": 8, "cap": 0},
-        {"label": "Program Gratis Ongkir XTRA", "type": "percent", "value": 4, "cap": 40000},
         {"label": "Biaya Proses Pesanan", "type": "fixed", "value": 1250, "cap": 0},
     ],
     "Tokopedia": [
         {"label": "Komisi Platform", "type": "percent", "value": 6.5, "cap": 0},
-        {"label": "Biaya Layanan (Program Xtra)", "type": "percent", "value": 4, "cap": 40000},
         {"label": "Biaya Proses Pesanan", "type": "fixed", "value": 1250, "cap": 0},
     ],
     "Lazada": [
         {"label": "Komisi Marketplace", "type": "percent", "value": 6, "cap": 0},
-        {"label": "Free Shipping Max", "type": "percent", "value": 4, "cap": 20000},
         {"label": "Biaya Proses Pesanan", "type": "fixed", "value": 1250, "cap": 0},
     ],
     "TikTok Shop": [
         {"label": "Komisi Platform", "type": "percent", "value": 6.5, "cap": 0},
-        {"label": "Biaya Layanan (Program Xtra)", "type": "percent", "value": 4, "cap": 40000},
         {"label": "Biaya Proses Pesanan", "type": "fixed", "value": 1250, "cap": 0},
     ],
 }
+
+ONGKIR_FEE_RX = re.compile(r"ongkir|shipping|program xtra", re.I)
 
 def default_fees(name: str) -> List[dict]:
     return [dict(f) for f in DEFAULT_CHANNEL_FEES.get(name, [])]
@@ -251,6 +249,7 @@ class Product(BaseModel):
     harga_channel: Dict[str, float] = {}
     stok: int = 0
     stok_minimal: int = 5
+    berat: float = 0
 
 class ProductInput(BaseModel):
     sku: str
@@ -264,6 +263,7 @@ class ProductInput(BaseModel):
     harga_channel: Dict[str, float] = {}
     stok: int = 0
     stok_minimal: int = 5
+    berat: float = 0
 
 class CartItem(BaseModel):
     product_id: str
@@ -386,12 +386,14 @@ async def _bundle_view(b: dict, pmap: dict) -> dict:
     comps = []
     stok = None
     hpp = 0.0
+    berat = 0.0
     satuan_total = 0.0
     for c in b.get("components", []):
         p = pmap.get(c["product_id"])
         q = max(1, c.get("qty", 1))
         pstok = p.get("stok", 0) if p else 0
         hpp += q * (p.get("harga_beli", 0) if p else 0)
+        berat += q * ((p or {}).get("berat", 0) or 0)
         satuan_total += q * (p.get("harga_jual", 0) if p else 0)
         avail = pstok // q
         stok = avail if stok is None else min(stok, avail)
@@ -401,7 +403,7 @@ async def _bundle_view(b: dict, pmap: dict) -> dict:
     return {"id": str(b["_id"]), "name": b["name"], "category": b.get("category", "Paket"),
             "harga_jual": b.get("harga_jual", 0), "harga_reseller": b.get("harga_reseller", 0),
             "harga_online": b.get("harga_online", 0), "harga_channel": b.get("harga_channel", {}), "components": comps,
-            "stok": max(0, stok or 0), "hpp": hpp, "harga_satuan_total": satuan_total,
+            "stok": max(0, stok or 0), "hpp": hpp, "berat": berat, "harga_satuan_total": satuan_total,
             "hemat": max(0, satuan_total - b.get("harga_jual", 0)), "is_bundle": True}
 
 @api_router.get("/bundles")
@@ -1218,6 +1220,8 @@ class EcomSaleInput(BaseModel):
     customer_name: str = ""
     order_no: str = ""
     date: Optional[str] = None
+    daerah: str = ""
+    berat_total: float = 0
 
 async def gen_ecom_no():
     count = await db.ecommerce_sales.count_documents({})
@@ -1246,6 +1250,7 @@ async def create_ecom_sale(data: EcomSaleInput, user: dict = Depends(get_current
            "omzet": omzet, "hpp": hpp, "laba_kotor": laba_kotor,
            "admin_fee": admin_fee, "fee_breakdown": data.fee_breakdown, "ongkir": ongkir, "biaya_lain": biaya_lain,
            "total_fee": total_fee, "laba_bersih": laba_bersih,
+           "daerah": data.daerah, "berat_total": max(0.0, data.berat_total), "ongkir_final": False,
            "customer_name": data.customer_name, "order_no": data.order_no,
            "status": "Diproses",
            "user_id": user["id"], "user_name": user["name"], "created_at": created}
@@ -1291,6 +1296,48 @@ async def update_ecom_status(sid: str, data: EcomStatusInput, admin: dict = Depe
         update["stock_restored"] = True
     await db.ecommerce_sales.update_one({"_id": ObjectId(sid)}, {"$set": update})
     return {"ok": True, "status": data.status, "stock_restored": update.get("stock_restored", doc.get("stock_restored", False))}
+
+class EcomOngkirInput(BaseModel):
+    ongkir: float
+
+@api_router.put("/ecommerce/sales/{sid}/ongkir")
+async def finalize_ecom_ongkir(sid: str, data: EcomOngkirInput, admin: dict = Depends(require_admin)):
+    if data.ongkir < 0:
+        raise HTTPException(status_code=400, detail="Ongkir tidak boleh negatif")
+    doc = await db.ecommerce_sales.find_one({"_id": ObjectId(sid)})
+    if not doc:
+        raise HTTPException(status_code=404, detail="Penjualan tidak ditemukan")
+    total_fee = doc.get("admin_fee", 0) + data.ongkir + doc.get("biaya_lain", 0)
+    upd = {"ongkir": data.ongkir, "ongkir_final": True, "total_fee": total_fee,
+           "laba_bersih": doc.get("laba_kotor", 0) - total_fee}
+    await db.ecommerce_sales.update_one({"_id": doc["_id"]}, {"$set": upd})
+    return {"ok": True, **upd}
+
+class ShippingRate(BaseModel):
+    daerah: str
+    tarif_per_kg: float
+
+class ShippingRatesInput(BaseModel):
+    rates: List[ShippingRate] = []
+    min_kg: float = 1
+
+@api_router.get("/shipping/rates")
+async def get_shipping_rates(user: dict = Depends(get_current_user)):
+    s = await db.settings.find_one({"key": "shipping_rates"}) or {}
+    return {"rates": s.get("rates", []), "min_kg": s.get("min_kg", 1)}
+
+@api_router.post("/shipping/rates")
+async def set_shipping_rates(data: ShippingRatesInput, admin: dict = Depends(require_admin)):
+    rates, seen = [], set()
+    for r in data.rates:
+        name = r.daerah.strip()
+        if not name or name.lower() in seen:
+            continue
+        seen.add(name.lower())
+        rates.append({"daerah": name, "tarif_per_kg": max(0.0, r.tarif_per_kg)})
+    min_kg = max(0.0, data.min_kg)
+    await db.settings.update_one({"key": "shipping_rates"}, {"$set": {"rates": rates, "min_kg": min_kg}}, upsert=True)
+    return {"rates": rates, "min_kg": min_kg}
 
 class EcomBulkRow(BaseModel):
     channel: str
@@ -1984,6 +2031,15 @@ async def seed():
     if not await db.settings.find_one({"key": "channels"}):
         await db.settings.update_one({"key": "channels"}, {"$set": {"list": [dict(c) for c in DEFAULT_CHANNELS]}}, upsert=True)
     await db.ecommerce_sales.update_many({"status": {"$exists": False}}, {"$set": {"status": "Selesai"}})
+
+    if not await db.settings.find_one({"key": "migr_ongkir_fees"}):
+        ch = await db.settings.find_one({"key": "channels"})
+        if ch and ch.get("list"):
+            for c in ch["list"]:
+                if "fees" in c:
+                    c["fees"] = [f for f in c["fees"] if not ONGKIR_FEE_RX.search(f.get("label", ""))]
+            await db.settings.update_one({"key": "channels"}, {"$set": {"list": ch["list"]}})
+        await db.settings.insert_one({"key": "migr_ongkir_fees", "done_at": now_iso()})
 
 
 @app.on_event("startup")

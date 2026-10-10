@@ -4,6 +4,7 @@ import { useSettings } from "@/context/SettingsContext";
 import { Upload, Loader2, Image as ImageIcon, Store, Globe, Plus, Trash2, Power, Wallet, Percent } from "lucide-react";
 import ChannelFeeEditor from "@/components/ChannelFeeEditor";
 import PricingTargetCard from "@/components/PricingTargetCard";
+import ShippingRatesCard from "@/components/ShippingRatesCard";
 import { feeText } from "@/lib/fees";
 import { toast } from "sonner";
 
@@ -200,6 +201,8 @@ export default function Pengaturan() {
           <button onClick={addCh} data-testid="channel-add-button" className="flex items-center gap-1 px-4 rounded-xl bg-[#1B5E3B] text-white text-sm font-semibold hover:bg-[#143D2B]"><Plus className="w-4 h-4" /> Tambah</button>
         </div>
       </div>
+
+      <ShippingRatesCard />
 
       <PricingTargetCard />
     </div>
