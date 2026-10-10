@@ -244,3 +244,4 @@ Aplikasi laporan penjualan sederhana untuk bisnis toko pertanian: laporan harian
 - Stok Opname panel renamed 'Stok Barang': only stock shown (Harga Beli, Nilai Modal, Nilai Jual, Potensi Laba, rupiah per category removed from UI & export).
 - Stok Barang panel: category chips act as filter (Semua + each category, A-Z), items sorted by category then name, card & PDF/Excel export follow selected category.
 - Kasir can now see Stok Barang panel on Stok Opname; GET /api/inventory/value open to all logged-in users but money fields (harga_beli/jual, nilai_modal/jual, potensi_laba) stripped for non-admin.
+- Opname per kategori: category select + 'Tambah Semua' loads all products of a category into the session (skips existing); counter 'x/y dihitung' + 'Kosongkan'. Tested iter 30: 100%.
