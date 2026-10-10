@@ -2,8 +2,7 @@ import { useState } from "react";
 import { NavLink, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import { useSettings } from "@/context/SettingsContext";
-import { LayoutDashboard, ShoppingCart, Tag, Boxes, Calendar, BarChart3, TrendingUp, LogOut, Menu, X, Sprout, Users, ReceiptText, Settings, Truck, HandCoins, Banknote, Scale, ShoppingBag, Globe, Percent, Clock, Wallet, ClipboardList, MapPin, KeyRound } from "lucide-react";
-import { ChangePasswordDialog } from "@/components/ChangePasswordDialog";
+import { LayoutDashboard, ShoppingCart, Tag, Boxes, Calendar, BarChart3, TrendingUp, LogOut, Menu, X, Sprout, Users, ReceiptText, Settings, Truck, HandCoins, Banknote, Scale, ShoppingBag, Globe, Percent, Clock, Wallet, ClipboardList, MapPin } from "lucide-react";
 
 const LINKS = [
   { label: "Dashboard", icon: LayoutDashboard, path: "/" },
@@ -35,7 +34,6 @@ export function Layout({ children }) {
   const navigate = useNavigate();
   const location = useLocation();
   const [open, setOpen] = useState(false);
-  const [pwOpen, setPwOpen] = useState(false);
 
   const current = LINKS.find((l) => l.path === location.pathname)?.label || "Dashboard";
   const links = LINKS.filter((l) => !l.adminOnly || user?.role === "admin");
@@ -83,13 +81,6 @@ export function Layout({ children }) {
           </div>
         </div>
         <button
-          onClick={() => { setOpen(false); setPwOpen(true); }}
-          data-testid="change-password-button"
-          className="w-full flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm text-emerald-100/80 hover:bg-[#1A3A2D] hover:text-white transition-colors"
-        >
-          <KeyRound className="w-4 h-4" /> Ganti Password
-        </button>
-        <button
           onClick={handleLogout}
           data-testid="logout-button"
           className="w-full flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm text-red-200 hover:bg-red-500/20 transition-colors"
@@ -102,7 +93,6 @@ export function Layout({ children }) {
 
   return (
     <div className="min-h-screen bg-background">
-      <ChangePasswordDialog open={pwOpen} onOpenChange={setPwOpen} />
       {/* Desktop sidebar */}
       <aside className="hidden lg:flex fixed inset-y-0 left-0 w-64 bg-[#0E241B] flex-col z-40">
         <SidebarContent />

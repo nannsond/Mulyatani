@@ -217,3 +217,6 @@ Aplikasi laporan penjualan sederhana untuk bisnis toko pertanian: laporan harian
 ## 2026-10-11 — Ganti Password
 - POST /api/auth/change-password (verifikasi password lama, min 6 karakter, harus beda). Tombol "Ganti Password" di sidebar (admin & kasir). Seed tidak menimpa password admin yang sudah diganti.
 - Tes iteration_22: 100%.
+
+## 2026-10-11 — Revisi
+- Tombol "Ganti Password" di sidebar dihapus (endpoint backend tetap ada). Kelola Kasir: tombol mata untuk lihat/sembunyikan password di form.

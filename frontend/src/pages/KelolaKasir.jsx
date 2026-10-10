@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { api, apiError } from "@/lib/api";
 import { fmtDate } from "@/lib/format";
-import { UserPlus, Pencil, Trash2, X, ShieldCheck, User } from "lucide-react";
+import { UserPlus, Pencil, Trash2, X, ShieldCheck, User, Eye, EyeOff } from "lucide-react";
 import { toast } from "sonner";
 
 const EMPTY = { name: "", email: "", password: "", role: "kasir" };
@@ -85,8 +85,14 @@ export default function KelolaKasir() {
               </div>
               <div>
                 <label className="text-sm font-medium">Password {modal.id && <span className="text-muted-foreground font-normal">(kosongkan jika tidak diubah)</span>}</label>
-                <input type="password" value={modal.password} onChange={(e) => setModal({ ...modal, password: e.target.value })} required={!modal.id} data-testid="user-password-input"
-                  className="mt-1 w-full px-3 py-2.5 rounded-xl border border-input text-sm focus:outline-none focus:ring-2 focus:ring-[#1B5E3B]" />
+                <div className="relative mt-1">
+                  <input type={modal.showPw ? "text" : "password"} value={modal.password} onChange={(e) => setModal({ ...modal, password: e.target.value })} required={!modal.id} data-testid="user-password-input"
+                    className="w-full pl-3 pr-10 py-2.5 rounded-xl border border-input text-sm focus:outline-none focus:ring-2 focus:ring-[#1B5E3B]" />
+                  <button type="button" onClick={() => setModal({ ...modal, showPw: !modal.showPw })} data-testid="user-password-toggle" aria-label={modal.showPw ? "Sembunyikan password" : "Lihat password"}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 w-7 h-7 rounded-lg flex items-center justify-center text-muted-foreground hover:bg-secondary">
+                    {modal.showPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
               </div>
               <div>
                 <label className="text-sm font-medium">Role</label>
