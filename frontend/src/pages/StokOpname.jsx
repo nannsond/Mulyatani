@@ -5,7 +5,8 @@ import { exportPDF, exportExcel } from "@/lib/exporter";
 import { FileDown, FileSpreadsheet } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { InventoryValuePanel } from "@/components/InventoryValuePanel";
-import { OpnameSessionForm, badge } from "@/components/OpnameSessionForm";
+import { OpnameSessionForm } from "@/components/OpnameSessionForm";
+import { OpnameHistory, groupSessions } from "@/components/OpnameHistory";
 
 export default function StokOpname() {
   const { user } = useAuth();
@@ -17,8 +18,12 @@ export default function StokOpname() {
   };
   useEffect(() => { load(); }, []);
 
-  const cols = ["Tanggal", "Produk", "Stok Sistem", "Stok Fisik", "Selisih", "Alasan", "Petugas"];
-  const rows = history.map((h) => [fmtDateTime(h.created_at), h.product_name, h.stok_sistem, h.stok_fisik, h.selisih, h.alasan, h.user_name]);
+  const cols = ["Sesi", "Tanggal", "Produk", "Stok Sistem", "Stok Fisik", "Selisih", "Alasan", "Petugas"];
+  const sessions = groupSessions(history);
+  const rows = sessions.flatMap((s, i) => [
+    ...s.items.map((h) => [`#${sessions.length - i}`, fmtDateTime(h.created_at), h.product_name, h.stok_sistem, h.stok_fisik, h.selisih, h.alasan, h.user_name]),
+    [`#${sessions.length - i}`, "", `TOTAL: ${s.items.length} produk`, "", "", `-${s.kurang} / +${s.lebih}`, `${s.nSesuai} sesuai`, ""],
+  ]);
 
   return (
     <div className="space-y-6">
@@ -36,33 +41,7 @@ export default function StokOpname() {
               className="flex items-center gap-2 px-3 py-2 rounded-xl border border-input text-sm hover:bg-secondary"><FileSpreadsheet className="w-4 h-4" /> Excel</button>
           </div>
         </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-slate-200 bg-secondary/50 text-left">
-                <th className="px-3 py-2.5 font-semibold">Tanggal</th>
-                <th className="px-3 py-2.5 font-semibold">Produk</th>
-                <th className="px-3 py-2.5 font-semibold text-center">Sistem</th>
-                <th className="px-3 py-2.5 font-semibold text-center">Fisik</th>
-                <th className="px-3 py-2.5 font-semibold text-center">Status</th>
-                <th className="px-3 py-2.5 font-semibold">Alasan</th>
-              </tr>
-            </thead>
-            <tbody>
-              {history.length === 0 && <tr><td colSpan={6} className="px-3 py-8 text-center text-muted-foreground">Belum ada riwayat.</td></tr>}
-              {history.map((h) => (
-                <tr key={h.id} className="border-b border-slate-100" data-testid={`opname-row-${h.id}`}>
-                  <td className="px-3 py-2.5 text-xs text-muted-foreground">{fmtDateTime(h.created_at)}</td>
-                  <td className="px-3 py-2.5 font-medium">{h.product_name}</td>
-                  <td className="px-3 py-2.5 text-center font-mono">{h.stok_sistem}</td>
-                  <td className="px-3 py-2.5 text-center font-mono">{h.stok_fisik}</td>
-                  <td className="px-3 py-2.5 text-center"><span className={`text-xs font-semibold px-2 py-1 rounded-lg ${badge(h.selisih).c}`}>{badge(h.selisih).t}</span></td>
-                  <td className="px-3 py-2.5 text-xs">{h.alasan}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <OpnameHistory history={history} />
       </div>
     </div>
     </div>
