@@ -41,7 +41,7 @@ export default function StokOpname() {
               className="flex items-center gap-2 px-3 py-2 rounded-xl border border-input text-sm hover:bg-secondary"><FileSpreadsheet className="w-4 h-4" /> Excel</button>
           </div>
         </div>
-        <OpnameHistory history={history} />
+        <OpnameHistory history={history} isAdmin={user?.role === "admin"} onDeleted={load} />
       </div>
     </div>
     </div>

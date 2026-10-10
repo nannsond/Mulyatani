@@ -1166,6 +1166,16 @@ async def create_opname_bulk(data: OpnameBulkInput, user: dict = Depends(get_cur
     return {"ok": True, "session_id": session_id, "count": len(docs),
             "sesuai": sum(1 for d in docs if d["selisih"] == 0)}
 
+@api_router.delete("/stok-opname/session/{key}")
+async def delete_opname_session(key: str, admin: dict = Depends(require_admin)):
+    query: Dict[str, Any] = {"session_id": key}
+    if ObjectId.is_valid(key):
+        query = {"$or": [query, {"_id": ObjectId(key), "session_id": {"$exists": False}}]}
+    res = await db.stok_opname.delete_many(query)
+    if res.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Sesi opname tidak ditemukan")
+    return {"ok": True, "deleted": res.deleted_count}
+
 # ---------------- Penjualan Online (E-commerce) ----------------
 
 class EcomItem(BaseModel):

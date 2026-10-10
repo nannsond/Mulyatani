@@ -241,3 +241,4 @@ Aplikasi laporan penjualan sederhana untuk bisnis toko pertanian: laporan harian
 - Multi-product session: add many products, stok fisik + alasan per row, live selisih, one shared note, save all at once.
 - Backend: POST /api/stok-opname/bulk (validates all first: empty/duplicate/negative/unknown → no partial writes; shared session_id). Tested iter 28: 100%.
 - Riwayat Stok Opname grouped per session (session_id; old single entries = own session): collapsible cards with date, petugas, note, total Kurang/Lebih units (+product counts), Sesuai count. PDF/Excel export includes Sesi column and per-session TOTAL rows.
+- Delete opname history per session (admin only): DELETE /api/stok-opname/session/{session_id | legacy doc id}; confirm dialog; removes history records only, product stock unchanged.
