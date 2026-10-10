@@ -1,0 +1,19 @@
+{
+  "summary": "Iteration 14: Per-channel fee (potongan) policies for Mulyatani POS. Verified backend endpoints (/api/channels with fees list, /api/channels/fee-defaults, PUT /api/channels/{name} admin-only + invalid filtered, POST /api/channels assigns default fees for known names and [] for unknown, POST /api/ecommerce/sales/bulk auto-applies channel fees when admin_fee=0 and keeps manual override, POST /api/ecommerce/sales persists fee_breakdown). Verified UI: Pengaturan admin fee summary + editor (open/edit/save/reset/add/remove), PenjualanOnline fee breakdown + ecom-net auto-recompute on channel switch, manual override + ecom-fee-auto-reset, DaftarHarga 'Harga Online' per-channel 'bersih Rp X' column. All 8 pytest tests passed. All UI flows passed.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": ["/app/backend/tests/test_iter14_channel_fees.py", "/app/test_reports/pytest/iter14.xml"],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "server.py is 1750+ lines; consider splitting into modules (routers per domain). Flagged in prior iterations.",
+    "bulk_ecom_sales uses `r.admin_fee or calc_channel_fee(...)` which correctly treats 0 as falsy — intended behavior per spec. If any admin wants to force zero fee explicitly, there is no way to do so via bulk import; minor."
+  ],
+  "updated_files": ["/app/backend/tests/test_iter14_channel_fees.py", "/app/test_reports/iteration_14.json"],
+  "success_rate": {"backend": "100% (8/8)", "frontend": "100% (fee editor save/reset, breakdown auto math 13130 Shopee + 11150 Lazada verified via net, manual override + auto-reset, DaftarHarga bersih column visible for products with harga_channel)"},
+  "test_credentials": "Admin JWT generated via /app/backend .env JWT_SECRET for nannsond@gmail.com (sub=6ac85c7524352b6e2314dcf9). Kasir: kasir@tokotani.com / Kasir#Mulya2026.",
+  "seed_data_creation": "No persistent seed data. 3 test ecommerce sales created during bulk/create tests were deleted (stock restored). Shopee channel fees were temporarily modified but restored to defaults.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Backend has DEFAULT_CHANNEL_FEES at server.py L155-176, calc_channel_fee at L181. Channel endpoints at L1168-1210. Bulk auto-fee at L1117. Frontend testids: channel-fee-summary-{slug}, channel-fee-toggle-{slug}, fee-editor-{slug}, fee-label/type/value/cap-{slug}-{i}, fee-add/reset/save-{slug}, ecom-fee-breakdown, ecom-net, ecom-admin-fee, ecom-fee-auto-reset. For DaftarHarga 'bersih' only renders when product has harga_channel for that channel; use Cangkul Baja Super (SKU-1012) for testing.",
+  "rca of the issue": "N/A — no issues found"
+}

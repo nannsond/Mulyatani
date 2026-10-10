@@ -1,0 +1,20 @@
+{
+  "summary": "Frontend-only retest of iteration_18 fixes. All 3 fixes verified: (1) Kehadiran mark-employee-select no DOM-nesting warning, (2) StokOpname product-select no DOM-nesting warning, (3) RiwayatTransaksi export-pdf-button + export-excel-button are disabled while loading and enabled after; Excel click triggers immediate xlsx download with 1 seeded TEST_ transaction row. TEST_ data cleaned up.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [],
+  "action_items": [],
+  "critical_code_review_comments": [],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A (skipped)", "frontend": "100% (3/3 fixes verified)"},
+  "test_credentials": "nannsond@gmail.com / admin123",
+  "seed_data_creation": "Created 1 product (TEST_RiwayatProd / TEST-RWT-001) and 1 POS transaction (INV-20261009-0001, Rp 2.000, customer TEST_cust). All cleaned up after test: tx_deleted=1, prod_deleted=1.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "All iter_18 regressions fixed. Kehadiran.jsx:141 and StokOpname.jsx:55 use template-string option children (no <span>). RiwayatTransaksi.jsx:148-151 export buttons gated by disabled={loading}. Backend product schema uses 'category' (not 'kategori') for POST /api/products.",
+  "rca of the issue": "N/A - verification only"
+}
