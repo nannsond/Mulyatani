@@ -1,6 +1,7 @@
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import * as XLSX from "xlsx";
+import { terbilang } from "./terbilang";
 
 export function exportPDF({ title, subtitle, columns, rows, foot }) {
   const doc = new jsPDF();
@@ -138,41 +139,97 @@ export async function printPriceList({ products, mode, logoUrl, info }) {
   doc.save(`Daftar_Harga_${mode}.pdf`);
 }
 
-export async function printPayslip({ row, monthLabel, info, logoUrl }) {
-  const doc = new jsPDF();
-  if (logoUrl) { try { const d = await loadImageData(logoUrl); doc.addImage(d, "PNG", 14, 10, 18, 18); } catch (e) { /* skip */ } }
-  const x = logoUrl ? 36 : 14;
-  doc.setFontSize(15); doc.setTextColor(27, 94, 59);
-  doc.text(info?.store_name || "Toko Tani Makmur", x, 18);
-  let hy = 24; doc.setFontSize(9); doc.setTextColor(90, 90, 90);
-  if (info?.address) { doc.text(info.address, x, hy); hy += 5; }
-  if (info?.phone) { doc.text("Telp: " + info.phone, x, hy); hy += 5; }
-  doc.setFontSize(13); doc.setTextColor(20, 20, 20);
-  doc.text("SLIP GAJI KARYAWAN", 14, hy + 6);
-  doc.setFontSize(10); doc.setTextColor(40, 40, 40);
-  doc.text(`Nama: ${row.user_name}`, 14, hy + 14);
-  doc.text(`Periode: ${monthLabel}`, 14, hy + 20);
-  doc.text(`Hari Hadir: ${row.hadir}    Telat: ${row.telat}`, 14, hy + 26);
+const NAVY = [31, 56, 100];
+
+function slipTable(doc, y, head, body, totalLabel, totalValue) {
   autoTable(doc, {
-    startY: hy + 32,
-    head: [["Komponen", "Jumlah"]],
-    body: [
-      ["Gaji Pokok", rp(row.gaji_pokok)],
-      ["Komisi Online", rp(row.komisi)],
-      ["Potongan Telat", "-" + rp(row.potongan)],
-    ],
-    foot: [["TOTAL GAJI", rp(row.total)]],
-    headStyles: { fillColor: [27, 94, 59] },
-    footStyles: { fillColor: [232, 240, 236], textColor: [15, 40, 30], fontStyle: "bold" },
-    columnStyles: { 1: { halign: "right" } },
-    styles: { fontSize: 10 },
+    startY: y,
+    head: [[head, "Perhitungan", "Jumlah"]],
+    body,
+    foot: [[totalLabel, "", totalValue]],
+    theme: "grid",
+    headStyles: { fillColor: NAVY, textColor: 255, fontStyle: "bold" },
+    footStyles: { fillColor: [242, 242, 242], textColor: [20, 20, 20], fontStyle: "bold" },
+    columnStyles: { 0: { cellWidth: 62 }, 2: { halign: "right", cellWidth: 40 } },
+    styles: { fontSize: 10, lineColor: [190, 190, 190], lineWidth: 0.2, cellPadding: 2.5 },
+    didParseCell: (d) => { if (d.column.index === 2 && d.section !== "body") d.cell.styles.halign = "right"; },
   });
-  const fy = doc.lastAutoTable.finalY + 24;
+  return doc.lastAutoTable.finalY;
+}
+
+const sectionTitle = (doc, text, y) => {
+  doc.setFont("helvetica", "bold"); doc.setFontSize(11); doc.setTextColor(...NAVY);
+  doc.text(text, 14, y);
+};
+
+export async function printPayslip({ row, monthLabel, info, logoUrl, payroll = {} }) {
+  const doc = new jsPDF();
+  const W = doc.internal.pageSize.getWidth();
+  let y = 14;
+  if (logoUrl) { try { const d = await loadImageData(logoUrl); doc.addImage(d, "PNG", 14, 10, 18, 18); } catch (e) { /* skip */ } }
+  doc.setFont("helvetica", "bold"); doc.setFontSize(16); doc.setTextColor(20, 20, 20);
+  doc.text("SLIP GAJI KARYAWAN", W / 2, y + 4, { align: "center" }); y += 11;
+  doc.setFont("helvetica", "normal"); doc.setFontSize(11);
+  doc.text(info?.store_name || "Toko Tani Makmur", W / 2, y, { align: "center" }); y += 5;
   doc.setFontSize(9); doc.setTextColor(90, 90, 90);
-  doc.text("Diterima oleh,", 20, fy);
-  doc.text("Hormat kami,", 150, fy);
-  doc.text(`( ${row.user_name} )`, 16, fy + 24);
-  doc.text(`( ${info?.store_name || "Pemilik Toko"} )`, 140, fy + 24);
+  if (info?.address) { doc.text(info.address, W / 2, y, { align: "center" }); y += 4.5; }
+  doc.setFontSize(10); doc.setTextColor(40, 40, 40);
+  doc.text(`Periode: ${monthLabel}`, W / 2, y + 1, { align: "center" }); y += 5;
+  doc.setDrawColor(...NAVY); doc.setLineWidth(0.6); doc.line(14, y, W - 14, y); y += 9;
+
+  sectionTitle(doc, "DATA KARYAWAN", y); y += 6;
+  doc.setFont("helvetica", "normal"); doc.setFontSize(10); doc.setTextColor(30, 30, 30);
+  [["Nama Karyawan", row.user_name], ["Jabatan", row.role === "admin" ? "Admin" : "Kasir"],
+   ["Kehadiran", `Hadir ${row.hadir || 0} hari • Telat ${row.telat || 0} kali • Alpha ${row.alpha || 0} hari`]]
+    .forEach(([k, v]) => { doc.text(k, 14, y); doc.text(`: ${v}`, 52, y); y += 5.5; });
+  y += 4;
+
+  const hk = payroll.hari_kerja || 26;
+  const pend = [["Gaji Pokok Bulanan", `${hk} Hari Kerja`, rp(row.gaji_pokok)]];
+  if (row.komisi > 0) pend.push(["Bonus", "Komisi Penjualan Online", rp(row.komisi)]);
+  (row.bonus_items || []).forEach((b) => pend.push(["Bonus", b.keterangan || "-", rp(b.jumlah)]));
+  const bruto = (row.gaji_pokok || 0) + (row.komisi || 0) + (row.bonus_items || []).reduce((s, b) => s + (Number(b.jumlah) || 0), 0);
+  sectionTitle(doc, "RINCIAN PENDAPATAN", y);
+  y = slipTable(doc, y + 3, "Komponen Pendapatan", pend, "TOTAL PENDAPATAN KOTOR", rp(bruto)) + 9;
+
+  const harian = Math.round((row.gaji_pokok || 0) / hk);
+  const autoPot = Math.round(row.potongan_alpha || 0) + Math.round(row.potongan_telat_calc || 0);
+  const pot = [];
+  if (Math.round(row.potongan || 0) === autoPot) {
+    pot.push(["Potongan Absensi", `${row.alpha || 0} Hari x ${rp(harian)}`, row.potongan_alpha ? rp(row.potongan_alpha) : "-"]);
+    if (row.telat > 0 || row.potongan_telat_calc > 0)
+      pot.push(["Potongan Keterlambatan", `${row.telat || 0} Kali x ${rp(payroll.potongan_telat || 0)}`, rp(row.potongan_telat_calc)]);
+  } else {
+    pot.push(["Potongan Absensi", `Alpha ${row.alpha || 0} hari, Telat ${row.telat || 0} kali`, row.potongan ? rp(row.potongan) : "-"]);
+  }
+  pot.push(["Potongan Lain-lain", row.potongan_lain_ket || "", row.potongan_lain ? rp(row.potongan_lain) : "-"]);
+  const totPot = (row.potongan || 0) + (row.potongan_lain || 0);
+  sectionTitle(doc, "RINCIAN POTONGAN", y);
+  y = slipTable(doc, y + 3, "Komponen Potongan", pot, "TOTAL POTONGAN", rp(totPot)) + 9;
+
+  const net = bruto - totPot;
+  const words = doc.splitTextToSize(`( ${terbilang(net)} )`, W - 40);
+  const boxH = 22 + words.length * 4.5;
+  doc.setFillColor(226, 239, 218); doc.setDrawColor(112, 173, 71); doc.setLineWidth(0.4);
+  doc.roundedRect(14, y, W - 28, boxH, 2, 2, "FD");
+  doc.setFont("helvetica", "bold"); doc.setFontSize(10); doc.setTextColor(56, 87, 35);
+  doc.text("TOTAL GAJI BERSIH (TAKE HOME PAY)", W / 2, y + 7, { align: "center" });
+  doc.setFontSize(18); doc.text(rp(net), W / 2, y + 16, { align: "center" });
+  doc.setFont("helvetica", "italic"); doc.setFontSize(9);
+  doc.text(words, W / 2, y + 22, { align: "center" });
+  y += boxH + 14;
+
+  if (y > 240) { doc.addPage(); y = 24; }
+  const tgl = new Date().toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" });
+  doc.setFont("helvetica", "normal"); doc.setFontSize(10); doc.setTextColor(30, 30, 30);
+  doc.text(`${payroll.kota ? payroll.kota + ", " : ""}${tgl}`, 14, y); y += 6;
+  doc.text("Dibuat oleh,", 14, y); doc.text("Diterima oleh,", W - 60, y);
+  y += 26;
+  doc.setFont("helvetica", "bold");
+  doc.text(`( ${payroll.penandatangan || info?.store_name || "Pemilik Toko"} )`, 14, y);
+  doc.text(`( ${row.user_name} )`, W - 60, y); y += 5;
+  doc.setFont("helvetica", "normal");
+  doc.text("Owner", 14, y); doc.text("Karyawan", W - 60, y);
   doc.save(`Slip_Gaji_${row.user_name.replace(/\s+/g, "_")}_${monthLabel.replace(/\s+/g, "_")}.pdf`);
 }
 

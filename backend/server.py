@@ -1614,6 +1614,8 @@ async def list_attendance(month: str, user: dict = Depends(get_current_user)):
 class PayrollSetting(BaseModel):
     potongan_telat: float
     hari_kerja: int = 26
+    kota: str = ""
+    penandatangan: str = ""
 
 class PayrollSave(BaseModel):
     user_id: str
@@ -1622,17 +1624,26 @@ class PayrollSave(BaseModel):
     komisi: float
     potongan: float
     note: str = ""
+    bonus_items: List[Dict[str, Any]] = []
+    potongan_lain: float = 0
+    potongan_lain_ket: str = ""
+
+def _clean_bonus(items):
+    return [{"keterangan": str(b.get("keterangan", "")).strip(), "jumlah": max(0.0, float(b.get("jumlah") or 0))}
+            for b in items or [] if str(b.get("keterangan", "")).strip() or float(b.get("jumlah") or 0)]
 
 @api_router.get("/payroll/settings")
 async def get_payroll_settings(user: dict = Depends(get_current_user)):
     s = await db.settings.find_one({"key": "payroll"}) or {}
-    return {"potongan_telat": s.get("potongan_telat", 0), "hari_kerja": s.get("hari_kerja", 26)}
+    return {"potongan_telat": s.get("potongan_telat", 0), "hari_kerja": s.get("hari_kerja", 26),
+            "kota": s.get("kota", ""), "penandatangan": s.get("penandatangan", "")}
 
 @api_router.post("/payroll/settings")
 async def set_payroll_settings(data: PayrollSetting, admin: dict = Depends(require_admin)):
     val = max(0.0, data.potongan_telat)
     hk = max(1, data.hari_kerja)
-    await db.settings.update_one({"key": "payroll"}, {"$set": {"potongan_telat": val, "hari_kerja": hk}}, upsert=True)
+    await db.settings.update_one({"key": "payroll"}, {"$set": {"potongan_telat": val, "hari_kerja": hk,
+        "kota": data.kota.strip(), "penandatangan": data.penandatangan.strip()}}, upsert=True)
     return {"ok": True, "potongan_telat": val, "hari_kerja": hk}
 
 async def _compute_payroll(month: str):
@@ -1669,11 +1680,17 @@ async def _compute_payroll(month: str):
             edited = True
         else:
             gaji_pokok = base; komisi = komisi_calc; potongan = potongan_calc; edited = False
+        bonus_items = (ov or {}).get("bonus_items", [])
+        potongan_lain = (ov or {}).get("potongan_lain", 0)
+        total = gaji_pokok + komisi + sum(b["jumlah"] for b in bonus_items) - potongan - potongan_lain
         rows.append({"user_id": uid, "user_name": name, "role": u["role"], "hadir": hadir, "telat": telat, "alpha": alpha,
                      "gaji_pokok": gaji_pokok, "komisi": komisi, "potongan": potongan,
-                     "total": gaji_pokok + komisi - potongan, "komisi_calc": komisi_calc,
+                     "bonus_items": bonus_items, "potongan_lain": potongan_lain,
+                     "potongan_lain_ket": (ov or {}).get("potongan_lain_ket", ""),
+                     "total": total, "komisi_calc": komisi_calc, "potongan_telat_calc": telat * pot_rate,
                      "potongan_calc": potongan_calc, "potongan_alpha": potongan_alpha, "edited": edited, "note": (ov or {}).get("note", "")})
-    return {"month": month, "commission_rate": comm, "potongan_telat": pot_rate, "hari_kerja": hari_kerja, "rows": rows}
+    return {"month": month, "commission_rate": comm, "potongan_telat": pot_rate, "hari_kerja": hari_kerja,
+            "kota": pay.get("kota", ""), "penandatangan": pay.get("penandatangan", ""), "rows": rows}
 
 @api_router.get("/payroll/report")
 async def payroll_report(month: str, admin: dict = Depends(require_admin)):
@@ -1699,9 +1716,13 @@ async def payroll_archives(admin: dict = Depends(require_admin)):
 
 @api_router.post("/payroll/save")
 async def payroll_save(data: PayrollSave, admin: dict = Depends(require_admin)):
-    total = data.gaji_pokok + data.komisi - data.potongan
+    bonus = _clean_bonus(data.bonus_items)
+    pot_lain = max(0.0, data.potongan_lain)
+    total = data.gaji_pokok + data.komisi + sum(b["jumlah"] for b in bonus) - data.potongan - pot_lain
     await db.payroll.update_one({"user_id": data.user_id, "month": data.month},
-        {"$set": {"gaji_pokok": data.gaji_pokok, "komisi": data.komisi, "potongan": data.potongan, "note": data.note, "total": total}}, upsert=True)
+        {"$set": {"gaji_pokok": data.gaji_pokok, "komisi": data.komisi, "potongan": data.potongan, "note": data.note,
+                  "bonus_items": bonus, "potongan_lain": pot_lain, "potongan_lain_ket": data.potongan_lain_ket.strip(),
+                  "total": total}}, upsert=True)
     await db.employee_salary.update_one({"user_id": data.user_id}, {"$set": {"gaji_pokok": data.gaji_pokok}}, upsert=True)
     return {"ok": True, "total": total}
 
