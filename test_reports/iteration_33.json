@@ -1,0 +1,23 @@
+{
+  "summary": "Iteration 33 - TikTok Shop 'Biaya Layanan Logistik per Pesanan' feature e2e tested. Backend 9/9 pytest passed: GET /api/shipping/rates returns platform_tables with TikTok Shop (6 tiers; Standar=13 routes, Ekonomi=9, Kargo=13, Instan & Sameday=8); Standar Jawa↔Jawa (Selain Jakarta) fees=[990,1090,2220,3030,3540,5060]; Ekonomi Jawa↔Jawa (Jakarta) all null; Kargo fees for tiers 0-1 (<=2kg) null across routes; kasir can view platform_tables; ecommerce sale on TikTok Shop stores daerah label 'Standar · Jawa ↔ Jawa (Selain Jakarta)' and ongkir=990, ongkir_final=false; finalize PUT /api/ecommerce/sales/{id}/ongkir still works and recalcs totals. Frontend Pengaturan: shipping-rates-card renders platform-logistics-tiktok-shop with 4 tabs (standar/ekonomi/kargo/instan-sameday); rupiah values and 'N.A.' shown correctly. Frontend Penjualan Online TikTok Shop: ecom-layanan-select + ecom-rute-select appear (daerah select hidden); rute disabled until layanan chosen; rute resets to '' when layanan changes; estimasi matches tier math (qty1 1kg=990, qty2 2kg=1090, qty3 3kg=2220); Kargo 2kg shows ecom-ongkir-na and ongkir=0; saved sale shows 'estimasi · isi final' button in table. Code review on OngkirEstimateBox/OngkirCell confirms Shopee (and other non-table channels) still use ecom-daerah-select per-kg path.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_iter33_tiktok_logistics.py",
+    "/app/test_reports/pytest/iter33.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "server.py seed inserts 'platform_logistics' only when missing; if logistics_tiktok.json ever changes, existing docs won't be refreshed. Consider idempotent upsert or version key.",
+    "OngkirEstimateBox: 'Ongkir final ditentukan platform saat dana cair, perbarui di tabel di bawah.' hint is shown even when channel uses fixed platform table (TikTok Shop). The fee from the table IS the per-order charge; copy may mislead users that it is an estimate. Minor UX wording.",
+    "server.py now ~2060 lines - still beyond recommended 700-line threshold. Modularise (shipping/ecommerce/products/auth/etc.)."
+  ],
+  "updated_files": ["/app/backend/tests/test_iter33_tiktok_logistics.py"],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "test_credentials": "Admin nannsond@gmail.com / admin123, Kasir kasir@tokotani.com / kasir123",
+  "seed_data_creation": "No new seed. Reused CONTOH-001 (berat=1kg) for cart tests. Test ecommerce sale (TEST_ITER33) was deleted after test to restore stock.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "platform_logistics setting is seeded from /app/backend/logistics_tiktok.json on backend startup (only if missing). Shipping rates endpoint response shape: {rates, min_kg, platform_tables: {<channel>: {tiers:[6], services:[{name, routes:[{zona_a, zona_b, fees:[6]}]}]}}}. TikTok Shop channel active; only this channel uses the ecom-layanan/rute selects. Other channels (Shopee/Tokopedia/Lazada) still use ecom-daerah-select per-kg path. Only TikTok Shop channel was active during the UI test session, so Shopee UI toggle was not directly exercised; code path verified by review of OngkirEstimateBox (if (est.table) ... else daerah select).",
+  "rca of the issue": "N/A - no issues found."
+}
