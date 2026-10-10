@@ -31,7 +31,7 @@ export default function StokOpname() {
 
   return (
     <div className="space-y-6">
-    {user?.role === "admin" && <InventoryValuePanel refreshKey={history.length} />}
+    <InventoryValuePanel refreshKey={history.length} />
     <div className="grid lg:grid-cols-3 gap-6">
       <OpnameSessionForm products={products} onSaved={load} />
 

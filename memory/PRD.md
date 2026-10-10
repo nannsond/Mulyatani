@@ -243,3 +243,4 @@ Aplikasi laporan penjualan sederhana untuk bisnis toko pertanian: laporan harian
 - Riwayat Stok Opname: flat table (session grouping removed per user), per-row delete for admin (DELETE /api/stok-opname/{id}, stock unchanged), month filter (default current month + Semua Bulan) with summary counts; PDF/Excel export follows filter. Tested iter 29: 100%.
 - Stok Opname panel renamed 'Stok Barang': only stock shown (Harga Beli, Nilai Modal, Nilai Jual, Potensi Laba, rupiah per category removed from UI & export).
 - Stok Barang panel: category chips act as filter (Semua + each category, A-Z), items sorted by category then name, card & PDF/Excel export follow selected category.
+- Kasir can now see Stok Barang panel on Stok Opname; GET /api/inventory/value open to all logged-in users but money fields (harga_beli/jual, nilai_modal/jual, potensi_laba) stripped for non-admin.

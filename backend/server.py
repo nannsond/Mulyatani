@@ -1485,7 +1485,7 @@ async def dashboard(user: dict = Depends(get_current_user)):
             "top_products": await top_products(today_all)}
 
 @api_router.get("/inventory/value")
-async def inventory_value(admin: dict = Depends(require_admin)):
+async def inventory_value(user: dict = Depends(get_current_user)):
     products = await db.products.find().sort("name", 1).to_list(5000)
     items, cats = [], {}
     for p in products:
@@ -1503,7 +1503,13 @@ async def inventory_value(admin: dict = Depends(require_admin)):
     total = {"produk": len(items), "unit": sum(i["stok"] for i in items),
              "nilai_modal": sum(i["nilai_modal"] for i in items), "nilai_jual": sum(i["nilai_jual"] for i in items)}
     total["potensi_laba"] = total["nilai_jual"] - total["nilai_modal"]
-    return {"total": total, "categories": sorted(cats.values(), key=lambda x: x["nilai_modal"], reverse=True), "items": items}
+    categories = sorted(cats.values(), key=lambda x: x["nilai_modal"], reverse=True)
+    if user.get("role") != "admin":
+        money = ("harga_beli", "harga_jual", "nilai_modal", "nilai_jual", "potensi_laba")
+        items = [{k: v for k, v in i.items() if k not in money} for i in items]
+        categories = [{k: v for k, v in c.items() if k not in money} for c in categories]
+        total = {k: v for k, v in total.items() if k not in money}
+    return {"total": total, "categories": categories, "items": items}
 
 # ---------------- Komisi (commission for online sales) ----------------
 class CommissionSetting(BaseModel):
