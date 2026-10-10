@@ -203,7 +203,7 @@ export default function BundlingPanel({ isAdmin, onChanged, channels = [], prici
                   <select onChange={(e) => { if (e.target.value) { setModal((m) => addComp(m, e.target.value)); e.target.value = ""; } }} data-testid="bundle-add-comp-select"
                     className="flex-1 px-3 py-2 rounded-lg border border-input text-sm bg-white">
                     <option value="">+ Tambah produk satuan...</option>
-                    {products.map((p) => <option key={p.id} value={p.id}>{p.name} (stok {p.stok})</option>)}
+                    {products.map((p) => <option key={p.id} value={p.id}>{`${p.name} (stok ${p.stok})`}</option>)}
                   </select>
                 </div>
               </div>
