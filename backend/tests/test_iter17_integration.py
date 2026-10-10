@@ -141,7 +141,7 @@ def test_bundle_create_and_stock(session, ctx, product_a, product_b):
 
 # ---------- POS transaction ----------
 def test_pos_transaction_and_stock_decrease(session, ctx, product_a):
-    r = session.get(f"{BASE}/api/products"); 
+    r = session.get(f"{BASE}/api/products")
     stok_before = next(p for p in r.json() if p["id"] == product_a["id"])["stok"]
 
     payload = {"items": [{"product_id": product_a["id"], "name": product_a["name"],

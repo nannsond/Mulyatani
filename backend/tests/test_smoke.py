@@ -1,5 +1,6 @@
 """Smoke tests for Mulyatani Phase 1: auth + all GET endpoints used by pages."""
 import os
+
 import pytest
 import requests
 

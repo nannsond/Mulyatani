@@ -5,8 +5,9 @@
 - POST /api/settings/logo (admin), GET /api/settings/logo (public), GET /api/settings has_logo
 - Kasir role 403 on POST /api/settings/logo
 """
-import os
 import io
+import os
+
 import pytest
 import requests
 

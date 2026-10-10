@@ -1,7 +1,7 @@
 """Security audit verification tests (SEC-001 to SEC-005 + ObjectId hardening + regression)."""
 import os
-import io
 import time
+
 import pytest
 import requests
 

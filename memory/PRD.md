@@ -201,3 +201,8 @@ Aplikasi laporan penjualan sederhana untuk bisnis toko pertanian: laporan harian
 
 ## Backlog
 - P2: DELETE arsip slip gaji; /api/settings/logo 200+null bila kosong; pecah server.py per router.
+
+## 2026-10-11 — Slip Gaji sesuai referensi user
+- Slip PDF dirombak mengikuti file "Slip_Gaji Mulya Tani": Data Karyawan, Rincian Pendapatan/Potongan (Komponen | Perhitungan | Jumlah), Total Gaji Bersih + terbilang, tanda tangan Kota/tanggal, Dibuat oleh (Owner) & Diterima oleh (Karyawan).
+- Baru: bonus tambahan multi-baris & potongan lain-lain per karyawan (dialog di Rekap Gaji), pengaturan Kota & Penandatangan.
+- Tes iteration_20: 100% backend & frontend.

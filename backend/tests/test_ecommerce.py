@@ -1,5 +1,6 @@
 """Tests for new Ecommerce sales feature (iteration 7)."""
 import os
+
 import pytest
 import requests
 
