@@ -4,6 +4,8 @@ import { fmtDateTime } from "@/lib/format";
 import { exportPDF, exportExcel } from "@/lib/exporter";
 import { ClipboardCheck, FileDown, FileSpreadsheet } from "lucide-react";
 import { toast } from "sonner";
+import { useAuth } from "@/context/AuthContext";
+import { InventoryValuePanel } from "@/components/InventoryValuePanel";
 
 const ALASAN = ["Penyesuaian", "Rusak", "Kadaluarsa", "Hilang", "Bonus Supplier", "Kesalahan Input"];
 
@@ -14,6 +16,7 @@ function badge(selisih) {
 }
 
 export default function StokOpname() {
+  const { user } = useAuth();
   const [products, setProducts] = useState([]);
   const [history, setHistory] = useState([]);
   const [form, setForm] = useState({ product_id: "", stok_fisik: "", alasan: "Penyesuaian", note: "" });
@@ -42,6 +45,8 @@ export default function StokOpname() {
   const rows = history.map((h) => [fmtDateTime(h.created_at), h.product_name, h.stok_sistem, h.stok_fisik, h.selisih, h.alasan, h.user_name]);
 
   return (
+    <div className="space-y-6">
+    {user?.role === "admin" && <InventoryValuePanel refreshKey={history.length} />}
     <div className="grid lg:grid-cols-3 gap-6">
       <form onSubmit={submit} className="bg-card rounded-2xl border border-slate-200 p-6 h-fit space-y-4">
         <h3 className="font-heading font-semibold text-lg text-[#0F281E] flex items-center gap-2">
@@ -125,6 +130,7 @@ export default function StokOpname() {
           </table>
         </div>
       </div>
+    </div>
     </div>
   );
 }

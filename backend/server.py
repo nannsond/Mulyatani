@@ -1441,6 +1441,27 @@ async def dashboard(user: dict = Depends(get_current_user)):
             "total_produk": len(products), "series7": series,
             "top_products": await top_products(today_all)}
 
+@api_router.get("/inventory/value")
+async def inventory_value(admin: dict = Depends(require_admin)):
+    products = await db.products.find().sort("name", 1).to_list(5000)
+    items, cats = [], {}
+    for p in products:
+        stok = max(0, p.get("stok", 0))
+        modal, jual = stok * p.get("harga_beli", 0), stok * p.get("harga_jual", 0)
+        items.append({"id": str(p["_id"]), "sku": p.get("sku", ""), "name": p["name"], "category": p.get("category", ""),
+                      "unit": p.get("unit", ""), "stok": stok, "harga_beli": p.get("harga_beli", 0),
+                      "harga_jual": p.get("harga_jual", 0), "nilai_modal": modal, "nilai_jual": jual})
+        c = cats.setdefault(p.get("category") or "Lainnya", {"category": p.get("category") or "Lainnya", "produk": 0, "unit": 0, "nilai_modal": 0, "nilai_jual": 0})
+        c["produk"] += 1
+        c["unit"] += stok
+        c["nilai_modal"] += modal
+        c["nilai_jual"] += jual
+    items.sort(key=lambda x: x["nilai_modal"], reverse=True)
+    total = {"produk": len(items), "unit": sum(i["stok"] for i in items),
+             "nilai_modal": sum(i["nilai_modal"] for i in items), "nilai_jual": sum(i["nilai_jual"] for i in items)}
+    total["potensi_laba"] = total["nilai_jual"] - total["nilai_modal"]
+    return {"total": total, "categories": sorted(cats.values(), key=lambda x: x["nilai_modal"], reverse=True), "items": items}
+
 # ---------------- Komisi (commission for online sales) ----------------
 class CommissionSetting(BaseModel):
     rate: float

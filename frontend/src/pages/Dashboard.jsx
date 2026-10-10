@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { rupiah, fmtDateTime } from "@/lib/format";
-import { TrendingUp, ShoppingCart, Package, AlertTriangle, Loader2 } from "lucide-react";
+import { TrendingUp, ShoppingCart, Package, AlertTriangle, Loader2, Warehouse } from "lucide-react";
+import { useAuth } from "@/context/AuthContext";
+import { Link } from "react-router-dom";
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 
 function Stat({ label, value, icon: Icon, accent, testid }) {
@@ -19,9 +21,13 @@ function Stat({ label, value, icon: Icon, accent, testid }) {
 }
 
 export default function Dashboard() {
+  const { user } = useAuth();
+  const isAdmin = user?.role === "admin";
   const [data, setData] = useState(null);
+  const [aset, setAset] = useState(null);
 
   useEffect(() => { api.get("/dashboard").then((r) => setData(r.data)); }, []);
+  useEffect(() => { if (isAdmin) api.get("/inventory/value").then((r) => setAset(r.data.total)); }, [isAdmin]);
 
   if (!data) return <div className="flex justify-center py-20"><Loader2 className="w-8 h-8 animate-spin text-[#1B5E3B]" /></div>;
 
@@ -35,6 +41,21 @@ export default function Dashboard() {
         <Stat label="Total Produk" value={data.total_produk} icon={Package} accent="bg-[#D97706]" testid="stat-total-produk" />
         <Stat label="Stok Menipis" value={data.low_stock.length} icon={AlertTriangle} accent="bg-destructive" testid="stat-low-stock" />
       </div>
+      {isAdmin && aset && (
+        <Link to="/stok-opname" data-testid="stat-inventory-value" className="flex items-center justify-between gap-4 flex-wrap bg-[#0E241B] text-white rounded-2xl p-5 hover:bg-[#143D2B] transition-colors">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-[#2D8A56] flex items-center justify-center"><Warehouse className="w-5 h-5" /></div>
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wider text-emerald-200/80">Total Nilai Aset Barang (Harga Beli)</p>
+              <p className="font-mono font-bold text-2xl" data-testid="stat-inventory-value-amount">{rupiah(aset.nilai_modal)}</p>
+            </div>
+          </div>
+          <div className="text-right text-sm text-emerald-100/80">
+            <p>Nilai jual: <span className="font-mono font-semibold text-white">{rupiah(aset.nilai_jual)}</span></p>
+            <p>{aset.produk} produk • {aset.unit} unit</p>
+          </div>
+        </Link>
+      )}
 
       <div className="grid lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 bg-card rounded-2xl border border-slate-200 p-6">

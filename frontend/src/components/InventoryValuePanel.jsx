@@ -1,0 +1,83 @@
+import { useEffect, useState } from "react";
+import { api } from "@/lib/api";
+import { rupiah } from "@/lib/format";
+import { exportPDF, exportExcel } from "@/lib/exporter";
+import { Warehouse, FileDown, FileSpreadsheet, ChevronDown, ChevronUp } from "lucide-react";
+
+const Card = ({ label, value, testid, strong }) => (
+  <div className={`rounded-xl p-4 border ${strong ? "bg-[#1B5E3B] border-[#1B5E3B] text-white" : "bg-secondary/40 border-slate-200"}`} data-testid={testid}>
+    <p className={`text-[11px] font-semibold uppercase tracking-wider ${strong ? "text-emerald-100" : "text-muted-foreground"}`}>{label}</p>
+    <p className="font-mono font-bold text-xl mt-1">{value}</p>
+  </div>
+);
+
+export const InventoryValuePanel = ({ refreshKey }) => {
+  const [data, setData] = useState(null);
+  const [showAll, setShowAll] = useState(false);
+
+  useEffect(() => { api.get("/inventory/value").then((r) => setData(r.data)); }, [refreshKey]);
+  if (!data) return null;
+
+  const { total, categories, items } = data;
+  const cols = ["SKU", "Produk", "Kategori", "Stok", "Harga Beli", "Nilai Modal", "Harga Jual", "Nilai Jual"];
+  const rows = items.map((i) => [i.sku, i.name, i.category, `${i.stok} ${i.unit}`, rupiah(i.harga_beli), rupiah(i.nilai_modal), rupiah(i.harga_jual), rupiah(i.nilai_jual)]);
+  const footer = ["", "TOTAL", "", `${total.unit}`, "", rupiah(total.nilai_modal), "", rupiah(total.nilai_jual)];
+  const shown = showAll ? items : items.slice(0, 10);
+
+  return (
+    <div className="bg-card rounded-2xl border border-slate-200 p-6 space-y-5" data-testid="inventory-value-panel">
+      <div className="flex items-center justify-between flex-wrap gap-2">
+        <h3 className="font-heading font-semibold text-lg text-[#0F281E] flex items-center gap-2"><Warehouse className="w-5 h-5" /> Nilai Aset Barang</h3>
+        <div className="flex gap-2">
+          <button onClick={() => exportPDF({ title: "Nilai Aset Barang", columns: cols, rows, foot: footer })} data-testid="inventory-export-pdf"
+            className="flex items-center gap-2 px-3 py-2 rounded-xl border border-input text-sm hover:bg-secondary"><FileDown className="w-4 h-4" /> PDF</button>
+          <button onClick={() => exportExcel({ filename: "Nilai_Aset_Barang", sheetName: "Aset", columns: cols, rows: [...rows, footer] })} data-testid="inventory-export-excel"
+            className="flex items-center gap-2 px-3 py-2 rounded-xl border border-input text-sm hover:bg-secondary"><FileSpreadsheet className="w-4 h-4" /> Excel</button>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <Card strong label="Total Aset (Harga Beli)" value={rupiah(total.nilai_modal)} testid="inventory-total-modal" />
+        <Card label="Nilai Jual Stok" value={rupiah(total.nilai_jual)} testid="inventory-total-jual" />
+        <Card label="Potensi Laba" value={rupiah(total.potensi_laba)} testid="inventory-potensi-laba" />
+        <Card label="Jumlah Barang" value={`${total.produk} produk • ${total.unit} unit`} testid="inventory-total-unit" />
+      </div>
+
+      {categories.length > 0 && (
+        <div className="flex flex-wrap gap-2" data-testid="inventory-categories">
+          {categories.map((c) => (
+            <span key={c.category} className="text-xs px-3 py-1.5 rounded-lg bg-emerald-50 border border-emerald-100 text-[#0F281E]">
+              <b>{c.category}</b> · {c.produk} produk · <span className="font-mono">{rupiah(c.nilai_modal)}</span>
+            </span>
+          ))}
+        </div>
+      )}
+
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm min-w-[700px]">
+          <thead><tr className="text-left text-xs uppercase tracking-wider text-muted-foreground border-b border-slate-200">
+            <th className="py-2 pr-3">Produk</th><th className="py-2 px-3 text-right">Stok</th><th className="py-2 px-3 text-right">Harga Beli</th>
+            <th className="py-2 px-3 text-right">Nilai Modal</th><th className="py-2 pl-3 text-right">Nilai Jual</th>
+          </tr></thead>
+          <tbody>
+            {items.length === 0 && <tr><td colSpan={5} className="py-6 text-center text-muted-foreground">Belum ada produk</td></tr>}
+            {shown.map((i) => (
+              <tr key={i.id} className="border-b border-slate-100" data-testid={`inventory-row-${i.id}`}>
+                <td className="py-2 pr-3"><p className="font-medium">{i.name}</p><p className="text-xs text-muted-foreground">{i.category}</p></td>
+                <td className="py-2 px-3 text-right font-mono">{i.stok} {i.unit}</td>
+                <td className="py-2 px-3 text-right font-mono">{rupiah(i.harga_beli)}</td>
+                <td className="py-2 px-3 text-right font-mono font-semibold">{rupiah(i.nilai_modal)}</td>
+                <td className="py-2 pl-3 text-right font-mono">{rupiah(i.nilai_jual)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {items.length > 10 && (
+        <button onClick={() => setShowAll((s) => !s)} data-testid="inventory-toggle-all" className="flex items-center gap-1 text-sm font-medium text-[#1B5E3B] hover:underline">
+          {showAll ? <><ChevronUp className="w-4 h-4" /> Tampilkan 10 teratas</> : <><ChevronDown className="w-4 h-4" /> Tampilkan semua ({items.length})</>}
+        </button>
+      )}
+    </div>
+  );
+};
