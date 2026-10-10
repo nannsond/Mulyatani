@@ -1138,6 +1138,30 @@ async def create_opname(data: OpnameInput, user: dict = Depends(get_current_user
 class OpnameBulkInput(BaseModel):
     items: List[OpnameInput]
 
+class DraftItem(BaseModel):
+    product_id: str
+    stok_fisik: str = ""
+    alasan: str = "Penyesuaian"
+
+class OpnameDraftInput(BaseModel):
+    items: List[DraftItem] = []
+    note: str = ""
+
+@api_router.get("/stok-opname/draft")
+async def get_opname_draft(user: dict = Depends(get_current_user)):
+    d = await db.opname_drafts.find_one({"user_id": user["id"]}, {"_id": 0})
+    return d or {"items": [], "note": "", "updated_at": None}
+
+@api_router.put("/stok-opname/draft")
+async def save_opname_draft(data: OpnameDraftInput, user: dict = Depends(get_current_user)):
+    if not data.items and not data.note.strip():
+        await db.opname_drafts.delete_one({"user_id": user["id"]})
+        return {"ok": True, "updated_at": None}
+    updated = now_iso()
+    await db.opname_drafts.update_one({"user_id": user["id"]}, {"$set": {
+        "user_id": user["id"], "items": [i.model_dump() for i in data.items], "note": data.note, "updated_at": updated}}, upsert=True)
+    return {"ok": True, "updated_at": updated}
+
 @api_router.post("/stok-opname/bulk")
 async def create_opname_bulk(data: OpnameBulkInput, user: dict = Depends(get_current_user)):
     if not data.items:

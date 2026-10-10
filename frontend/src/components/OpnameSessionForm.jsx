@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { api, apiError } from "@/lib/api";
-import { ClipboardCheck, Trash2, Layers } from "lucide-react";
+import { ClipboardCheck, Trash2, Layers, CheckCheck, CloudCheck } from "lucide-react";
+import { fmtDateTime } from "@/lib/format";
 import { toast } from "sonner";
 import { ProductSearchInput } from "@/components/ProductSearchInput";
 
@@ -23,7 +24,14 @@ function SessionRow({ row, product, onChange, onRemove }) {
           <div className="text-sm font-medium truncate">{product.name}</div>
           <div className="text-xs text-muted-foreground">{product.sku} · Sistem <span className="font-mono font-semibold text-[#1B5E3B]">{product.stok} {product.unit}</span></div>
         </div>
-        <button type="button" onClick={onRemove} data-testid={`opname-session-remove-${product.id}`} className="p-1 text-red-500 hover:bg-red-50 rounded-lg"><Trash2 className="w-4 h-4" /></button>
+        <div className="flex items-center gap-1 shrink-0">
+          <button type="button" onClick={() => onChange({ ...row, stok_fisik: String(product.stok) })} data-testid={`opname-session-same-${product.id}`}
+            title="Isi stok fisik sama dengan sistem"
+            className={`flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-semibold border transition-colors ${String(product.stok) === row.stok_fisik ? "bg-green-100 border-green-200 text-green-700" : "border-slate-200 text-[#1B5E3B] hover:bg-emerald-50"}`}>
+            <CheckCheck className="w-3.5 h-3.5" /> Sama
+          </button>
+          <button type="button" onClick={onRemove} data-testid={`opname-session-remove-${product.id}`} className="p-1 text-red-500 hover:bg-red-50 rounded-lg"><Trash2 className="w-4 h-4" /></button>
+        </div>
       </div>
       <div className="grid grid-cols-2 gap-2">
         <input type="number" min="0" value={row.stok_fisik} placeholder="Stok fisik" data-testid={`opname-session-fisik-${product.id}`}
@@ -46,6 +54,25 @@ export function OpnameSessionForm({ products, onSaved }) {
   const [cat, setCat] = useState("");
   const categories = [...new Set(products.map((p) => p.category || "Lainnya"))].sort((a, b) => a.localeCompare(b, "id"));
   const pmap = Object.fromEntries(products.map((p) => [p.id, p]));
+  const [draftAt, setDraftAt] = useState(null);
+  const loaded = useRef(false);
+
+  useEffect(() => {
+    api.get("/stok-opname/draft").then(({ data }) => {
+      if (data.items?.length) {
+        setRows(data.items); setNote(data.note || ""); setDraftAt(data.updated_at);
+        toast.info(`Draf opname dilanjutkan (${data.items.length} produk)`);
+      }
+    }).finally(() => { loaded.current = true; });
+  }, []);
+
+  useEffect(() => {
+    if (!loaded.current) return;
+    const t = setTimeout(() => {
+      api.put("/stok-opname/draft", { items: rows, note }).then(({ data }) => setDraftAt(data.updated_at)).catch(() => {});
+    }, 700);
+    return () => clearTimeout(t);
+  }, [rows, note]);
 
   const add = (p) => {
     if (rows.some((r) => r.product_id === p.id)) { toast.info("Produk sudah ada di sesi"); return; }
@@ -62,8 +89,10 @@ export function OpnameSessionForm({ products, onSaved }) {
   };
   const update = (i, row) => setRows(rows.map((r, j) => (j === i ? row : r)));
 
+  const allRows = rows;
   const submit = async (e) => {
     e.preventDefault();
+    const rows = allRows.filter((r) => pmap[r.product_id]);
     if (rows.length === 0) { toast.error("Tambahkan produk dulu"); return; }
     if (rows.some((r) => r.stok_fisik === "")) { toast.error("Isi stok fisik semua produk"); return; }
     setSaving(true);
@@ -103,6 +132,11 @@ export function OpnameSessionForm({ products, onSaved }) {
           </button>
         </div>
       </div>
+      {draftAt && rows.length > 0 && (
+        <div className="flex items-center gap-1.5 text-xs text-muted-foreground" data-testid="opname-draft-status">
+          <CloudCheck className="w-3.5 h-3.5 text-[#1B5E3B]" /> Draf tersimpan otomatis · {fmtDateTime(draftAt)}
+        </div>
+      )}
       <div className="space-y-2 max-h-[420px] overflow-auto">
         {rows.length === 0 && <div className="text-sm text-muted-foreground text-center py-4 border border-dashed rounded-xl">Belum ada produk di sesi ini.</div>}
         {rows.map((r, i) => pmap[r.product_id] && (
