@@ -2,7 +2,8 @@ import { useEffect, useState } from "react";
 import { catTarget, suggestPrice, targetProfit } from "@/lib/fees";
 import { rupiah } from "@/lib/format";
 import { TargetInput } from "@/components/SuggestPricePanel";
-import { Plus, Trash2, X, Wand2 } from "lucide-react";
+import { Trash2, X, Wand2 } from "lucide-react";
+import ProductSearchPicker from "@/components/ProductSearchPicker";
 
 const slug = (s) => s.replace(/\s+/g, "-").toLowerCase();
 const inputCls = "mt-1 w-full px-3 py-2.5 rounded-xl border border-input text-sm font-mono focus:outline-none focus:ring-2";
@@ -53,14 +54,7 @@ export default function BundleModal({ modal, setModal, products, channels, prici
                 </div>
               ))}
             </div>
-            <div className="mt-2 flex items-center gap-2">
-              <Plus className="w-4 h-4 text-muted-foreground" />
-              <select onChange={(e) => { if (e.target.value) { addComp(e.target.value); e.target.value = ""; } }} data-testid="bundle-add-comp-select"
-                className="flex-1 px-3 py-2 rounded-lg border border-input text-sm bg-white">
-                <option value="">+ Tambah produk satuan...</option>
-                {products.map((p) => <option key={p.id} value={p.id}>{`${p.name} (stok ${p.stok})`}</option>)}
-              </select>
-            </div>
+            <ProductSearchPicker products={products} excludeIds={modal.components.map((c) => c.product_id)} onPick={addComp} />
             <p className="text-xs text-muted-foreground mt-2" data-testid="bundle-modal-cost">Modal paket (total harga beli komponen): <span className="font-mono font-semibold text-foreground">{rupiah(cost)}</span></p>
           </div>
           <div className="grid grid-cols-2 gap-3">
