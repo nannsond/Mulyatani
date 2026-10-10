@@ -206,3 +206,10 @@ Aplikasi laporan penjualan sederhana untuk bisnis toko pertanian: laporan harian
 - Slip PDF dirombak mengikuti file "Slip_Gaji Mulya Tani": Data Karyawan, Rincian Pendapatan/Potongan (Komponen | Perhitungan | Jumlah), Total Gaji Bersih + terbilang, tanda tangan Kota/tanggal, Dibuat oleh (Owner) & Diterima oleh (Karyawan).
 - Baru: bonus tambahan multi-baris & potongan lain-lain per karyawan (dialog di Rekap Gaji), pengaturan Kota & Penandatangan.
 - Tes iteration_20: 100% backend & frontend.
+
+## 2026-10-11 — Rekap Gaji lanjutan
+- Hapus arsip slip gaji per bulan (DELETE /api/payroll/archive/{month}).
+- Kirim slip gaji via WhatsApp (wa.me ringkasan + unduh PDF untuk dilampirkan); no. WA karyawan disimpan (POST /api/payroll/phone).
+- Potongan Lain-lain multi-baris (potongan_items) seperti bonus.
+- Hadir/Telat/Alpha/Izin(+Sakit) bisa diedit; Telat/Alpha menghitung ulang potongan; disimpan & ikut arsip.
+- Tes iteration_21: 100%.
