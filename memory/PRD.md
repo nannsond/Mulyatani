@@ -213,3 +213,7 @@ Aplikasi laporan penjualan sederhana untuk bisnis toko pertanian: laporan harian
 - Potongan Lain-lain multi-baris (potongan_items) seperti bonus.
 - Hadir/Telat/Alpha/Izin(+Sakit) bisa diedit; Telat/Alpha menghitung ulang potongan; disimpan & ikut arsip.
 - Tes iteration_21: 100%.
+
+## 2026-10-11 — Ganti Password
+- POST /api/auth/change-password (verifikasi password lama, min 6 karakter, harus beda). Tombol "Ganti Password" di sidebar (admin & kasir). Seed tidak menimpa password admin yang sudah diganti.
+- Tes iteration_22: 100%.
