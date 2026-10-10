@@ -32,3 +32,14 @@ export function suggestPrice(fees = [], cost = 0, target = 0) {
 }
 
 export const targetProfit = (cost, mode, value) => (mode === "percent" ? Math.round(((Number(cost) || 0) * (Number(value) || 0)) / 100) : Number(value) || 0);
+
+export const PRICING_CATEGORIES = ["Pupuk", "Benih", "Pestisida", "Alat Tani", "Lainnya", "Paket"];
+
+// Target untung per kategori (jika diatur), selain itu target default.
+export const catTarget = (t, cat) => t?.categories?.[cat] || { mode: t?.mode || "percent", value: t?.value ?? 20 };
+
+export function saranOf(fees, cost, t, cat) {
+  if (!(Number(cost) > 0)) return 0;
+  const ct = catTarget(t, cat);
+  return suggestPrice(fees, cost, targetProfit(cost, ct.mode, ct.value));
+}

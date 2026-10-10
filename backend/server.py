@@ -1477,20 +1477,24 @@ async def set_commission(data: CommissionSetting, admin: dict = Depends(require_
     await db.settings.update_one({"key": "commission"}, {"$set": {"rate": rate}}, upsert=True)
     return {"ok": True, "rate": rate}
 
-class PricingTarget(BaseModel):
+class CategoryTarget(BaseModel):
     mode: Literal["percent", "fixed"] = "percent"
     value: float = 20
+
+class PricingTarget(CategoryTarget):
+    categories: Dict[str, CategoryTarget] = {}
 
 @api_router.get("/pricing/settings")
 async def get_pricing(user: dict = Depends(get_current_user)):
     s = await db.settings.find_one({"key": "pricing"}) or {}
-    return {"mode": s.get("mode", "percent"), "value": s.get("value", 20)}
+    return {"mode": s.get("mode", "percent"), "value": s.get("value", 20), "categories": s.get("categories", {})}
 
 @api_router.post("/pricing/settings")
 async def set_pricing(data: PricingTarget, admin: dict = Depends(require_admin)):
     val = max(0.0, data.value)
-    await db.settings.update_one({"key": "pricing"}, {"$set": {"mode": data.mode, "value": val}}, upsert=True)
-    return {"ok": True, "mode": data.mode, "value": val}
+    cats = {k: {"mode": v.mode, "value": max(0.0, v.value)} for k, v in data.categories.items()}
+    await db.settings.update_one({"key": "pricing"}, {"$set": {"mode": data.mode, "value": val, "categories": cats}}, upsert=True)
+    return {"ok": True, "mode": data.mode, "value": val, "categories": cats}
 
 @api_router.get("/commission/report")
 async def commission_report(month: str, admin: dict = Depends(require_admin)):

@@ -2,11 +2,12 @@ import { useEffect, useState } from "react";
 import { api, apiError } from "@/lib/api";
 import { rupiah } from "@/lib/format";
 import { toast } from "sonner";
+import BundleSaran from "@/components/BundleSaran";
 import { Plus, Pencil, Trash2, X, Boxes, AlertTriangle, PackageMinus, Loader2 } from "lucide-react";
 
 const EMPTY = { name: "", category: "Paket", harga_jual: 0, harga_reseller: 0, harga_online: 0, components: [] };
 
-export default function BundlingPanel({ isAdmin, onChanged }) {
+export default function BundlingPanel({ isAdmin, onChanged, channels = [], pricingTarget }) {
   const [bundles, setBundles] = useState([]);
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -21,6 +22,7 @@ export default function BundlingPanel({ isAdmin, onChanged }) {
   useEffect(() => { load(); }, []);
 
   const pName = (id) => products.find((p) => p.id === id)?.name || "";
+  const modalCost = modal ? modal.components.reduce((t, c) => t + (Number(c.qty) || 1) * (products.find((p) => p.id === c.product_id)?.harga_beli || 0), 0) : 0;
 
   const addComp = (modalState, pid) => {
     const p = products.find((x) => x.id === pid);
@@ -109,6 +111,7 @@ export default function BundlingPanel({ isAdmin, onChanged }) {
                   {b.harga_reseller > 0 && <span>Reseller: <span className="font-mono text-[#C85A32]">{rupiah(b.harga_reseller)}</span></span>}
                   {b.harga_online > 0 && <span>Online: <span className="font-mono text-[#2563EB]">{rupiah(b.harga_online)}</span></span>}
                 </div>
+                <div className="mt-2"><BundleSaran cost={b.hpp} channels={channels} pricingTarget={pricingTarget} price={b.harga_online} testid={`bundle-saran-${b.id}`} /></div>
                 {b.hemat > 0 && (
                   <span data-testid={`bundle-hemat-${b.id}`} className="inline-flex items-center gap-1 mt-2 text-xs font-bold px-2 py-0.5 rounded-full bg-green-100 text-green-700 w-fit">
                     Hemat {rupiah(b.hemat)} vs beli satuan
@@ -177,6 +180,8 @@ export default function BundlingPanel({ isAdmin, onChanged }) {
                   <label className="text-sm font-medium">Harga Online (untuk Penjualan Online)</label>
                   <input type="number" min="0" value={modal.harga_online} onChange={(e) => setModal({ ...modal, harga_online: e.target.value })} data-testid="bundle-online-input"
                     className="mt-1 w-full px-3 py-2.5 rounded-xl border border-input text-sm font-mono focus:outline-none focus:ring-2 focus:ring-[#2563EB]" />
+                  <div className="mt-2"><BundleSaran cost={modalCost} channels={channels} pricingTarget={pricingTarget} price={Number(modal.harga_online) || 0}
+                    onUse={(v) => setModal((m) => ({ ...m, harga_online: v }))} testid="bundle-modal-saran" /></div>
                 </div>
               </div>
 

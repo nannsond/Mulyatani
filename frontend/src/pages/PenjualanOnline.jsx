@@ -5,7 +5,7 @@ import { exportEcomTemplate, readEcomExcel } from "@/lib/exporter";
 import { Search, Plus, Minus, Trash2, ShoppingBag, Loader2, CheckCircle2, FileSpreadsheet, Upload } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/context/AuthContext";
-import { calcFees, suggestPrice, targetProfit } from "@/lib/fees";
+import { calcFees, saranOf } from "@/lib/fees";
 import { usePricingTarget } from "@/lib/usePricingTarget";
 
 const STATUSES = ["Diproses", "Dikirim", "Selesai", "Dikembalikan"];
@@ -52,12 +52,12 @@ export default function PenjualanOnline() {
 
   const sellable = [
     ...products,
-    ...bundles.map((b) => ({ id: b.id, name: b.name, category: "Paket", harga_online: b.harga_online, stok: b.stok, stok_minimal: 0, is_bundle: true, hemat: b.hemat })),
+    ...bundles.map((b) => ({ id: b.id, name: b.name, category: "Paket", harga_online: b.harga_online, hpp: b.hpp, stok: b.stok, stok_minimal: 0, is_bundle: true, hemat: b.hemat })),
   ];
   const priceFor = (p) => p.harga_channel?.[channel] || p.harga_online || 0;
   const target = usePricingTarget();
   const chFees = channels.find((c) => c.name === channel)?.fees || [];
-  const saranFor = (p) => (p?.harga_beli > 0 ? suggestPrice(chFees, p.harga_beli, targetProfit(p.harga_beli, target.mode, target.value)) : 0);
+  const saranFor = (p) => (p ? saranOf(chFees, p.harga_beli || p.hpp, target, p.category) : 0);
   const findSellable = (id) => sellable.find((x) => x.id === id);
   useEffect(() => {
     setCart((c) => c.map((i) => { const p = sellable.find((x) => x.id === i.product_id); return p ? { ...i, harga: priceFor(p) } : i; }));

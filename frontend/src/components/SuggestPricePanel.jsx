@@ -1,30 +1,35 @@
 import { useState } from "react";
 import { api } from "@/lib/api";
 import { rupiah } from "@/lib/format";
-import { suggestPrice, targetProfit } from "@/lib/fees";
+import { suggestPrice, targetProfit, catTarget } from "@/lib/fees";
 import { X, Loader2, Wand2 } from "lucide-react";
 import { toast } from "sonner";
 
-export function TargetInput({ mode, value, onMode, onValue, prefix }) {
+export function TargetInput({ mode, value, onMode, onValue, prefix, allowSettings = false }) {
   return (
     <div className="flex gap-2">
       <select value={mode} onChange={(e) => onMode(e.target.value)} data-testid={`${prefix}-target-mode`} className="px-2 py-2 rounded-xl border border-input text-sm bg-white">
+        {allowSettings && <option value="settings">Sesuai Pengaturan (per kategori)</option>}
         <option value="percent">Untung % dari modal</option>
         <option value="fixed">Untung Rp / unit</option>
       </select>
-      <input type="number" min="0" value={value} onChange={(e) => onValue(e.target.value)} data-testid={`${prefix}-target-value`}
-        className="w-28 px-3 py-2 rounded-xl border border-input text-sm font-mono" />
+      {mode !== "settings" && <input type="number" min="0" value={value} onChange={(e) => onValue(e.target.value)} data-testid={`${prefix}-target-value`}
+        className="w-28 px-3 py-2 rounded-xl border border-input text-sm font-mono" />}
     </div>
   );
 }
 
-export default function SuggestPricePanel({ products, channels, onClose, onApplied, defaultMode = "percent", defaultValue = 20 }) {
-  const [mode, setMode] = useState(defaultMode);
-  const [value, setValue] = useState(defaultValue);
+export default function SuggestPricePanel({ products, channels, onClose, onApplied, pricingTarget }) {
+  const [mode, setMode] = useState("settings");
+  const [value, setValue] = useState(20);
   const [picked, setPicked] = useState(channels.map((c) => c.name));
   const [saving, setSaving] = useState(false);
   const used = channels.filter((c) => picked.includes(c.name));
-  const rows = products.map((p) => ({ p, prices: Object.fromEntries(used.map((c) => [c.name, suggestPrice(c.fees, p.harga_beli, targetProfit(p.harga_beli, mode, value))])) }));
+  const profitOf = (p) => {
+    const t = mode === "settings" ? catTarget(pricingTarget, p.category) : { mode, value };
+    return targetProfit(p.harga_beli, t.mode, t.value);
+  };
+  const rows = products.map((p) => ({ p, profit: profitOf(p), prices: Object.fromEntries(used.map((c) => [c.name, suggestPrice(c.fees, p.harga_beli, profitOf(p))])) }));
 
   const apply = async () => {
     if (!used.length) { toast.error("Pilih minimal 1 platform"); return; }
@@ -49,7 +54,7 @@ export default function SuggestPricePanel({ products, channels, onClose, onAppli
         </div>
         <p className="text-xs text-muted-foreground mb-4">Harga dihitung agar setelah potongan tiap platform, untung bersih per unit tetap sesuai target (dibulatkan ke atas Rp100).</p>
         <div className="flex flex-wrap items-center gap-3 mb-4">
-          <TargetInput mode={mode} value={value} onMode={setMode} onValue={setValue} prefix="suggest" />
+          <TargetInput mode={mode} value={value} onMode={setMode} onValue={setValue} prefix="suggest" allowSettings />
           <div className="flex flex-wrap gap-2">
             {channels.map((c) => (
               <label key={c.name} className="flex items-center gap-1.5 text-sm px-2.5 py-1.5 rounded-lg border border-input cursor-pointer">
@@ -71,11 +76,11 @@ export default function SuggestPricePanel({ products, channels, onClose, onAppli
               </tr>
             </thead>
             <tbody>
-              {rows.map(({ p, prices }) => (
+              {rows.map(({ p, profit, prices }) => (
                 <tr key={p.id} className="border-t border-slate-100" data-testid={`suggest-row-${p.id}`}>
                   <td className="px-3 py-2">{p.name}</td>
                   <td className="px-3 py-2 text-right font-mono">{rupiah(p.harga_beli)}</td>
-                  <td className="px-3 py-2 text-right font-mono text-[#1B5E3B]">{rupiah(targetProfit(p.harga_beli, mode, value))}</td>
+                  <td className="px-3 py-2 text-right font-mono text-[#1B5E3B]">{rupiah(profit)}</td>
                   {used.map((c) => <td key={c.name} className="px-3 py-2 text-right font-mono font-semibold">{rupiah(prices[c.name])}</td>)}
                 </tr>
               ))}

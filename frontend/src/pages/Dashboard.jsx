@@ -4,6 +4,7 @@ import { rupiah, fmtDateTime } from "@/lib/format";
 import { TrendingUp, ShoppingCart, Package, AlertTriangle, Loader2, Warehouse } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { Link } from "react-router-dom";
+import PriceWarningCard from "@/components/PriceWarningCard";
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 
 function Stat({ label, value, icon: Icon, accent, testid }) {
@@ -114,6 +115,7 @@ export default function Dashboard() {
           </div>
         )}
       </div>
+      {isAdmin && <PriceWarningCard />}
     </div>
   );
 }

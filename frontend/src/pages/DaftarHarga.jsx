@@ -7,7 +7,7 @@ import { Plus, Pencil, Trash2, FileDown, FileSpreadsheet, X, Search, User, Users
 import BundlingPanel from "@/components/BundlingPanel";
 import { exportPDF, exportExcel, printPriceList } from "@/lib/exporter";
 import { toast } from "sonner";
-import { calcFees, suggestPrice, targetProfit } from "@/lib/fees";
+import { calcFees, suggestPrice, targetProfit, catTarget, saranOf } from "@/lib/fees";
 import SuggestPricePanel, { TargetInput } from "@/components/SuggestPricePanel";
 import { usePricingTarget } from "@/lib/usePricingTarget";
 
@@ -32,8 +32,9 @@ export default function DaftarHarga() {
   const target = usePricingTarget();
   const [tMode, setTMode] = useState("percent");
   const [tValue, setTValue] = useState(20);
-  useEffect(() => { if (target.loaded) { setTMode(target.mode); setTValue(target.value); } }, [target]);
-  const saranFor = (p, c) => suggestPrice(c.fees, p.harga_beli, targetProfit(p.harga_beli, target.mode, target.value));
+  const modalCat = modal?.category;
+  useEffect(() => { if (target.loaded) { const t = catTarget(target, modalCat); setTMode(t.mode); setTValue(t.value); } }, [target, modalCat]);
+  const saranFor = (p, c) => saranOf(c.fees, p.harga_beli, target, p.category);
   const fillSuggest = () => {
     const target = targetProfit(modal.harga_beli, tMode, tValue);
     setModal({ ...modal, harga_channel: Object.fromEntries(channels.map((c) => [c.name, suggestPrice(c.fees, modal.harga_beli, target)])) });
@@ -101,7 +102,7 @@ export default function DaftarHarga() {
         </button>
       </div>
 
-      {view === "bundling" ? <BundlingPanel isAdmin={isAdmin} onChanged={load} /> : (
+      {view === "bundling" ? <BundlingPanel isAdmin={isAdmin} onChanged={load} channels={channels} pricingTarget={target} /> : (
       <>
       <div className="flex rounded-xl border border-input overflow-hidden w-fit" data-testid="price-tab">
         <button onClick={() => setTab("normal")} data-testid="price-tab-normal"
@@ -224,7 +225,7 @@ export default function DaftarHarga() {
       </>
       )}
 
-      {suggestOpen && <SuggestPricePanel products={sorted} channels={channels} defaultMode={target.mode} defaultValue={target.value} onClose={() => setSuggestOpen(false)} onApplied={() => { setSuggestOpen(false); load(); }} />}
+      {suggestOpen && <SuggestPricePanel products={sorted} channels={channels} pricingTarget={target} onClose={() => setSuggestOpen(false)} onApplied={() => { setSuggestOpen(false); load(); }} />}
 
       {modal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
