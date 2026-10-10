@@ -235,3 +235,8 @@ Aplikasi laporan penjualan sederhana untuk bisnis toko pertanian: laporan harian
 ## Backlog
 - P1: Set WEBHOOK_CRON_SECRET; migrate old data if a source exists.
 - P2: Print bundle list, bulk "Isi Harga Saran" for bundles, one-click price fix from dashboard, suggested-price column in exports.
+
+## Implemented (2026-06) — Stok Opname manual & multi-produk
+- Input Opname: product typed manually (name/SKU search with suggestions, Enter to add).
+- Multi-product session: add many products, stok fisik + alasan per row, live selisih, one shared note, save all at once.
+- Backend: POST /api/stok-opname/bulk (validates all first: empty/duplicate/negative/unknown → no partial writes; shared session_id). Tested iter 28: 100%.
