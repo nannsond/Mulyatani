@@ -112,7 +112,7 @@ export function OpnameSessionForm({ products, onSaved }) {
       <h3 className="font-heading font-semibold text-lg text-[#0F281E] flex items-center gap-2">
         <ClipboardCheck className="w-5 h-5" /> Input Opname
         {rows.length > 0 && <span className="ml-auto text-xs font-medium px-2 py-1 rounded-lg bg-secondary" data-testid="opname-session-count">{rows.filter((r) => r.stok_fisik !== "").length}/{rows.length} dihitung</span>}
-        {rows.length > 0 && <button type="button" onClick={() => setRows([])} data-testid="opname-session-clear" className="text-xs text-red-500 hover:underline">Kosongkan</button>}
+        {rows.length > 0 && <button type="button" onClick={() => { setRows([]); setNote(""); }} data-testid="opname-session-clear" className="text-xs text-red-500 hover:underline">Kosongkan</button>}
       </h3>
       <div>
         <label className="text-sm font-medium">Tambah Produk</label>

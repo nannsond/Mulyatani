@@ -1,0 +1,22 @@
+{
+  "summary": "Tested Simpan Draf Opname (autosave/restore/per-user/empty-deletes) and Isi Sama Sistem (Sama button fills system stock, selisih=Sesuai, button green). Backend: 7/7 pytest passed. Frontend: full UI flow via Playwright passed (login admin -> add category -> note autosave -> draft-status visible -> Sama fills fisik=stok and turns green with 'Sesuai' badge -> reload restores rows+note+fisik -> Kosongkan clears rows -> clearing note+empty items deletes draft confirmed by second reload).",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_opname_draft_iter31.py",
+    "/app/test_reports/pytest/iter31.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "Draft autosave debounce (700ms) is per keystroke but a route-away before timeout may skip final save; consider flush on unmount/visibilitychange.",
+    "GET /api/stok-opname/draft returns updated_at:None when empty; FE guards with rows.length>0 for status chip - OK, no action.",
+    "Per-user isolation enforced via user_id filter in opname_drafts collection - verified."
+  ],
+  "updated_files": ["/app/backend/tests/test_opname_draft_iter31.py"],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "test_credentials": "Admin nannsond@gmail.com/admin123, Kasir kasir@tokotani.com/kasir123",
+  "seed_data_creation": "Bulk opname test created rows that were deleted afterwards; drafts for both users cleared at end.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Both features (Simpan Draf Opname + Isi Sama Sistem) verified end-to-end. Test file /app/backend/tests/test_opname_draft_iter31.py is reusable regression. Login endpoint returns 'token' (not 'access_token')."
+}
