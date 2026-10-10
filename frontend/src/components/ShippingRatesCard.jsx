@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { api, apiError } from "@/lib/api";
 import { Truck, Plus, Trash2, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import PlatformLogisticsTable from "@/components/PlatformLogisticsTable";
 
 const inputCls = "px-3 py-2 rounded-xl border border-input text-sm focus:outline-none focus:ring-2 focus:ring-[#1B5E3B]";
 
@@ -9,7 +10,8 @@ export default function ShippingRatesCard() {
   const [rates, setRates] = useState([]);
   const [minKg, setMinKg] = useState(1);
   const [saving, setSaving] = useState(false);
-  useEffect(() => { api.get("/shipping/rates").then(({ data }) => { setRates(data.rates); setMinKg(data.min_kg); }); }, []);
+  const [tables, setTables] = useState({});
+  useEffect(() => { api.get("/shipping/rates").then(({ data }) => { setRates(data.rates); setMinKg(data.min_kg); setTables(data.platform_tables || {}); }); }, []);
 
   const update = (i, patch) => setRates(rates.map((r, j) => (j === i ? { ...r, ...patch } : r)));
   const save = async () => {
@@ -26,7 +28,7 @@ export default function ShippingRatesCard() {
     <div className="bg-card rounded-2xl border border-slate-200 p-6 space-y-4" data-testid="shipping-rates-card">
       <div>
         <h3 className="font-heading font-semibold text-lg text-[#0F281E] flex items-center gap-2"><Truck className="w-5 h-5 text-[#1B5E3B]" /> Tarif Ongkir per Daerah</h3>
-        <p className="text-sm text-muted-foreground mt-1">Dipakai untuk estimasi ongkir penjualan online: berat total (dibulatkan ke atas per kg) × tarif daerah. Ongkir final diisi saat dana dari platform cair.</p>
+        <p className="text-sm text-muted-foreground mt-1">Dipakai untuk estimasi ongkir channel tanpa tabel platform: berat total (dibulatkan ke atas per kg) × tarif daerah. Ongkir final diisi saat dana dari platform cair.</p>
       </div>
       <div className="space-y-2">
         {rates.length === 0 && <p className="text-sm text-muted-foreground">Belum ada tarif daerah.</p>}
@@ -47,6 +49,7 @@ export default function ShippingRatesCard() {
           {saving && <Loader2 className="w-4 h-4 animate-spin" />} Simpan Tarif
         </button>
       </div>
+      {Object.entries(tables).map(([ch, t]) => <PlatformLogisticsTable key={ch} channel={ch} table={t} />)}
     </div>
   );
 }

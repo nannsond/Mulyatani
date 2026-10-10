@@ -19,6 +19,7 @@ import bcrypt
 import uuid
 import requests
 import re
+import json
 from fastapi.responses import JSONResponse
 from bson.errors import InvalidId
 
@@ -1324,7 +1325,8 @@ class ShippingRatesInput(BaseModel):
 @api_router.get("/shipping/rates")
 async def get_shipping_rates(user: dict = Depends(get_current_user)):
     s = await db.settings.find_one({"key": "shipping_rates"}) or {}
-    return {"rates": s.get("rates", []), "min_kg": s.get("min_kg", 1)}
+    pl = await db.settings.find_one({"key": "platform_logistics"}) or {}
+    return {"rates": s.get("rates", []), "min_kg": s.get("min_kg", 1), "platform_tables": pl.get("tables", {})}
 
 @api_router.post("/shipping/rates")
 async def set_shipping_rates(data: ShippingRatesInput, admin: dict = Depends(require_admin)):
@@ -2031,6 +2033,10 @@ async def seed():
     if not await db.settings.find_one({"key": "channels"}):
         await db.settings.update_one({"key": "channels"}, {"$set": {"list": [dict(c) for c in DEFAULT_CHANNELS]}}, upsert=True)
     await db.ecommerce_sales.update_many({"status": {"$exists": False}}, {"$set": {"status": "Selesai"}})
+
+    if not await db.settings.find_one({"key": "platform_logistics"}):
+        with open(ROOT_DIR / "logistics_tiktok.json", encoding="utf-8") as f:
+            await db.settings.insert_one({"key": "platform_logistics", "tables": {"TikTok Shop": json.load(f)}})
 
     if not await db.settings.find_one({"key": "migr_ongkir_fees"}):
         ch = await db.settings.find_one({"key": "channels"})

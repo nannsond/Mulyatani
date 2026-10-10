@@ -9,6 +9,23 @@ export const estimateOngkir = (berat, rate, minKg) => {
   return Math.ceil(Math.max(berat, Number(minKg) || 0)) * (Number(rate.tarif_per_kg) || 0);
 };
 
+const tierIndex = (berat) => (berat <= 1 ? 0 : Math.min(5, Math.ceil(berat - 1e-9) - 1));
+export const routeLabel = (r) => `${r.zona_a} ↔ ${r.zona_b}`;
+
+export function estimateFor(shipping, channel, sel, berat, hasItems) {
+  const table = shipping.platform_tables?.[channel];
+  if (table) {
+    const svc = table.services.find((x) => x.name === sel.layanan);
+    const route = svc?.routes.find((r) => routeLabel(r) === sel.rute);
+    if (!route || !hasItems) return { fee: 0, label: "", table };
+    const tier = tierIndex(berat);
+    const fee = route.fees[tier];
+    return { fee: fee || 0, na: fee == null, tier: table.tiers[tier], label: `${svc.name} · ${sel.rute}`, table };
+  }
+  const rate = shipping.rates.find((r) => r.daerah === sel.daerah);
+  return { fee: estimateOngkir(berat, rate, shipping.min_kg), label: sel.daerah };
+}
+
 export function OngkirCell({ sale, isAdmin, onSaved }) {
   const [editing, setEditing] = useState(false);
   const [val, setVal] = useState("");

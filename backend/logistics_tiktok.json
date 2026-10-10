@@ -1,0 +1,548 @@
+{
+ "tiers": [
+  "0.00 - 1.00 kg",
+  "1.01 - 2.00 kg",
+  "2.01 - 3.00 kg",
+  "3.01 - 4.00 kg",
+  "4.01 - 5.00 kg",
+  "> 5.00 kg"
+ ],
+ "services": [
+  {
+   "name": "Standar",
+   "routes": [
+    {
+     "zona_a": "Jawa",
+     "zona_b": "Jawa (Jakarta)",
+     "fees": [
+      690,
+      890,
+      1620,
+      2220,
+      2730,
+      4350
+     ]
+    },
+    {
+     "zona_a": "Jawa",
+     "zona_b": "Jawa (Selain Jakarta)",
+     "fees": [
+      990,
+      1090,
+      2220,
+      3030,
+      3540,
+      5060
+     ]
+    },
+    {
+     "zona_a": "Jawa",
+     "zona_b": "Bali",
+     "fees": [
+      1720,
+      2220,
+      4150,
+      5060,
+      5060,
+      5060
+     ]
+    },
+    {
+     "zona_a": "Jawa",
+     "zona_b": "Nusa Tenggara",
+     "fees": [
+      2930,
+      3640,
+      5060,
+      5060,
+      5060,
+      5060
+     ]
+    },
+    {
+     "zona_a": "Jawa",
+     "zona_b": "Sumatera",
+     "fees": [
+      2830,
+      3330,
+      5060,
+      5060,
+      5060,
+      5060
+     ]
+    },
+    {
+     "zona_a": "Jawa",
+     "zona_b": "Sulawesi",
+     "fees": [
+      3940,
+      4850,
+      5060,
+      5060,
+      5060,
+      5060
+     ]
+    },
+    {
+     "zona_a": "Jawa",
+     "zona_b": "Kalimantan",
+     "fees": [
+      3440,
+      4150,
+      5060,
+      5060,
+      5060,
+      5060
+     ]
+    },
+    {
+     "zona_a": "Jawa",
+     "zona_b": "Papua & Maluku",
+     "fees": [
+      5060,
+      5060,
+      5060,
+      5060,
+      5060,
+      5060
+     ]
+    },
+    {
+     "zona_a": "Sumatra",
+     "zona_b": "Sumatra",
+     "fees": [
+      750,
+      1090,
+      1880,
+      3220,
+      4660,
+      4720
+     ]
+    },
+    {
+     "zona_a": "Bali",
+     "zona_b": "Bali",
+     "fees": [
+      540,
+      680,
+      1340,
+      3260,
+      4210,
+      4210
+     ]
+    },
+    {
+     "zona_a": "Sulawesi",
+     "zona_b": "Sulawesi",
+     "fees": [
+      760,
+      1170,
+      2130,
+      4010,
+      4010,
+      4010
+     ]
+    },
+    {
+     "zona_a": "Kalimantan",
+     "zona_b": "Kalimantan",
+     "fees": [
+      760,
+      1170,
+      2130,
+      4010,
+      4010,
+      4010
+     ]
+    },
+    {
+     "zona_a": "Luar Jawa Lainnya",
+     "zona_b": "Luar Jawa Lainnya",
+     "fees": [
+      2020,
+      2530,
+      3840,
+      4950,
+      5060,
+      5060
+     ]
+    }
+   ]
+  },
+  {
+   "name": "Ekonomi",
+   "routes": [
+    {
+     "zona_a": "Jawa",
+     "zona_b": "Jawa (Jakarta)",
+     "fees": [
+      null,
+      null,
+      null,
+      null,
+      null,
+      null
+     ]
+    },
+    {
+     "zona_a": "Jawa",
+     "zona_b": "Jawa (Selain Jakarta)",
+     "fees": [
+      null,
+      null,
+      null,
+      null,
+      null,
+      null
+     ]
+    },
+    {
+     "zona_a": "Jawa",
+     "zona_b": "Bali",
+     "fees": [
+      1420,
+      1920,
+      3440,
+      4850,
+      5060,
+      5060
+     ]
+    },
+    {
+     "zona_a": "Jawa",
+     "zona_b": "Nusa Tenggara",
+     "fees": [
+      2430,
+      3030,
+      5060,
+      5060,
+      5060,
+      5060
+     ]
+    },
+    {
+     "zona_a": "Jawa",
+     "zona_b": "Sumatera",
+     "fees": [
+      1920,
+      2330,
+      3940,
+      5060,
+      5060,
+      5060
+     ]
+    },
+    {
+     "zona_a": "Jawa",
+     "zona_b": "Sulawesi",
+     "fees": [
+      3540,
+      4250,
+      5060,
+      5060,
+      5060,
+      5060
+     ]
+    },
+    {
+     "zona_a": "Jawa",
+     "zona_b": "Kalimantan",
+     "fees": [
+      3130,
+      3640,
+      5060,
+      5060,
+      5060,
+      5060
+     ]
+    },
+    {
+     "zona_a": "Jawa",
+     "zona_b": "Papua & Maluku",
+     "fees": [
+      3540,
+      4250,
+      5060,
+      5060,
+      5060,
+      5060
+     ]
+    },
+    {
+     "zona_a": "Luar Jawa",
+     "zona_b": "Luar Jawa",
+     "fees": [
+      2020,
+      2530,
+      3840,
+      4950,
+      5060,
+      5060
+     ]
+    }
+   ]
+  },
+  {
+   "name": "Kargo",
+   "routes": [
+    {
+     "zona_a": "Jawa",
+     "zona_b": "Jawa (Jakarta)",
+     "fees": [
+      null,
+      null,
+      1420,
+      1520,
+      1520,
+      4850
+     ]
+    },
+    {
+     "zona_a": "Jawa",
+     "zona_b": "Jawa (Selain Jakarta)",
+     "fees": [
+      null,
+      null,
+      1420,
+      1420,
+      1520,
+      4550
+     ]
+    },
+    {
+     "zona_a": "Jawa",
+     "zona_b": "Bali",
+     "fees": [
+      null,
+      null,
+      3940,
+      4250,
+      4350,
+      5060
+     ]
+    },
+    {
+     "zona_a": "Jawa",
+     "zona_b": "Nusa Tenggara",
+     "fees": [
+      null,
+      null,
+      5060,
+      5060,
+      5060,
+      5060
+     ]
+    },
+    {
+     "zona_a": "Jawa",
+     "zona_b": "Sumatera",
+     "fees": [
+      null,
+      null,
+      3940,
+      4040,
+      4150,
+      5060
+     ]
+    },
+    {
+     "zona_a": "Jawa",
+     "zona_b": "Sulawesi",
+     "fees": [
+      null,
+      null,
+      5060,
+      5060,
+      5060,
+      5060
+     ]
+    },
+    {
+     "zona_a": "Jawa",
+     "zona_b": "Kalimantan",
+     "fees": [
+      null,
+      null,
+      5060,
+      5060,
+      5060,
+      5060
+     ]
+    },
+    {
+     "zona_a": "Jawa",
+     "zona_b": "Papua & Maluku",
+     "fees": [
+      null,
+      null,
+      5060,
+      5060,
+      5060,
+      5060
+     ]
+    },
+    {
+     "zona_a": "Sumatra",
+     "zona_b": "Sumatra",
+     "fees": [
+      null,
+      null,
+      2240,
+      2460,
+      2460,
+      4300
+     ]
+    },
+    {
+     "zona_a": "Bali",
+     "zona_b": "Bali",
+     "fees": [
+      null,
+      null,
+      630,
+      740,
+      810,
+      1500
+     ]
+    },
+    {
+     "zona_a": "Sulawesi",
+     "zona_b": "Sulawesi",
+     "fees": [
+      null,
+      null,
+      2240,
+      2460,
+      2460,
+      4300
+     ]
+    },
+    {
+     "zona_a": "Kalimantan",
+     "zona_b": "Kalimantan",
+     "fees": [
+      null,
+      null,
+      2240,
+      2460,
+      2460,
+      4300
+     ]
+    },
+    {
+     "zona_a": "Luar Jawa Lainnya",
+     "zona_b": "Luar Jawa Lainnya",
+     "fees": [
+      null,
+      null,
+      2930,
+      3340,
+      3340,
+      5060
+     ]
+    }
+   ]
+  },
+  {
+   "name": "Instan & Sameday",
+   "routes": [
+    {
+     "zona_a": "Jawa (Jakarta)",
+     "zona_b": "Semua jarak",
+     "fees": [
+      2020,
+      2020,
+      2020,
+      2020,
+      2020,
+      2020
+     ]
+    },
+    {
+     "zona_a": "Jawa (Selain Jakarta)",
+     "zona_b": "Semua jarak",
+     "fees": [
+      3030,
+      3030,
+      3030,
+      3030,
+      3030,
+      3030
+     ]
+    },
+    {
+     "zona_a": "Bali",
+     "zona_b": "Semua jarak",
+     "fees": [
+      2120,
+      2120,
+      2120,
+      2120,
+      2120,
+      2120
+     ]
+    },
+    {
+     "zona_a": "Nusa Tenggara",
+     "zona_b": "Semua jarak",
+     "fees": [
+      1720,
+      1720,
+      1720,
+      1720,
+      1720,
+      1720
+     ]
+    },
+    {
+     "zona_a": "Sumatera",
+     "zona_b": "Semua jarak",
+     "fees": [
+      2020,
+      2020,
+      2020,
+      2020,
+      2020,
+      2020
+     ]
+    },
+    {
+     "zona_a": "Sulawesi",
+     "zona_b": "Semua jarak",
+     "fees": [
+      1720,
+      1720,
+      1720,
+      1720,
+      1720,
+      1720
+     ]
+    },
+    {
+     "zona_a": "Kalimantan",
+     "zona_b": "Semua jarak",
+     "fees": [
+      1920,
+      1920,
+      1920,
+      1920,
+      1920,
+      1920
+     ]
+    },
+    {
+     "zona_a": "Papua & Maluku",
+     "zona_b": "Semua jarak",
+     "fees": [
+      1820,
+      1820,
+      1820,
+      1820,
+      1820,
+      1820
+     ]
+    }
+   ]
+  }
+ ]
+}
