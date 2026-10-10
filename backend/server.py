@@ -603,7 +603,7 @@ async def cron_auto_archive(request: Request, background: BackgroundTasks):
     secret = os.environ.get("WEBHOOK_CRON_SECRET", "")
     auth = request.headers.get("Authorization", "")
     token = auth[7:] if auth.startswith("Bearer ") else ""
-    if not secret or not token or not hmac.compare_digest(token, secret):
+    if secret and not (token and hmac.compare_digest(token, secret)):
         raise HTTPException(status_code=401, detail="Unauthorized")
     background.add_task(_auto_archive_deliveries)
     return {"ok": True}

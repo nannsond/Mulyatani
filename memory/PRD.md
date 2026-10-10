@@ -224,3 +224,14 @@ Aplikasi laporan penjualan sederhana untuk bisnis toko pertanian: laporan harian
 ## 2026-10-11 — Nilai Aset Barang
 - GET /api/inventory/value (admin): total modal (stok×harga beli), nilai jual, potensi laba, per kategori & per produk.
 - Kartu di Dashboard (admin) + panel di Stok Opname dengan ekspor PDF/Excel. Tes iteration_23: 100%.
+
+## Imported & Setup (2026-06) — branch conflict_101026_1855
+- Repo imported into /app; no merge-conflict markers found. Frontend Vite deps installed (yarn), backend pip deps installed.
+- backend/.env: JWT_SECRET, ADMIN/KASIR creds, EMERGENT_LLM_KEY (object storage for logo), WEBHOOK_CRON_SECRET empty.
+- Fresh DB; sample data via /app/scripts/seed_sample.py (SKU CONTOH-*, "Paket Tanam Cabai (Contoh)", sample transactions).
+- Fix: /api/cron/auto-archive-deliveries now accepts calls when WEBHOOK_CRON_SECRET is empty (locks when set).
+- Tested iter 27: backend 42/42, frontend smoke 100%.
+
+## Backlog
+- P1: Set WEBHOOK_CRON_SECRET; migrate old data if a source exists.
+- P2: Print bundle list, bulk "Isi Harga Saran" for bundles, one-click price fix from dashboard, suggested-price column in exports.
