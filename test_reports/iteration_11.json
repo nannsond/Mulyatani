@@ -1,0 +1,32 @@
+{
+  "summary": "Iter 11 (payroll archive + attendance status Hadir/Izin/Sakit/Alpha + admin mark) tested. Backend: 13/13 pytest tests pass (POST /payroll/archive admin ok + archived count, kasir 403, GET /payroll/archives list sorted desc with month/total/count, kasir 403, report shows edited=true post-archive; POST /attendance/mark admin-marks-other, kasir self allowed, kasir mark-other 403, invalid status 400, Izin clears check_in/out; recap includes hadir/telat/izin/sakit/alpha/total_menit; payroll hadir/telat counts only status=Hadir, Izin/Sakit excluded). Frontend: on /rekap-gaji payroll-archive-button archives + toast; payroll-archives card lists archived months; payroll-archive-2026-10 click sets month filter; recap columns Hadir/Telat/Izin/Sakit/Alpha/Total Jam present with badges Izin/Sakit/Alpha in detail; admin attendance-mark-card submits (mark-employee-select, mark-date-input, mark-status-select, mark-submit-button) and refreshes recap; kasir sees attendance-izin-button + attendance-sakit-button when no record for today.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "Kehadiran today card (self Izin/Sakit)", "issue": "TIMEZONE BUG: Frontend todayStr() uses new Date().toISOString().slice(0,10) which returns UTC date, while backend /attendance/today uses WIB (UTC+7). When UTC day != WIB day (e.g. during ~17:00-23:59 UTC), markSelf posts {date: UTC-date} but /attendance/today looks up WIB-date → mismatch. Result: after clicking Izin/Sakit the detail list gets the record (loadList uses month only) but attendance-today-status badge never shows; the Absen Masuk + Izin + Sakit buttons remain visible. Reproduced live: kasir, pod WIB=2026-10-09 00:04, UTC=2026-10-08 17:04 — clicked attendance-izin-button, detail table shows '08 Okt 2026 Izin' but today card still shows the three buttons. Same bug affects: Absensi Hari Ini date header (shows UTC date, not WIB), admin mark.date default, admin check-in guard (loadToday returns null so Absen Masuk + Izin + Sakit always available on days where UTC lags WIB).", "selector": "attendance-today-status / attendance-izin-button", "priority": "HIGH"}
+    ],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter11_archive_attendance.py",
+    "/app/test_reports/pytest/iter11.xml"
+  ],
+  "action_items": [
+    "Fix timezone bug in /app/frontend/src/lib/format.js: todayStr() should return WIB date (UTC+7) to match backend wib_now(). E.g. `new Date(Date.now() + 7*3600*1000).toISOString().slice(0,10)` or use Intl.DateTimeFormat with Asia/Jakarta.",
+    "After fix, verify (a) attendance-today-status badge appears after clicking Izin/Sakit when UTC/WIB days differ; (b) Absensi Hari Ini header shows WIB date; (c) admin mark-date-input defaults to WIB today."
+  ],
+  "critical_code_review_comments": [
+    "Frontend todayStr() uses UTC — should match backend WIB. Any screen that compares a client-generated date to backend WIB (checkin guard, markSelf, admin mark default, 'Absensi Hari Ini' header) is broken near UTC midnight.",
+    "Payroll archive uses the same payroll override collection as per-row saves, so an archived month is visually indistinguishable from a per-row edit — correct per spec; but there is no 'un-archive' bulk action, individual rows need the existing reset button per employee.",
+    "server.py now 1358 lines; still worth splitting into routers (noted iter 10)."
+  ],
+  "updated_files": ["/app/backend/tests/test_iter11_archive_attendance.py"],
+  "success_rate": {"backend": "100%", "frontend": "90%"},
+  "test_credentials": "Admin nannsond@gmail.com / T0k0Mulya#Tani2026; Kasir kasir@tokotani.com / Kasir#Mulya2026",
+  "seed_data_creation": "Added attendance records for 2026-10 month during tests: admin-marked kasir Izin on 2026-10-15 and 2026-10-19, kasir self Sakit on 2026-10-17, kasir self Izin on 2026-10-08 (today, via UI test), admin-marked employee Alpha on 2026-10-22. Also re-archived 2026-10 payroll (idempotent upsert).",
+  "retest_needed": true,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "All iter 11 backend endpoints verified. The only outstanding issue is the UTC vs WIB mismatch in frontend todayStr() — once fixed, re-verify kasir self Izin/Sakit flow shows attendance-today-status badge. Note: duplicate-named users ('Pemilik Toko', 'Kasir Toko') still exist (iter 10 note); payroll row count may differ from recap count by user_name, use user_id when correlating.",
+  "rca of the issue": "RCA: Frontend `todayStr()` in /app/frontend/src/lib/format.js uses JavaScript's `new Date().toISOString().slice(0,10)` which returns the UTC-based date. Backend uses `wib_now()` (Asia/Jakarta, UTC+7). During the window 17:00-23:59 UTC (00:00-06:59 WIB next day), UTC-date is 1 day behind WIB-date. The /attendance/today handler queries by backend WIB date, but the frontend posts /attendance/mark with UTC date and renders the 'Absensi Hari Ini' header using UTC date. Result: the mark is stored on UTC date, /attendance/today (WIB date) returns null, UI never shows the status badge. Repro: set system such that UTC and WIB fall on different days (as in current pod: UTC=2026-10-08 17:04, WIB=2026-10-09 00:04), login kasir, go to /kehadiran, click Izin — detail list shows new row for UTC date but today card still shows Absen Masuk + Izin + Sakit. Fix: in format.js change todayStr to produce WIB date, e.g. `const d = new Date(Date.now()+7*3600*1000); return d.toISOString().slice(0,10);` (or use Intl API with timeZone: 'Asia/Jakarta')."
+}

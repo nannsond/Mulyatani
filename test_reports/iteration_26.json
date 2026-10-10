@@ -1,0 +1,22 @@
+{
+  "summary": "Verified Paket Bundling view redesigned to match Produk Satuan (table-based). Tabs bundle-price-tab-normal/reseller/online, bundle-search-input, bundle-sort-select, bundle-export-pdf/excel, bundle-add-trigger (admin only) all present. Table columns Normal tab: Nama Paket, Modal, Harga Normal, Harga Reseller, Harga Online, Stok, Aksi. Online tab additionally renders per-channel columns (Shopee, Tokopedia, Lazada, TikTok Shop) with bundle-channel-price-{id}-{slug} cell showing price or '= online' italic, 'bersih Rp..' and bundle-saran-{id}-{slug} saran computed using Paket category target. BundleModal verified: bundle-name-input, bundle-add-comp-select, bundle-comp-qty-0, bundle-modal-cost = Rp 104.000 (2×52.000 Pupuk Urea), bundle-harga-input/reseller/online, bundle-suggest-target-mode/value prefilled from Paket (15%), bundle-channel-price-{shopee|tokopedia|lazada|tiktok-shop}, bundle-suggest-fill filled all 4 channel prices (Shopee 137.400, Tokopedia 135.100, Lazada 134.300, TikTok 153.000). bundle-save-button creates bundle; reopening edit shows saved channel prices intact. Backend POST/PUT /api/bundles accept harga_channel map and drop zero values; GET /api/bundles returns harga_channel. Penjualan Online renders ecom-product-{bundle_id} and ecom-saran-{bundle_id}. Dashboard price-warning-card renders for admin. Kasir correctly sees bundling table WITHOUT Aksi column and without bundle-add-trigger/edit/delete/reduce testids. Search filters bundles (bundle-empty shown). Hemat badge bundle-hemat-{id} shown. Reduce stock prompt works and deletes work (TEST bundle cleaned up).",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": ["/app/backend/tests/test_iter26_bundle_channel.py", "/app/test_reports/pytest/iter26.xml"],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "BundlingPanel.jsx uses colSpan={8 + (isOnline ? channels.length : 0)} for the empty state row - that number should also subtract 1 when !isAdmin (no Aksi col). Minor cosmetic only (visible when zero bundles)."
+  ],
+  "updated_files": ["/app/backend/tests/test_iter26_bundle_channel.py"],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "test_credentials": "Admin nannsond@gmail.com/admin123, Kasir kasir@tokotani.com/kasir123",
+  "seed_data_creation": "Created a TEST_UI_Paket bundle during the UI run and deleted it at the end. Backend test creates TEST_IT26_A/B products and TEST_IT26_Bundle, all cleaned up in teardown.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Iteration 26 Paket Bundling table UI fully verified E2E. Backend bundle schema confirmed: harga_jual, harga_reseller, harga_online, harga_channel (dict, zero values dropped), components. Note: POST /api/bundles returns only {ok, id} - verify via subsequent GET /api/bundles. Login uses 'token' key, not 'access_token'. Product POST requires 'sku' field.",
+  "rca of the issue": "N/A - no issues found."
+}

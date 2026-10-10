@@ -1,0 +1,53 @@
+{
+  "summary": "Tested iteration 4 features: (A) Dua harga (Normal & Reseller) on products + Daftar Harga tabs + POS mode toggle + export, (B) Info Toko settings + receipt, (C) Detail Transaksi modal in Riwayat, (D) Laba per Kategori in monthly/yearly, (E) Ekspor Riwayat (PDF/Excel), plus regression (admin & kasir login, role gating, sidebar logo). 7/7 new backend pytest cases pass. All frontend testids and flows verified end-to-end. SettingsContext refresh-after-login bug reported in iter-3 is FIXED (verified: logged in fresh and Info Toko fields populated without reload).",
+  "tested_scope": ["backend", "frontend", "auth", "rbac", "integration", "regression"],
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "passed": [
+    "GET /api/products returns harga_jual + harga_reseller for all products (seed backfill harga_reseller = round(harga_jual*0.9))",
+    "POST /api/products persists harga_reseller; PUT updates it; GET verifies persistence",
+    "POST /api/settings/info admin -> 200; GET /api/settings returns store_name/address/phone",
+    "POST /api/settings/info kasir -> 403",
+    "GET /api/reports/monthly?year=2026&month=10 returns category_laba list with {category,omzet,laba} (5 categories)",
+    "GET /api/reports/yearly?year=2026 returns category_laba list (5 categories)",
+    "POST /api/transactions with reseller price persists it (items[0].harga == reseller price), no mongo _id leak",
+    "Frontend Daftar Harga: price-tab-normal + price-tab-reseller visible; tab switch highlights column; export-pdf-button + export-excel-button fire without JS error",
+    "Frontend DaftarHarga add-modal has product-harga-reseller-input",
+    "Frontend POS: pos-price-normal + pos-price-reseller toggles; product card prices update on switch; cart item price updates when toggling mode (Rp 110.000 -> Rp 99.000 for first product)",
+    "Frontend Riwayat: 100 rows list; riwayat-detail-<id> opens riwayat-detail-modal with detail-item-<idx> entries; riwayat-detail-print clicks without JS error; riwayat-detail-close dismisses modal; export-pdf-button + export-excel-button fire without JS error",
+    "Frontend Laporan Bulanan: category-laba renders with 5 category-laba-row-<cat> rows; product-laba also present",
+    "Frontend Laporan Tahunan: category-laba renders with 5 rows; product-laba also present",
+    "Frontend Pengaturan: info-store-name-input, info-address-input, info-phone-input preload from GET /api/settings (confirming SettingsContext fix from iter-3); info-save-button -> toast Info toko disimpan + settings refetch",
+    "Regression: kasir login OK; nav-pengaturan and nav-kelola-kasir hidden; nav-pos/nav-riwayat/nav-laporan-* visible; product-add-modal-trigger hidden on Daftar Harga for kasir; sidebar-logo renders immediately after kasir login (no reload needed)"
+  ],
+  "test_report_links": [
+    "/app/backend/tests/test_iter4_features.py",
+    "/app/backend/tests/test_iter3_features.py",
+    "/app/backend/tests/test_new_features.py",
+    "/app/test_reports/pytest/iteration4.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "server.py gen_invoice() still uses count+1 which is race-prone under concurrent checkout. Low risk in single-register scenario; consider atomic counter collection or ULID.",
+    "server.py: no auth on GET /api/settings/logo (public by design per spec) - OK; but POST /api/settings/info uses require_admin while GET /api/settings only requires any auth, so kasir sees store info - acceptable (kasir needs it for receipt).",
+    "SettingsContext now depends on useAuth().user - FIXED. Note: when logging out (user becomes null), settings are reset which is correct.",
+    "backend/server.py Product list uses .to_list(1000) and seed uses .to_list(1000) - fine for current scale but hardcoded limits should be configurable.",
+    "exporter.js printReceipt uses img.crossOrigin='anonymous' then draws onto a canvas and calls toDataURL - will throw if backend omits CORS on image response. /api/settings/logo currently works via wildcard CORS - OK, but relies on it.",
+    "frontend DaftarHarga form uses required on all number fields; when editing an existing product that was seeded before harga_reseller existed, the backend seed migration already backfills so no NaN risk."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter4_features.py",
+    "/app/test_reports/iteration_4.json"
+  ],
+  "success_rate": {"backend": "100% (7/7 new + prior suites still green)", "frontend": "100% of iter-4 flows"},
+  "test_credentials": "Admin nannsond@gmail.com/admin123; Kasir kasir@tokotani.com/kasir123",
+  "seed_data_creation": "Pytest briefly created TEST-<uuid> product with harga_reseller=1800/1700 then deleted it. Pytest also set Info Toko to 'Toko Pe-i Mulya Tani Caruban' / 'Jl. Raya Caruban No. 123, Madiun' / '0812-3456-7890' (also matches the UI test save). One extra reseller-priced transaction was created via POST /api/transactions during TestPOSResellerCheckout; it decrements stock on the chosen product.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "All iter-1..4 features green. Backend regression suites: /app/backend/tests/test_new_features.py (iter-2), test_iter3_features.py (14), test_iter4_features.py (7). Frontend routes use path '/laporan/bulanan' and '/laporan/tahunan' (slash, not hyphen). SettingsContext refetches on auth user change (fixes iter-3 integration bug). gen_invoice race condition remains an untouched code-review item.",
+  "rca of the issue": "No open issues this iteration."
+}
