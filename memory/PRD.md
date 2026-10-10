@@ -241,3 +241,4 @@ Aplikasi laporan penjualan sederhana untuk bisnis toko pertanian: laporan harian
 - Multi-product session: add many products, stok fisik + alasan per row, live selisih, one shared note, save all at once.
 - Backend: POST /api/stok-opname/bulk (validates all first: empty/duplicate/negative/unknown → no partial writes; shared session_id). Tested iter 28: 100%.
 - Riwayat Stok Opname: flat table (session grouping removed per user), per-row delete for admin (DELETE /api/stok-opname/{id}, stock unchanged), month filter (default current month + Semua Bulan) with summary counts; PDF/Excel export follows filter. Tested iter 29: 100%.
+- Stok Opname panel renamed 'Stok Barang': only stock shown (Harga Beli, Nilai Modal, Nilai Jual, Potensi Laba, rupiah per category removed from UI & export).
