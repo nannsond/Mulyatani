@@ -246,3 +246,10 @@ Aplikasi laporan penjualan sederhana untuk bisnis toko pertanian: laporan harian
 - Kasir can now see Stok Barang panel on Stok Opname; GET /api/inventory/value open to all logged-in users but money fields (harga_beli/jual, nilai_modal/jual, potensi_laba) stripped for non-admin.
 - Opname per kategori: category select + 'Tambah Semua' loads all products of a category into the session (skips existing); counter 'x/y dihitung' + 'Kosongkan'. Tested iter 30: 100%.
 - Draf opname autosave per user (GET/PUT /api/stok-opname/draft, collection opname_drafts), restored on reopen; cleared on save/Kosongkan. Per-row 'Sama' button fills stok fisik = sistem. Tested iter 31: 100%.
+
+## Implemented (2026-06) — Ongkir e-commerce per berat & daerah
+- Removed free-shipping fee components (Gratis Ongkir XTRA, Program Xtra, Free Shipping Max) from defaults + one-time migration of saved channel fees.
+- Product field `berat` (kg/unit); bundle berat = sum components.
+- Pengaturan: Tarif Ongkir per Daerah (GET/POST /api/shipping/rates, min_kg).
+- Penjualan Online: daerah select, berat total, estimated ongkir = ceil(max(berat,min_kg)) × tarif (overridable); sale stores daerah, berat_total, ongkir_final=false.
+- Sales table Ongkir column; admin sets final ongkir when funds disburse (PUT /api/ecommerce/sales/{id}/ongkir recalculates total_fee & laba_bersih). Tested iter 32: 100%.
