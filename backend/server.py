@@ -320,6 +320,22 @@ async def login(data: LoginInput):
 async def me(user: dict = Depends(get_current_user)):
     return user
 
+class ChangePasswordInput(BaseModel):
+    current_password: str
+    new_password: str
+
+@api_router.post("/auth/change-password")
+async def change_password(data: ChangePasswordInput, user: dict = Depends(get_current_user)):
+    doc = await db.users.find_one({"_id": ObjectId(user["id"])})
+    if not doc or not verify_password(data.current_password, doc["password_hash"]):
+        raise HTTPException(status_code=400, detail="Password lama salah")
+    if len(data.new_password) < 6:
+        raise HTTPException(status_code=400, detail="Password baru minimal 6 karakter")
+    if data.new_password == data.current_password:
+        raise HTTPException(status_code=400, detail="Password baru harus berbeda dari password lama")
+    await db.users.update_one({"_id": doc["_id"]}, {"$set": {"password_hash": hash_password(data.new_password)}})
+    return {"ok": True}
+
 # ---------------- Product routes ----------------
 @api_router.get("/products")
 async def list_products(user: dict = Depends(get_current_user)):
