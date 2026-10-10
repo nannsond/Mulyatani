@@ -1135,6 +1135,37 @@ async def create_opname(data: OpnameInput, user: dict = Depends(get_current_user
     doc["id"] = str(res.inserted_id); doc.pop("_id", None)
     return doc
 
+class OpnameBulkInput(BaseModel):
+    items: List[OpnameInput]
+
+@api_router.post("/stok-opname/bulk")
+async def create_opname_bulk(data: OpnameBulkInput, user: dict = Depends(get_current_user)):
+    if not data.items:
+        raise HTTPException(status_code=400, detail="Daftar opname kosong")
+    ids = [i.product_id for i in data.items]
+    if len(set(ids)) != len(ids):
+        raise HTTPException(status_code=400, detail="Produk duplikat dalam sesi opname")
+    if any(i.stok_fisik < 0 for i in data.items):
+        raise HTTPException(status_code=400, detail="Stok fisik tidak boleh negatif")
+    prods = {str(p["_id"]): p for p in await db.products.find({"_id": {"$in": [ObjectId(x) for x in ids]}}).to_list(len(ids))}
+    missing = [x for x in ids if x not in prods]
+    if missing:
+        raise HTTPException(status_code=404, detail="Ada produk yang tidak ditemukan")
+    session_id = uuid.uuid4().hex
+    created = now_iso()
+    docs = []
+    for i in data.items:
+        p = prods[i.product_id]
+        docs.append({"product_id": i.product_id, "product_name": p["name"], "sku": p["sku"],
+                     "stok_sistem": p["stok"], "stok_fisik": i.stok_fisik, "selisih": i.stok_fisik - p["stok"],
+                     "alasan": i.alasan, "note": i.note, "user_name": user["name"],
+                     "session_id": session_id, "created_at": created})
+    await db.stok_opname.insert_many(docs)
+    for i in data.items:
+        await db.products.update_one({"_id": ObjectId(i.product_id)}, {"$set": {"stok": i.stok_fisik}})
+    return {"ok": True, "session_id": session_id, "count": len(docs),
+            "sesuai": sum(1 for d in docs if d["selisih"] == 0)}
+
 # ---------------- Penjualan Online (E-commerce) ----------------
 
 class EcomItem(BaseModel):
