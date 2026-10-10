@@ -27,16 +27,23 @@ export default function StokOpname() {
   };
   useEffect(() => { load(); }, []);
 
+  const [query, setQuery] = useState("");
+  const [open, setOpen] = useState(false);
   const selected = products.find((p) => p.id === form.product_id);
+  const q = query.trim().toLowerCase();
+  const matches = q ? products.filter((p) => `${p.name} ${p.sku}`.toLowerCase().includes(q)).slice(0, 20) : [];
   const selisih = selected && form.stok_fisik !== "" ? Number(form.stok_fisik) - selected.stok : null;
 
   const submit = async (e) => {
     e.preventDefault();
-    if (!form.product_id || form.stok_fisik === "") { toast.error("Lengkapi data"); return; }
+    const pid = form.product_id || products.find((p) => p.name.toLowerCase() === q || p.sku.toLowerCase() === q)?.id;
+    if (!pid) { toast.error("Pilih produk dari daftar saran"); return; }
+    if (form.stok_fisik === "") { toast.error("Lengkapi data"); return; }
     try {
-      await api.post("/stok-opname", { product_id: form.product_id, stok_fisik: Number(form.stok_fisik), alasan: form.alasan, note: form.note });
+      await api.post("/stok-opname", { product_id: pid, stok_fisik: Number(form.stok_fisik), alasan: form.alasan, note: form.note });
       toast.success("Stok opname disesuaikan");
       setForm({ product_id: "", stok_fisik: "", alasan: "Penyesuaian", note: "" });
+      setQuery("");
       load();
     } catch (err) { toast.error(apiError(err.response?.data?.detail)); }
   };
@@ -54,11 +61,22 @@ export default function StokOpname() {
         </h3>
         <div>
           <label className="text-sm font-medium">Produk</label>
-          <select value={form.product_id} onChange={(e) => setForm({ ...form, product_id: e.target.value })} data-testid="stok-opname-product-select"
-            className="mt-1 w-full px-3 py-2.5 rounded-xl border border-input text-sm bg-white">
-            <option value="">-- Pilih Produk --</option>
-            {products.map((p) => <option key={p.id} value={p.id}>{`${p.name} (${p.sku})`}</option>)}
-          </select>
+          <div className="relative">
+            <input value={query} data-testid="stok-opname-product-input" placeholder="Ketik nama atau SKU produk"
+              onChange={(e) => { setQuery(e.target.value); setOpen(true); setForm({ ...form, product_id: "" }); }}
+              onFocus={() => setOpen(true)} onBlur={() => setTimeout(() => setOpen(false), 150)}
+              className="mt-1 w-full px-3 py-2.5 rounded-xl border border-input text-sm focus:outline-none focus:ring-2 focus:ring-[#1B5E3B]" />
+            {open && query && !selected && (
+              <div className="absolute z-20 mt-1 w-full max-h-60 overflow-auto bg-white border border-slate-200 rounded-xl shadow-lg" data-testid="stok-opname-product-suggestions">
+                {matches.length === 0 && <div className="px-3 py-2 text-sm text-muted-foreground">Produk tidak ditemukan</div>}
+                {matches.map((p) => (
+                  <button type="button" key={p.id} data-testid={`stok-opname-suggestion-${p.id}`}
+                    onMouseDown={() => { setForm({ ...form, product_id: p.id }); setQuery(`${p.name} (${p.sku})`); setOpen(false); }}
+                    className="w-full text-left px-3 py-2 text-sm hover:bg-secondary">{p.name} <span className="text-muted-foreground">({p.sku})</span></button>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
         {selected && (
           <div className="flex items-center justify-between p-3 rounded-xl bg-secondary/60 text-sm">
