@@ -376,6 +376,7 @@ class BundleInput(BaseModel):
     harga_jual: float = 0
     harga_reseller: float = 0
     harga_online: float = 0
+    harga_channel: Dict[str, float] = {}
     components: List[BundleComponent] = []
 
 class BundleReduce(BaseModel):
@@ -399,7 +400,7 @@ async def _bundle_view(b: dict, pmap: dict) -> dict:
                       "habis": pstok <= 0, "missing": p is None})
     return {"id": str(b["_id"]), "name": b["name"], "category": b.get("category", "Paket"),
             "harga_jual": b.get("harga_jual", 0), "harga_reseller": b.get("harga_reseller", 0),
-            "harga_online": b.get("harga_online", 0), "components": comps,
+            "harga_online": b.get("harga_online", 0), "harga_channel": b.get("harga_channel", {}), "components": comps,
             "stok": max(0, stok or 0), "hpp": hpp, "harga_satuan_total": satuan_total,
             "hemat": max(0, satuan_total - b.get("harga_jual", 0)), "is_bundle": True}
 
@@ -415,6 +416,7 @@ async def create_bundle(data: BundleInput, admin: dict = Depends(require_admin))
         raise HTTPException(status_code=400, detail="Komponen paket tidak boleh kosong")
     doc = {"name": data.name, "category": data.category or "Paket", "harga_jual": data.harga_jual,
            "harga_reseller": data.harga_reseller, "harga_online": data.harga_online,
+           "harga_channel": {k: v for k, v in data.harga_channel.items() if v > 0},
            "components": [c.model_dump() for c in data.components], "created_at": now_iso()}
     res = await db.bundles.insert_one(doc)
     return {"ok": True, "id": str(res.inserted_id)}
@@ -426,6 +428,7 @@ async def update_bundle(bid: str, data: BundleInput, admin: dict = Depends(requi
     r = await db.bundles.update_one({"_id": ObjectId(bid)}, {"$set": {
         "name": data.name, "category": data.category or "Paket", "harga_jual": data.harga_jual,
         "harga_reseller": data.harga_reseller, "harga_online": data.harga_online,
+        "harga_channel": {k: v for k, v in data.harga_channel.items() if v > 0},
         "components": [c.model_dump() for c in data.components]}})
     if r.matched_count == 0:
         raise HTTPException(status_code=404, detail="Paket tidak ditemukan")

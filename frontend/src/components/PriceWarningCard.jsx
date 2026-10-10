@@ -17,7 +17,7 @@ export default function PriceWarningCard() {
 
   const items = [
     ...data.products.map((p) => ({ id: p.id, name: p.name, cost: p.harga_beli, cat: p.category, priceOf: (c) => p.harga_channel?.[c] || p.harga_online || 0 })),
-    ...data.bundles.map((b) => ({ id: b.id, name: `${b.name} (Paket)`, cost: b.hpp, cat: "Paket", priceOf: () => b.harga_online || 0 })),
+    ...data.bundles.map((b) => ({ id: b.id, name: `${b.name} (Paket)`, cost: b.hpp, cat: "Paket", priceOf: (c) => b.harga_channel?.[c] || b.harga_online || 0 })),
   ];
   const warns = items.map((it) => ({
     ...it,

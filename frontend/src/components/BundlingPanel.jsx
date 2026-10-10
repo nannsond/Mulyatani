@@ -1,35 +1,31 @@
 import { useEffect, useState } from "react";
 import { api, apiError } from "@/lib/api";
 import { rupiah } from "@/lib/format";
+import { calcFees, saranOf } from "@/lib/fees";
+import { exportPDF, exportExcel } from "@/lib/exporter";
 import { toast } from "sonner";
-import BundleSaran from "@/components/BundleSaran";
-import { Plus, Pencil, Trash2, X, Boxes, AlertTriangle, PackageMinus, Loader2 } from "lucide-react";
+import { Plus, Pencil, Trash2, Boxes, AlertTriangle, PackageMinus, Loader2, Search, User, Users, ShoppingBag, FileDown, FileSpreadsheet } from "lucide-react";
+import BundleModal from "@/components/BundleModal";
 
-const EMPTY = { name: "", category: "Paket", harga_jual: 0, harga_reseller: 0, harga_online: 0, components: [] };
+const EMPTY = { name: "", category: "Paket", harga_jual: 0, harga_reseller: 0, harga_online: 0, harga_channel: {}, components: [] };
+const slug = (s) => s.replace(/\s+/g, "-").toLowerCase();
+const TABS = [
+  { key: "normal", label: "Harga Normal", icon: User, color: "#1B5E3B" },
+  { key: "reseller", label: "Harga Reseller", icon: Users, color: "#C85A32" },
+  { key: "online", label: "Harga Online", icon: ShoppingBag, color: "#2563EB" },
+];
 
 export default function BundlingPanel({ isAdmin, onChanged, channels = [], pricingTarget }) {
   const [bundles, setBundles] = useState([]);
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [modal, setModal] = useState(null);
+  const [tab, setTab] = useState("normal");
+  const [search, setSearch] = useState("");
+  const [sortBy, setSortBy] = useState("name");
 
-  const load = () => {
-    setLoading(true);
-    return Promise.all([api.get("/bundles"), api.get("/products")]).then(([b, p]) => {
-      setBundles(b.data); setProducts(p.data); setLoading(false);
-    });
-  };
+  const load = () => Promise.all([api.get("/bundles"), api.get("/products")]).then(([b, p]) => { setBundles(b.data); setProducts(p.data); setLoading(false); });
   useEffect(() => { load(); }, []);
-
-  const pName = (id) => products.find((p) => p.id === id)?.name || "";
-  const modalCost = modal ? modal.components.reduce((t, c) => t + (Number(c.qty) || 1) * (products.find((p) => p.id === c.product_id)?.harga_beli || 0), 0) : 0;
-
-  const addComp = (modalState, pid) => {
-    const p = products.find((x) => x.id === pid);
-    if (!p) return modalState;
-    if (modalState.components.some((c) => c.product_id === pid)) return modalState;
-    return { ...modalState, components: [...modalState.components, { product_id: p.id, name: p.name, qty: 1 }] };
-  };
 
   const save = async (e) => {
     e.preventDefault();
@@ -38,7 +34,8 @@ export default function BundlingPanel({ isAdmin, onChanged, channels = [], prici
     const body = {
       name: modal.name, category: modal.category || "Paket", harga_jual: Number(modal.harga_jual) || 0,
       harga_reseller: Number(modal.harga_reseller) || 0, harga_online: Number(modal.harga_online) || 0,
-      components: modal.components.map((c) => ({ product_id: c.product_id, name: pName(c.product_id), qty: Number(c.qty) || 1 })),
+      harga_channel: Object.fromEntries(Object.entries(modal.harga_channel || {}).map(([k, v]) => [k, Number(v)]).filter(([, v]) => v > 0)),
+      components: modal.components.map((c) => ({ product_id: c.product_id, name: products.find((p) => p.id === c.product_id)?.name || c.name, qty: Number(c.qty) || 1 })),
     };
     try {
       if (modal.id) await api.put(`/bundles/${modal.id}`, body);
@@ -67,153 +64,134 @@ export default function BundlingPanel({ isAdmin, onChanged, channels = [], prici
   };
 
   const openEdit = (b) => setModal({
-    id: b.id, name: b.name, category: b.category || "Paket", harga_jual: b.harga_jual,
-    harga_reseller: b.harga_reseller || 0, harga_online: b.harga_online || 0,
+    id: b.id, name: b.name, category: b.category || "Paket", harga_jual: b.harga_jual, harga_reseller: b.harga_reseller || 0,
+    harga_online: b.harga_online || 0, harga_channel: b.harga_channel || {},
     components: b.components.map((c) => ({ product_id: c.product_id, name: c.name, qty: c.qty })),
   });
 
   if (loading) return <div className="flex justify-center py-20"><Loader2 className="w-8 h-8 animate-spin text-[#1B5E3B]" /></div>;
 
+  const isOnline = tab === "online";
+  const priceKey = { normal: "harga_jual", reseller: "harga_reseller", online: "harga_online" }[tab];
+  const priceLabel = TABS.find((t) => t.key === tab).label;
+  const sorted = bundles.filter((b) => b.name.toLowerCase().includes(search.toLowerCase()))
+    .sort((a, b) => (sortBy === "name_desc" ? b.name.localeCompare(a.name, "id") : a.name.localeCompare(b.name, "id")));
+  const cols = ["Nama Paket", "Komposisi", "Modal", priceLabel, "Stok"];
+  const rows = sorted.map((b) => [b.name, b.components.map((c) => `${c.qty}x ${c.name}`).join(", "), b.hpp, b[priceKey] || 0, b.stok]);
+  const exportTitle = `Daftar ${priceLabel} Paket`;
+
   return (
-    <div className="space-y-4" data-testid="bundling-panel">
-      <div className="flex items-center justify-between">
-        <p className="text-sm text-muted-foreground">Stok paket dihitung otomatis dari ketersediaan produk satuan penyusunnya.</p>
-        {isAdmin && (
-          <button onClick={() => setModal({ ...EMPTY })} data-testid="bundle-add-trigger"
-            className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#0F281E] text-white text-sm font-semibold hover:bg-[#143D2B]"><Plus className="w-4 h-4" /> Tambah Paket</button>
-        )}
+    <div className="space-y-5" data-testid="bundling-panel">
+      <div className="flex rounded-xl border border-input overflow-hidden w-fit" data-testid="bundle-price-tab">
+        {TABS.map((t) => (
+          <button key={t.key} onClick={() => setTab(t.key)} data-testid={`bundle-price-tab-${t.key}`} style={tab === t.key ? { backgroundColor: t.color } : {}}
+            className={`flex items-center gap-2 px-5 py-2.5 text-sm font-semibold transition-colors ${tab === t.key ? "text-white" : "bg-card hover:bg-secondary"}`}>
+            <t.icon className="w-4 h-4" /> {t.label}
+          </button>
+        ))}
       </div>
 
-      {bundles.length === 0 ? (
-        <div className="bg-card rounded-2xl border border-slate-200 p-10 text-center text-muted-foreground" data-testid="bundle-empty">
-          <Boxes className="w-10 h-10 mx-auto mb-3 opacity-40" />
-          Belum ada paket bundling. {isAdmin && "Klik \"Tambah Paket\" untuk membuat."}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="relative flex-1 min-w-[200px] max-w-sm">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          <input value={search} onChange={(e) => setSearch(e.target.value)} data-testid="bundle-search-input" placeholder="Cari paket..."
+            className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-input bg-card text-sm focus:outline-none focus:ring-2 focus:ring-[#1B5E3B]" />
         </div>
-      ) : (
-        <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-4">
-          {bundles.map((b) => {
-            const anyHabis = b.components.some((c) => c.habis || c.missing);
-            return (
-              <div key={b.id} className="bg-card rounded-2xl border border-slate-200 p-5 flex flex-col" data-testid={`bundle-card-${b.id}`}>
-                <div className="flex items-start justify-between gap-2">
-                  <div>
-                    <span className="text-[10px] uppercase tracking-wider font-semibold text-[#2563EB]">★ Paket Bundling</span>
-                    <h3 className="font-heading font-bold text-[#0F281E] leading-tight">{b.name}</h3>
-                  </div>
-                  <span data-testid={`bundle-stock-${b.id}`}
-                    className={`shrink-0 text-xs font-bold px-2.5 py-1 rounded-full ${b.stok <= 0 ? "bg-destructive text-white" : b.stok <= 3 ? "bg-amber-100 text-amber-700 border border-amber-300" : "bg-green-100 text-green-700"}`}>
-                    Stok: {b.stok}
-                  </span>
-                </div>
-
-                <p className="font-mono font-bold text-[#1B5E3B] mt-1">{rupiah(b.harga_jual)}</p>
-                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1 text-xs text-muted-foreground">
-                  {b.harga_reseller > 0 && <span>Reseller: <span className="font-mono text-[#C85A32]">{rupiah(b.harga_reseller)}</span></span>}
-                  {b.harga_online > 0 && <span>Online: <span className="font-mono text-[#2563EB]">{rupiah(b.harga_online)}</span></span>}
-                </div>
-                <div className="mt-2"><BundleSaran cost={b.hpp} channels={channels} pricingTarget={pricingTarget} price={b.harga_online} testid={`bundle-saran-${b.id}`} /></div>
-                {b.hemat > 0 && (
-                  <span data-testid={`bundle-hemat-${b.id}`} className="inline-flex items-center gap-1 mt-2 text-xs font-bold px-2 py-0.5 rounded-full bg-green-100 text-green-700 w-fit">
-                    Hemat {rupiah(b.hemat)} vs beli satuan
-                  </span>
-                )}
-
-                <div className="mt-3 space-y-1.5 flex-1">
-                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Komposisi</p>
-                  {b.components.map((c, idx) => (
-                    <div key={idx} className="flex items-center justify-between text-sm" data-testid={`bundle-comp-${b.id}-${idx}`}>
-                      <span className="truncate">{c.qty}× {c.name}{c.missing && <span className="text-destructive"> (produk hilang)</span>}</span>
-                      <span className={`font-mono text-xs shrink-0 ml-2 ${c.habis || c.missing ? "text-destructive font-bold" : "text-muted-foreground"}`}>
-                        stok {c.stok}{(c.habis || c.missing) ? " · habis" : ""}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-
-                {anyHabis && (
-                  <div className="mt-3 flex items-center gap-1.5 text-xs font-semibold text-destructive bg-red-50 border border-red-200 rounded-lg px-2.5 py-1.5" data-testid={`bundle-warning-${b.id}`}>
-                    <AlertTriangle className="w-3.5 h-3.5" /> Ada komponen habis — paket tidak bisa dijual
-                  </div>
-                )}
-
-                {isAdmin && (
-                  <div className="mt-3 pt-3 border-t border-slate-100 flex items-center gap-2">
-                    <button onClick={() => reduce(b)} disabled={b.stok <= 0} data-testid={`bundle-reduce-${b.id}`}
-                      className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-[#C85A32] text-white text-xs font-semibold hover:bg-[#B04B26] disabled:opacity-40"><PackageMinus className="w-3.5 h-3.5" /> Kurangi Stok</button>
-                    <button onClick={() => openEdit(b)} data-testid={`bundle-edit-${b.id}`} className="w-9 h-9 rounded-lg border border-input flex items-center justify-center hover:bg-secondary"><Pencil className="w-4 h-4" /></button>
-                    <button onClick={() => del(b)} data-testid={`bundle-delete-${b.id}`} className="w-9 h-9 rounded-lg text-destructive hover:bg-red-50 flex items-center justify-center"><Trash2 className="w-4 h-4" /></button>
-                  </div>
-                )}
-              </div>
-            );
-          })}
+        <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} data-testid="bundle-sort-select"
+          className="px-3 py-2.5 rounded-xl border border-input bg-card text-sm focus:outline-none focus:ring-2 focus:ring-[#1B5E3B]">
+          <option value="name">Urutkan: Nama A-Z</option>
+          <option value="name_desc">Urutkan: Nama Z-A</option>
+        </select>
+        <div className="flex gap-2">
+          <button onClick={() => exportPDF({ title: exportTitle, columns: cols, rows })} data-testid="bundle-export-pdf"
+            className="flex items-center gap-2 px-3 py-2.5 rounded-xl border border-input text-sm hover:bg-secondary"><FileDown className="w-4 h-4" /> PDF</button>
+          <button onClick={() => exportExcel({ filename: exportTitle.replace(/\s+/g, "_"), sheetName: "Paket", columns: cols, rows })} data-testid="bundle-export-excel"
+            className="flex items-center gap-2 px-3 py-2.5 rounded-xl border border-input text-sm hover:bg-secondary"><FileSpreadsheet className="w-4 h-4" /> Excel</button>
+          {isAdmin && (
+            <button onClick={() => setModal({ ...EMPTY })} data-testid="bundle-add-trigger"
+              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#1B5E3B] text-white text-sm font-semibold hover:bg-[#143D2B]"><Plus className="w-4 h-4" /> Tambah</button>
+          )}
         </div>
-      )}
+      </div>
 
-      {modal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/50" onClick={() => setModal(null)} />
-          <form onSubmit={save} className="relative bg-white rounded-2xl w-full max-w-lg p-6 max-h-[90vh] overflow-y-auto" data-testid="bundle-modal">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="font-heading font-bold text-lg">{modal.id ? "Edit Paket" : "Tambah Paket Bundling"}</h3>
-              <button type="button" onClick={() => setModal(null)}><X className="w-5 h-5" /></button>
-            </div>
+      <div className="bg-card rounded-2xl border border-slate-200 overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-slate-200 bg-secondary/50 text-left">
+              <th className="px-4 py-3 font-semibold">Nama Paket</th>
+              <th className="px-4 py-3 font-semibold text-right">Modal</th>
+              <th className={`px-4 py-3 font-semibold text-right ${tab === "normal" ? "text-[#1B5E3B]" : ""}`}>Harga Normal</th>
+              <th className={`px-4 py-3 font-semibold text-right ${tab === "reseller" ? "text-[#C85A32]" : ""}`}>Harga Reseller</th>
+              <th className={`px-4 py-3 font-semibold text-right ${isOnline ? "text-[#2563EB]" : ""}`}>Harga Online</th>
+              {isOnline && channels.map((c) => <th key={c.name} className="px-4 py-3 font-semibold text-right" style={{ color: c.color }}>{c.name}</th>)}
+              <th className="px-4 py-3 font-semibold text-right">Stok</th>
+              {isAdmin && <th className="px-4 py-3 font-semibold text-center">Aksi</th>}
+            </tr>
+          </thead>
+          <tbody>
+            {sorted.length === 0 && (
+              <tr><td colSpan={8 + (isOnline ? channels.length : 0)} className="px-4 py-10 text-center text-muted-foreground" data-testid="bundle-empty">
+                <Boxes className="w-8 h-8 mx-auto mb-2 opacity-40" /> Belum ada paket bundling. {isAdmin && "Klik \"Tambah\" untuk membuat."}
+              </td></tr>
+            )}
+            {sorted.map((b) => <BundleRow key={b.id} b={b} tab={tab} channels={channels} pricingTarget={pricingTarget} isAdmin={isAdmin}
+              onEdit={() => openEdit(b)} onDelete={() => del(b)} onReduce={() => reduce(b)} />)}
+          </tbody>
+        </table>
+      </div>
 
-            <div className="space-y-3">
-              <div>
-                <label className="text-sm font-medium">Nama Paket</label>
-                <input value={modal.name} onChange={(e) => setModal({ ...modal, name: e.target.value })} data-testid="bundle-name-input"
-                  placeholder="mis. Paket Hemat Tani" className="mt-1 w-full px-3 py-2.5 rounded-xl border border-input text-sm focus:outline-none focus:ring-2 focus:ring-[#1B5E3B]" />
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-sm font-medium">Harga Jual (Normal)</label>
-                  <input type="number" min="0" value={modal.harga_jual} onChange={(e) => setModal({ ...modal, harga_jual: e.target.value })} data-testid="bundle-harga-input"
-                    className="mt-1 w-full px-3 py-2.5 rounded-xl border border-input text-sm font-mono focus:outline-none focus:ring-2 focus:ring-[#1B5E3B]" />
-                </div>
-                <div>
-                  <label className="text-sm font-medium">Harga Reseller</label>
-                  <input type="number" min="0" value={modal.harga_reseller} onChange={(e) => setModal({ ...modal, harga_reseller: e.target.value })} data-testid="bundle-reseller-input"
-                    className="mt-1 w-full px-3 py-2.5 rounded-xl border border-input text-sm font-mono focus:outline-none focus:ring-2 focus:ring-[#C85A32]" />
-                </div>
-                <div className="col-span-2">
-                  <label className="text-sm font-medium">Harga Online (untuk Penjualan Online)</label>
-                  <input type="number" min="0" value={modal.harga_online} onChange={(e) => setModal({ ...modal, harga_online: e.target.value })} data-testid="bundle-online-input"
-                    className="mt-1 w-full px-3 py-2.5 rounded-xl border border-input text-sm font-mono focus:outline-none focus:ring-2 focus:ring-[#2563EB]" />
-                  <div className="mt-2"><BundleSaran cost={modalCost} channels={channels} pricingTarget={pricingTarget} price={Number(modal.harga_online) || 0}
-                    onUse={(v) => setModal((m) => ({ ...m, harga_online: v }))} testid="bundle-modal-saran" /></div>
-                </div>
-              </div>
-
-              <div>
-                <label className="text-sm font-medium">Komponen (Produk Satuan)</label>
-                <div className="mt-1 space-y-2">
-                  {modal.components.map((c, idx) => (
-                    <div key={idx} className="flex items-center gap-2" data-testid={`bundle-comp-row-${idx}`}>
-                      <span className="flex-1 min-w-0 truncate text-sm">{pName(c.product_id) || c.name}</span>
-                      <input type="number" min="1" value={c.qty} data-testid={`bundle-comp-qty-${idx}`}
-                        onChange={(e) => setModal((m) => ({ ...m, components: m.components.map((it, k) => k === idx ? { ...it, qty: e.target.value } : it) }))}
-                        className="w-16 px-2 py-1.5 rounded-lg border border-input text-sm text-center" />
-                      <button type="button" onClick={() => setModal((m) => ({ ...m, components: m.components.filter((_, k) => k !== idx) }))} data-testid={`bundle-comp-remove-${idx}`} className="text-destructive shrink-0"><Trash2 className="w-4 h-4" /></button>
-                    </div>
-                  ))}
-                </div>
-                <div className="mt-2 flex items-center gap-2">
-                  <Plus className="w-4 h-4 text-muted-foreground" />
-                  <select onChange={(e) => { if (e.target.value) { setModal((m) => addComp(m, e.target.value)); e.target.value = ""; } }} data-testid="bundle-add-comp-select"
-                    className="flex-1 px-3 py-2 rounded-lg border border-input text-sm bg-white">
-                    <option value="">+ Tambah produk satuan...</option>
-                    {products.map((p) => <option key={p.id} value={p.id}>{`${p.name} (stok ${p.stok})`}</option>)}
-                  </select>
-                </div>
-              </div>
-            </div>
-
-            <button type="submit" data-testid="bundle-save-button"
-              className="mt-5 w-full bg-[#1B5E3B] text-white py-2.5 rounded-xl text-sm font-semibold hover:bg-[#143D2B]">Simpan Paket</button>
-          </form>
-        </div>
-      )}
+      {modal && <BundleModal modal={modal} setModal={setModal} products={products} channels={channels} pricingTarget={pricingTarget} onSubmit={save} />}
     </div>
+  );
+}
+
+function BundleRow({ b, tab, channels, pricingTarget, isAdmin, onEdit, onDelete, onReduce }) {
+  const isOnline = tab === "online";
+  const anyHabis = b.components.some((c) => c.habis || c.missing);
+  return (
+    <tr className="border-b border-slate-100 hover:bg-secondary/30 align-top" data-testid={`bundle-row-${b.id}`}>
+      <td className="px-4 py-3 font-medium">
+        <div className="flex items-center gap-2 flex-wrap">
+          <span>{b.name}</span>
+          {b.stok <= 0 ? (
+            <span data-testid={`bundle-stock-badge-${b.id}`} className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-destructive text-white"><AlertTriangle className="w-3 h-3" /> Habis</span>
+          ) : b.stok <= 3 ? (
+            <span data-testid={`bundle-stock-badge-${b.id}`} className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 border border-amber-300"><AlertTriangle className="w-3 h-3" /> Stok Menipis</span>
+          ) : null}
+          {b.hemat > 0 && <span data-testid={`bundle-hemat-${b.id}`} className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-green-100 text-green-700">Hemat {rupiah(b.hemat)}</span>}
+        </div>
+        <p className="text-xs text-muted-foreground font-normal mt-0.5" data-testid={`bundle-comp-${b.id}`}>
+          {b.components.map((c, i) => (
+            <span key={i} className={c.habis || c.missing ? "text-destructive font-semibold" : ""}>{i > 0 && ", "}{c.qty}× {c.name}{c.missing ? " (hilang)" : c.habis ? " (habis)" : ""}</span>
+          ))}
+        </p>
+        {anyHabis && <p className="text-[11px] text-destructive font-semibold mt-0.5" data-testid={`bundle-warning-${b.id}`}>Ada komponen habis, paket tidak bisa dijual</p>}
+      </td>
+      <td className="px-4 py-3 text-right font-mono">{rupiah(b.hpp)}</td>
+      <td className={`px-4 py-3 text-right font-mono ${tab === "normal" ? "font-semibold text-[#1B5E3B]" : "text-muted-foreground"}`}>{rupiah(b.harga_jual)}</td>
+      <td className={`px-4 py-3 text-right font-mono ${tab === "reseller" ? "font-semibold text-[#C85A32]" : "text-muted-foreground"}`}>{rupiah(b.harga_reseller || 0)}</td>
+      <td className={`px-4 py-3 text-right font-mono ${isOnline ? "font-semibold text-[#2563EB]" : "text-muted-foreground"}`}>{b.harga_online ? rupiah(b.harga_online) : <span className="text-xs italic">belum diatur</span>}</td>
+      {isOnline && channels.map((c) => {
+        const price = b.harga_channel?.[c.name] || b.harga_online;
+        const net = price - calcFees(c.fees, price).total;
+        return (
+          <td key={c.name} className="px-4 py-3 text-right font-mono" data-testid={`bundle-channel-price-${b.id}-${slug(c.name)}`}>
+            {b.harga_channel?.[c.name] ? rupiah(b.harga_channel[c.name]) : <span className="text-xs italic text-muted-foreground">= online</span>}
+            {price > 0 && <div className={`text-[10px] ${net < b.hpp ? "text-destructive font-semibold" : "text-muted-foreground"}`}>bersih {rupiah(net)}</div>}
+            {b.hpp > 0 && <div className="text-[10px] text-[#2563EB] font-semibold" data-testid={`bundle-saran-${b.id}-${slug(c.name)}`}>saran {rupiah(saranOf(c.fees, b.hpp, pricingTarget, "Paket"))}</div>}
+          </td>
+        );
+      })}
+      <td className="px-4 py-3 text-right font-mono" data-testid={`bundle-stock-${b.id}`}><span className={b.stok <= 3 ? "text-destructive font-semibold" : ""}>{b.stok} paket</span></td>
+      {isAdmin && (
+        <td className="px-4 py-3">
+          <div className="flex items-center justify-center gap-1">
+            <button onClick={onReduce} disabled={b.stok <= 0} title="Kurangi stok" data-testid={`bundle-reduce-${b.id}`} className="w-8 h-8 rounded-lg text-[#C85A32] hover:bg-orange-50 flex items-center justify-center disabled:opacity-40"><PackageMinus className="w-4 h-4" /></button>
+            <button onClick={onEdit} data-testid={`bundle-edit-${b.id}`} className="w-8 h-8 rounded-lg hover:bg-secondary flex items-center justify-center"><Pencil className="w-4 h-4" /></button>
+            <button onClick={onDelete} data-testid={`bundle-delete-${b.id}`} className="w-8 h-8 rounded-lg text-destructive hover:bg-red-50 flex items-center justify-center"><Trash2 className="w-4 h-4" /></button>
+          </div>
+        </td>
+      )}
+    </tr>
   );
 }

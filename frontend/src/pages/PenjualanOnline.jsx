@@ -52,7 +52,7 @@ export default function PenjualanOnline() {
 
   const sellable = [
     ...products,
-    ...bundles.map((b) => ({ id: b.id, name: b.name, category: "Paket", harga_online: b.harga_online, hpp: b.hpp, stok: b.stok, stok_minimal: 0, is_bundle: true, hemat: b.hemat })),
+    ...bundles.map((b) => ({ id: b.id, name: b.name, category: "Paket", harga_online: b.harga_online, harga_channel: b.harga_channel, hpp: b.hpp, stok: b.stok, stok_minimal: 0, is_bundle: true, hemat: b.hemat })),
   ];
   const priceFor = (p) => p.harga_channel?.[channel] || p.harga_online || 0;
   const target = usePricingTarget();
