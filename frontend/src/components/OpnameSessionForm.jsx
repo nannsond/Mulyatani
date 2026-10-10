@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { api, apiError } from "@/lib/api";
-import { ClipboardCheck, Trash2 } from "lucide-react";
+import { ClipboardCheck, Trash2, Layers } from "lucide-react";
 import { toast } from "sonner";
 import { ProductSearchInput } from "@/components/ProductSearchInput";
 
@@ -43,11 +43,22 @@ export function OpnameSessionForm({ products, onSaved }) {
   const [rows, setRows] = useState([]);
   const [note, setNote] = useState("");
   const [saving, setSaving] = useState(false);
+  const [cat, setCat] = useState("");
+  const categories = [...new Set(products.map((p) => p.category || "Lainnya"))].sort((a, b) => a.localeCompare(b, "id"));
   const pmap = Object.fromEntries(products.map((p) => [p.id, p]));
 
   const add = (p) => {
     if (rows.some((r) => r.product_id === p.id)) { toast.info("Produk sudah ada di sesi"); return; }
     setRows([...rows, { product_id: p.id, stok_fisik: "", alasan: "Penyesuaian" }]);
+  };
+  const addCategory = () => {
+    if (!cat) { toast.error("Pilih kategori dulu"); return; }
+    const have = new Set(rows.map((r) => r.product_id));
+    const fresh = products.filter((p) => (p.category || "Lainnya") === cat && !have.has(p.id))
+      .sort((a, b) => a.name.localeCompare(b.name, "id"));
+    if (fresh.length === 0) { toast.info("Semua produk kategori ini sudah ada di sesi"); return; }
+    setRows([...rows, ...fresh.map((p) => ({ product_id: p.id, stok_fisik: "", alasan: "Penyesuaian" }))]);
+    toast.success(`${fresh.length} produk ${cat} ditambahkan`);
   };
   const update = (i, row) => setRows(rows.map((r, j) => (j === i ? row : r)));
 
@@ -71,11 +82,26 @@ export function OpnameSessionForm({ products, onSaved }) {
     <form onSubmit={submit} className="bg-card rounded-2xl border border-slate-200 p-6 h-fit space-y-4" data-testid="opname-session-form">
       <h3 className="font-heading font-semibold text-lg text-[#0F281E] flex items-center gap-2">
         <ClipboardCheck className="w-5 h-5" /> Input Opname
-        {rows.length > 0 && <span className="ml-auto text-xs font-medium px-2 py-1 rounded-lg bg-secondary" data-testid="opname-session-count">{rows.length} produk</span>}
+        {rows.length > 0 && <span className="ml-auto text-xs font-medium px-2 py-1 rounded-lg bg-secondary" data-testid="opname-session-count">{rows.filter((r) => r.stok_fisik !== "").length}/{rows.length} dihitung</span>}
+        {rows.length > 0 && <button type="button" onClick={() => setRows([])} data-testid="opname-session-clear" className="text-xs text-red-500 hover:underline">Kosongkan</button>}
       </h3>
       <div>
         <label className="text-sm font-medium">Tambah Produk</label>
         <ProductSearchInput products={products} onSelect={add} />
+      </div>
+      <div>
+        <label className="text-sm font-medium">Atau Tambah Satu Kategori</label>
+        <div className="mt-1 flex gap-2">
+          <select value={cat} onChange={(e) => setCat(e.target.value)} data-testid="opname-category-select"
+            className="flex-1 min-w-0 px-3 py-2.5 rounded-xl border border-input text-sm bg-white">
+            <option value="">-- Pilih Kategori --</option>
+            {categories.map((c) => <option key={c} value={c}>{`${c} (${products.filter((p) => (p.category || "Lainnya") === c).length})`}</option>)}
+          </select>
+          <button type="button" onClick={addCategory} data-testid="opname-category-add-button"
+            className="flex items-center gap-1.5 px-3 py-2.5 rounded-xl border border-[#1B5E3B] text-[#1B5E3B] text-sm font-semibold hover:bg-emerald-50 transition-colors whitespace-nowrap">
+            <Layers className="w-4 h-4" /> Tambah Semua
+          </button>
+        </div>
       </div>
       <div className="space-y-2 max-h-[420px] overflow-auto">
         {rows.length === 0 && <div className="text-sm text-muted-foreground text-center py-4 border border-dashed rounded-xl">Belum ada produk di sesi ini.</div>}
