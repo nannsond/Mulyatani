@@ -1322,6 +1322,61 @@ async def update_ecom_status(sid: str, data: EcomStatusInput, admin: dict = Depe
     await db.ecommerce_sales.update_one({"_id": ObjectId(sid)}, {"$set": update})
     return {"ok": True, "status": data.status, "stock_restored": update.get("stock_restored", doc.get("stock_restored", False))}
 
+class EcomEditItem(BaseModel):
+    qty: int
+    harga: float
+
+class EcomSaleEdit(BaseModel):
+    channel: str
+    date: str
+    order_no: str = ""
+    customer_name: str = ""
+    items: List[EcomEditItem]
+    admin_fee: float = 0
+    ongkir: float = 0
+    biaya_lain: float = 0
+
+async def _adjust_item_stock(item: dict, delta: int):
+    if item.get("is_bundle"):
+        for c in item.get("components", []):
+            await db.products.update_one({"_id": ObjectId(c["product_id"])}, {"$inc": {"stok": -c["qty"] * delta}})
+    else:
+        await db.products.update_one({"_id": ObjectId(item["product_id"])}, {"$inc": {"stok": -delta}})
+
+@api_router.put("/ecommerce/sales/{sid}")
+async def edit_ecom_sale(sid: str, data: EcomSaleEdit, admin: dict = Depends(require_admin)):
+    doc = await db.ecommerce_sales.find_one({"_id": ObjectId(sid)})
+    if not doc:
+        raise HTTPException(status_code=404, detail="Penjualan tidak ditemukan")
+    if data.channel not in [c["name"] for c in await get_channels_cfg()]:
+        raise HTTPException(status_code=400, detail="Channel tidak valid")
+    old = doc.get("items", [])
+    if len(data.items) != len(old):
+        raise HTTPException(status_code=400, detail="Jumlah item tidak sesuai")
+    if any(i.qty < 1 or i.harga < 0 for i in data.items) or min(data.admin_fee, data.ongkir, data.biaya_lain) < 0:
+        raise HTTPException(status_code=400, detail="Qty minimal 1 dan nilai tidak boleh negatif")
+    qty_changed = any(n.qty != o["qty"] for n, o in zip(data.items, old))
+    cost = await product_cost_map() if qty_changed else {}
+    items = []
+    for n, o in zip(data.items, old):
+        if n.qty != o["qty"] and not doc.get("stock_restored"):
+            await _adjust_item_stock(o, n.qty - o["qty"])
+        items.append({**o, "qty": n.qty, "harga": n.harga, "subtotal": n.qty * n.harga})
+    omzet = sum(i["subtotal"] for i in items)
+    hpp = sum(i["qty"] * (i.get("hpp", 0) if i.get("is_bundle") else cost.get(i["product_id"], 0)) for i in items) if qty_changed else doc.get("hpp", 0)
+    total_fee = data.admin_fee + data.ongkir + data.biaya_lain
+    created = data.date + "T00:00:00+00:00" if len(data.date) == 10 else data.date
+    if created[:10] == doc.get("created_at", "")[:10]:
+        created = doc["created_at"]
+    upd = {"channel": data.channel, "created_at": created, "order_no": data.order_no.strip(), "customer_name": data.customer_name.strip(),
+           "items": items, "omzet": omzet, "hpp": hpp, "laba_kotor": omzet - hpp,
+           "admin_fee": data.admin_fee, "ongkir": data.ongkir, "biaya_lain": data.biaya_lain,
+           "total_fee": total_fee, "laba_bersih": omzet - hpp - total_fee}
+    if data.admin_fee != doc.get("admin_fee", 0):
+        upd["fee_breakdown"] = [{"label": "Biaya admin (diedit)", "amount": data.admin_fee}]
+    await db.ecommerce_sales.update_one({"_id": doc["_id"]}, {"$set": upd})
+    return {"ok": True, **upd}
+
 class EcomOngkirInput(BaseModel):
     ongkir: float
 

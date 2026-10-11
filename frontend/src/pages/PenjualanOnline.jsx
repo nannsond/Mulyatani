@@ -2,11 +2,12 @@ import { useEffect, useState, useRef } from "react";
 import { api, apiError } from "@/lib/api";
 import { rupiah, fmtDate, todayStr, CHANNEL_COLORS } from "@/lib/format";
 import { exportEcomTemplate, readEcomExcel } from "@/lib/exporter";
-import { Search, Plus, Minus, Trash2, ShoppingBag, Loader2, CheckCircle2, FileSpreadsheet, Upload } from "lucide-react";
+import { Search, Plus, Minus, Trash2, Pencil, ShoppingBag, Loader2, CheckCircle2, FileSpreadsheet, Upload } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/context/AuthContext";
 import { calcFees } from "@/lib/fees";
 import { OngkirCell } from "@/components/OngkirCell";
+import EcomEditDialog from "@/components/EcomEditDialog";
 
 const STATUSES = ["Diproses", "Dikirim", "Selesai", "Dikembalikan"];
 const STATUS_STYLE = {
@@ -43,6 +44,7 @@ export default function PenjualanOnline() {
 
   const loadProducts = () => api.get("/products").then((r) => setProducts(r.data));
   const loadBundles = () => api.get("/bundles").then((r) => setBundles(r.data));
+  const [editSale, setEditSale] = useState(null);
   const loadRecent = () => api.get(`/ecommerce/sales?month=${filterMonth}${filterChannel ? `&channel=${encodeURIComponent(filterChannel)}` : ""}`).then((r) => setRecent(r.data));
   useEffect(() => {
     loadProducts(); loadBundles();
@@ -285,7 +287,10 @@ export default function PenjualanOnline() {
                       <span className={`text-xs px-2 py-1 rounded-lg font-semibold ${STATUS_STYLE[s.status] || STATUS_STYLE.Diproses}`}>{s.status || "Diproses"}</span>
                     )}
                   </td>
-                  {isAdmin && <td className="px-3 py-2.5 text-center"><button onClick={() => del(s.id)} data-testid={`ecom-delete-${s.id}`} className="text-destructive"><Trash2 className="w-4 h-4" /></button></td>}
+                  {isAdmin && <td className="px-3 py-2.5 text-center"><div className="flex items-center justify-center gap-2">
+                    <button onClick={() => setEditSale(s)} data-testid={`ecom-edit-${s.id}`} title="Edit" className="text-[#1B5E3B] hover:text-[#143D2B]"><Pencil className="w-4 h-4" /></button>
+                    <button onClick={() => del(s.id)} data-testid={`ecom-delete-${s.id}`} title="Hapus" className="text-destructive"><Trash2 className="w-4 h-4" /></button>
+                  </div></td>}
                 </tr>
               ))}
             </tbody>
@@ -293,6 +298,7 @@ export default function PenjualanOnline() {
         </div>
         <p className="text-xs text-muted-foreground mt-3">Hanya pesanan berstatus <span className="font-semibold text-green-700">Selesai</span> yang dihitung ke Laba Rugi, Dashboard, dan laporan harian/bulanan/tahunan.</p>
       </div>
+      {editSale && <EcomEditDialog sale={editSale} channels={channels} onClose={() => setEditSale(null)} onSaved={() => { setEditSale(null); loadRecent(); loadProducts(); loadBundles(); }} />}
     </div>
   );
 }

@@ -1,0 +1,28 @@
+{
+  "summary": "Iter 35: Tested new commission-split behavior (pool from online sales Dikirim+Selesai, split by kasir attendance). All 11 new backend tests pass; UI /komisi has all required data-testids and correct behavior (explanation mentions Dikirim/Selesai + hari hadir + kasir; pool stats, rate save, month filter, no-attendance warning, rows filtered to kasir only).",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_iter35_commission_split.py",
+    "/app/test_reports/pytest/iter35.xml"
+  ],
+  "action_items": [
+    "Old tests /app/backend/tests/test_iter9_commission_attendance.py still assert per-row komisi = row.laba_kotor * rate/100 (old per-inputter behavior) and use outdated passwords (T0k0Mulya#Tani2026 / Kasir#Mulya2026). They should be deleted or rewritten; the new behavior is covered by test_iter35_commission_split.py."
+  ],
+  "critical_code_review_comments": [
+    "_commission_split: filters kasir by role 'kasir' and uses hadir count — matches requirement. ObjectId -> str conversion is correct, _id excluded.",
+    "Payroll correctly derives komisi_calc from _commission_split result; admin rows have 0 komisi because they aren't in commission rows (good).",
+    "server.py now 2061 lines - exceeds 700-line guideline; consider splitting into modules (sales, commission, payroll, attendance).",
+    "/api/commission/report: no bounds check on month format — a malformed month string becomes a regex that could still work but 400 validation would be safer."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter35_commission_split.py (new)"
+  ],
+  "success_rate": {"backend": "100% (11/11)", "frontend": "100% (all testids + behaviors)"},
+  "test_credentials": "Admin nannsond@gmail.com/admin123, Kasir kasir@tokotani.com/kasir123 (from /app/memory/test_credentials.md and backend .env)",
+  "seed_data_creation": "Test created 2 TEST ecommerce_sales (TEST_customer/TEST_order) in month 2019-07 and 3 TEST attendance docs for kasir in 2019-07; all cleaned up after module. Commission rate restored to original value after tests.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "test_iter35_commission_split.py is the canonical commission-split test. The old test_iter9_commission_attendance.py is outdated (wrong formula + wrong passwords) — main agent should remove/update it. Pytest runs with -n 2 --dist loadscope via /app/backend/pytest.ini; use -n 0 for serial debug.",
+  "rca of the issue": "N/A — feature works as specified."
+}
