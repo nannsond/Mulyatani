@@ -262,3 +262,4 @@ Aplikasi laporan penjualan sederhana untuk bisnis toko pertanian: laporan harian
 - Biaya Layanan Logistik TikTok Shop dihapus dari Penjualan Online (tabel logistik, endpoint /api/shipping/rates, seed platform_logistics). Ongkir diisi manual.
 - Kotak berat/ongkir di Penjualan Online dihapus; ongkir diketik manual per pesanan.
 - Isian berat produk dihapus; Satuan produk jadi dropdown (pcs, zak, kg).
+- Daftar Harga & Paket Bundling: tab harga digabung jadi satu tabel (Normal, Reseller, per platform); cetak/PDF/Excel ikut semua kolom.

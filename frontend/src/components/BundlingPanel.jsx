@@ -4,23 +4,17 @@ import { rupiah } from "@/lib/format";
 import { calcFees } from "@/lib/fees";
 import { exportPDF, exportExcel } from "@/lib/exporter";
 import { toast } from "sonner";
-import { Plus, Pencil, Trash2, Boxes, AlertTriangle, PackageMinus, Loader2, Search, User, Users, ShoppingBag, FileDown, FileSpreadsheet } from "lucide-react";
+import { Plus, Pencil, Trash2, Boxes, AlertTriangle, PackageMinus, Loader2, Search, FileDown, FileSpreadsheet } from "lucide-react";
 import BundleModal from "@/components/BundleModal";
 
 const EMPTY = { name: "", category: "Paket", harga_jual: 0, harga_reseller: 0, harga_channel: {}, components: [] };
 const slug = (s) => s.replace(/\s+/g, "-").toLowerCase();
-const TABS = [
-  { key: "normal", label: "Harga Normal", icon: User, color: "#1B5E3B" },
-  { key: "reseller", label: "Harga Reseller", icon: Users, color: "#C85A32" },
-  { key: "online", label: "Harga Platform", icon: ShoppingBag, color: "#2563EB" },
-];
 
 export default function BundlingPanel({ isAdmin, onChanged, channels = [] }) {
   const [bundles, setBundles] = useState([]);
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [modal, setModal] = useState(null);
-  const [tab, setTab] = useState("normal");
   const [search, setSearch] = useState("");
   const [sortBy, setSortBy] = useState("name");
 
@@ -71,26 +65,14 @@ export default function BundlingPanel({ isAdmin, onChanged, channels = [] }) {
 
   if (loading) return <div className="flex justify-center py-20"><Loader2 className="w-8 h-8 animate-spin text-[#1B5E3B]" /></div>;
 
-  const isOnline = tab === "online";
-  const priceLabel = TABS.find((t) => t.key === tab).label;
-  const pricesOf = (b) => isOnline ? channels.map((c) => b.harga_channel?.[c.name] || 0) : [b[tab === "reseller" ? "harga_reseller" : "harga_jual"] || 0];
   const sorted = bundles.filter((b) => b.name.toLowerCase().includes(search.toLowerCase()))
     .sort((a, b) => (sortBy === "name_desc" ? b.name.localeCompare(a.name, "id") : a.name.localeCompare(b.name, "id")));
-  const cols = ["Nama Paket", "Komposisi", "Modal", ...(isOnline ? channels.map((c) => c.name) : [priceLabel]), "Stok"];
-  const rows = sorted.map((b) => [b.name, b.components.map((c) => `${c.qty}x ${c.name}`).join(", "), b.hpp, ...pricesOf(b), b.stok]);
-  const exportTitle = `Daftar ${priceLabel} Paket`;
+  const cols = ["Nama Paket", "Komposisi", "Modal", "Harga Normal", "Harga Reseller", ...channels.map((c) => c.name), "Stok"];
+  const rows = sorted.map((b) => [b.name, b.components.map((c) => `${c.qty}x ${c.name}`).join(", "), b.hpp, b.harga_jual || 0, b.harga_reseller || 0, ...channels.map((c) => b.harga_channel?.[c.name] || 0), b.stok]);
+  const exportTitle = "Daftar Harga Paket";
 
   return (
     <div className="space-y-5" data-testid="bundling-panel">
-      <div className="flex rounded-xl border border-input overflow-hidden w-fit" data-testid="bundle-price-tab">
-        {TABS.map((t) => (
-          <button key={t.key} onClick={() => setTab(t.key)} data-testid={`bundle-price-tab-${t.key}`} style={tab === t.key ? { backgroundColor: t.color } : {}}
-            className={`flex items-center gap-2 px-5 py-2.5 text-sm font-semibold transition-colors ${tab === t.key ? "text-white" : "bg-card hover:bg-secondary"}`}>
-            <t.icon className="w-4 h-4" /> {t.label}
-          </button>
-        ))}
-      </div>
-
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="relative flex-1 min-w-[200px] max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -120,20 +102,20 @@ export default function BundlingPanel({ isAdmin, onChanged, channels = [] }) {
             <tr className="border-b border-slate-200 bg-secondary/50 text-left">
               <th className="px-4 py-3 font-semibold">Nama Paket</th>
               <th className="px-4 py-3 font-semibold text-right">Modal</th>
-              <th className={`px-4 py-3 font-semibold text-right ${tab === "normal" ? "text-[#1B5E3B]" : ""}`}>Harga Normal</th>
-              <th className={`px-4 py-3 font-semibold text-right ${tab === "reseller" ? "text-[#C85A32]" : ""}`}>Harga Reseller</th>
-              {isOnline && channels.map((c) => <th key={c.name} className="px-4 py-3 font-semibold text-right" style={{ color: c.color }}>{c.name}</th>)}
+              <th className="px-4 py-3 font-semibold text-right text-[#1B5E3B]">Harga Normal</th>
+              <th className="px-4 py-3 font-semibold text-right text-[#C85A32]">Harga Reseller</th>
+              {channels.map((c) => <th key={c.name} className="px-4 py-3 font-semibold text-right" style={{ color: c.color }}>{c.name}</th>)}
               <th className="px-4 py-3 font-semibold text-right">Stok</th>
               {isAdmin && <th className="px-4 py-3 font-semibold text-center">Aksi</th>}
             </tr>
           </thead>
           <tbody>
             {sorted.length === 0 && (
-              <tr><td colSpan={7 + (isOnline ? channels.length : 0)} className="px-4 py-10 text-center text-muted-foreground" data-testid="bundle-empty">
+              <tr><td colSpan={7 + channels.length} className="px-4 py-10 text-center text-muted-foreground" data-testid="bundle-empty">
                 <Boxes className="w-8 h-8 mx-auto mb-2 opacity-40" /> Belum ada paket bundling. {isAdmin && "Klik \"Tambah\" untuk membuat."}
               </td></tr>
             )}
-            {sorted.map((b) => <BundleRow key={b.id} b={b} tab={tab} channels={channels} isAdmin={isAdmin}
+            {sorted.map((b) => <BundleRow key={b.id} b={b} channels={channels} isAdmin={isAdmin}
               onEdit={() => openEdit(b)} onDelete={() => del(b)} onReduce={() => reduce(b)} />)}
           </tbody>
         </table>
@@ -144,8 +126,7 @@ export default function BundlingPanel({ isAdmin, onChanged, channels = [] }) {
   );
 }
 
-function BundleRow({ b, tab, channels, isAdmin, onEdit, onDelete, onReduce }) {
-  const isOnline = tab === "online";
+function BundleRow({ b, channels, isAdmin, onEdit, onDelete, onReduce }) {
   const anyHabis = b.components.some((c) => c.habis || c.missing);
   return (
     <tr className="border-b border-slate-100 hover:bg-secondary/30 align-top" data-testid={`bundle-row-${b.id}`}>
@@ -167,9 +148,9 @@ function BundleRow({ b, tab, channels, isAdmin, onEdit, onDelete, onReduce }) {
         {anyHabis && <p className="text-[11px] text-destructive font-semibold mt-0.5" data-testid={`bundle-warning-${b.id}`}>Ada komponen habis, paket tidak bisa dijual</p>}
       </td>
       <td className="px-4 py-3 text-right font-mono">{rupiah(b.hpp)}</td>
-      <td className={`px-4 py-3 text-right font-mono ${tab === "normal" ? "font-semibold text-[#1B5E3B]" : "text-muted-foreground"}`}>{rupiah(b.harga_jual)}</td>
-      <td className={`px-4 py-3 text-right font-mono ${tab === "reseller" ? "font-semibold text-[#C85A32]" : "text-muted-foreground"}`}>{rupiah(b.harga_reseller || 0)}</td>
-      {isOnline && channels.map((c) => {
+      <td className="px-4 py-3 text-right font-mono font-semibold text-[#1B5E3B]">{rupiah(b.harga_jual)}</td>
+      <td className="px-4 py-3 text-right font-mono font-semibold text-[#C85A32]">{rupiah(b.harga_reseller || 0)}</td>
+      {channels.map((c) => {
         const price = b.harga_channel?.[c.name] || 0;
         const net = price - calcFees(c.fees, price).total;
         return (
