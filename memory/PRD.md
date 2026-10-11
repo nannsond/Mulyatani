@@ -285,3 +285,4 @@ Aplikasi laporan penjualan sederhana untuk bisnis toko pertanian: laporan harian
 - Klik baris arus kas harian → dialog rincian transaksi (GET /api/reports/cash/day). Dana online masuk kas pada cair.tanggal bila dicatat. Tested iter 41.
 - Piutang Sesuai Tanggal: pembayaran piutang (POST /transactions/{id}/pay {amount,date}) masuk kas di tanggal diterima (tx_cash_events). Pengingat Catat Cair: GET /api/ecommerce/belum-cair + CairReminder di kotak Kas. Tested iter 42.
 - Hutang Sesuai Tanggal: POST /purchases/{id}/pay {amount,date} keluar kas di tanggal bayar (paid_cash_events). Grafik Arus Kas (CashFlowChart: saldo berjalan, masuk, keluar) di atas tabel harian. Tested iter 43.
+- Riwayat Pembayaran piutang/hutang: toggle riwayat per baris (bayar awal + cicilan, tanggal, pencatat, sisa berjalan), filter 'Tampilkan yang sudah lunas' (?all=true). Tested iter 44.
