@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { api, apiError } from "@/lib/api";
 import { rupiah } from "@/lib/format";
-import { calcFees, saranOf } from "@/lib/fees";
+import { calcFees } from "@/lib/fees";
 import { exportPDF, exportExcel } from "@/lib/exporter";
 import { toast } from "sonner";
 import { Plus, Pencil, Trash2, Boxes, AlertTriangle, PackageMinus, Loader2, Search, User, Users, ShoppingBag, FileDown, FileSpreadsheet } from "lucide-react";
@@ -15,7 +15,7 @@ const TABS = [
   { key: "online", label: "Harga Online", icon: ShoppingBag, color: "#2563EB" },
 ];
 
-export default function BundlingPanel({ isAdmin, onChanged, channels = [], pricingTarget }) {
+export default function BundlingPanel({ isAdmin, onChanged, channels = [] }) {
   const [bundles, setBundles] = useState([]);
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -134,18 +134,18 @@ export default function BundlingPanel({ isAdmin, onChanged, channels = [], prici
                 <Boxes className="w-8 h-8 mx-auto mb-2 opacity-40" /> Belum ada paket bundling. {isAdmin && "Klik \"Tambah\" untuk membuat."}
               </td></tr>
             )}
-            {sorted.map((b) => <BundleRow key={b.id} b={b} tab={tab} channels={channels} pricingTarget={pricingTarget} isAdmin={isAdmin}
+            {sorted.map((b) => <BundleRow key={b.id} b={b} tab={tab} channels={channels} isAdmin={isAdmin}
               onEdit={() => openEdit(b)} onDelete={() => del(b)} onReduce={() => reduce(b)} />)}
           </tbody>
         </table>
       </div>
 
-      {modal && <BundleModal modal={modal} setModal={setModal} products={products} channels={channels} pricingTarget={pricingTarget} onSubmit={save} />}
+      {modal && <BundleModal modal={modal} setModal={setModal} products={products} channels={channels} onSubmit={save} />}
     </div>
   );
 }
 
-function BundleRow({ b, tab, channels, pricingTarget, isAdmin, onEdit, onDelete, onReduce }) {
+function BundleRow({ b, tab, channels, isAdmin, onEdit, onDelete, onReduce }) {
   const isOnline = tab === "online";
   const anyHabis = b.components.some((c) => c.habis || c.missing);
   return (
@@ -178,7 +178,6 @@ function BundleRow({ b, tab, channels, pricingTarget, isAdmin, onEdit, onDelete,
           <td key={c.name} className="px-4 py-3 text-right font-mono" data-testid={`bundle-channel-price-${b.id}-${slug(c.name)}`}>
             {b.harga_channel?.[c.name] ? rupiah(b.harga_channel[c.name]) : <span className="text-xs italic text-muted-foreground">= online</span>}
             {price > 0 && <div className={`text-[10px] ${net < b.hpp ? "text-destructive font-semibold" : "text-muted-foreground"}`}>bersih {rupiah(net)}</div>}
-            {b.hpp > 0 && <div className="text-[10px] text-[#2563EB] font-semibold" data-testid={`bundle-saran-${b.id}-${slug(c.name)}`}>saran {rupiah(saranOf(c.fees, b.hpp, pricingTarget, "Paket"))}</div>}
           </td>
         );
       })}

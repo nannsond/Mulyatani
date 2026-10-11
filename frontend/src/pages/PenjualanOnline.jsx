@@ -5,8 +5,7 @@ import { exportEcomTemplate, readEcomExcel } from "@/lib/exporter";
 import { Search, Plus, Minus, Trash2, ShoppingBag, Loader2, CheckCircle2, FileSpreadsheet, Upload } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/context/AuthContext";
-import { calcFees, saranOf } from "@/lib/fees";
-import { usePricingTarget } from "@/lib/usePricingTarget";
+import { calcFees } from "@/lib/fees";
 import { OngkirCell, estimateFor } from "@/components/OngkirCell";
 import { OngkirEstimateBox } from "@/components/OngkirEstimateBox";
 
@@ -60,10 +59,6 @@ export default function PenjualanOnline() {
     ...bundles.map((b) => ({ id: b.id, name: b.name, category: "Paket", berat: b.berat, harga_online: b.harga_online, harga_channel: b.harga_channel, hpp: b.hpp, stok: b.stok, stok_minimal: 0, is_bundle: true, hemat: b.hemat })),
   ];
   const priceFor = (p) => p.harga_channel?.[channel] || p.harga_online || 0;
-  const target = usePricingTarget();
-  const chFees = channels.find((c) => c.name === channel)?.fees || [];
-  const saranFor = (p) => (p ? saranOf(chFees, p.harga_beli || p.hpp, target, p.category) : 0);
-  const findSellable = (id) => sellable.find((x) => x.id === id);
   useEffect(() => {
     setCart((c) => c.map((i) => { const p = sellable.find((x) => x.id === i.product_id); return p ? { ...i, harga: priceFor(p) } : i; }));
   }, [channel]);
@@ -187,11 +182,6 @@ export default function PenjualanOnline() {
                   <span className={`font-mono font-bold ${priceFor(p) ? "text-[#1B5E3B]" : "text-muted-foreground text-xs"}`}>{priceFor(p) ? rupiah(priceFor(p)) : "Harga online belum diatur"}</span>
                   <span className={`text-xs ${p.stok <= p.stok_minimal ? "text-destructive" : "text-muted-foreground"}`}>Stok: {p.stok}</span>
                 </div>
-                {saranFor(p) > 0 && (
-                  <p className={`text-[11px] mt-1 font-semibold ${priceFor(p) < saranFor(p) ? "text-amber-600" : "text-[#2563EB]"}`} data-testid={`ecom-saran-${p.id}`}>
-                    Saran {channel}: {rupiah(saranFor(p))}
-                  </p>
-                )}
                 {p.is_bundle && p.hemat > 0 && <span className="inline-block mt-1.5 text-[10px] font-bold px-2 py-0.5 rounded-full bg-green-100 text-green-700">Hemat {rupiah(p.hemat)}</span>}
               </button>
             ))}
@@ -218,15 +208,6 @@ export default function PenjualanOnline() {
                   </div>
                   <input type="number" value={i.harga} onChange={(e) => setHarga(i.product_id, e.target.value)} data-testid={`ecom-price-${i.product_id}`}
                     className="w-full px-2 py-1.5 rounded-lg border border-input text-xs font-mono" placeholder="Harga jual" />
-                  {saranFor(findSellable(i.product_id)) > 0 && (() => {
-                    const s = saranFor(findSellable(i.product_id));
-                    return (
-                      <div className="flex items-center justify-between text-[11px]" data-testid={`ecom-cart-saran-${i.product_id}`}>
-                        <span className={i.harga < s ? "text-amber-600 font-semibold" : "text-muted-foreground"}>Saran: {rupiah(s)}{i.harga < s ? " (di bawah target)" : ""}</span>
-                        {i.harga !== s && <button onClick={() => setHarga(i.product_id, s)} data-testid={`ecom-cart-use-saran-${i.product_id}`} className="text-[#2563EB] font-semibold">Pakai saran</button>}
-                      </div>
-                    );
-                  })()}
                 </div>
               ))}
             </div>

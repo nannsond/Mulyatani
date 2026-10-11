@@ -3,7 +3,6 @@ import { api, apiError } from "@/lib/api";
 import { useSettings } from "@/context/SettingsContext";
 import { Upload, Loader2, Image as ImageIcon, Store, Globe, Plus, Trash2, Power, Wallet, Percent } from "lucide-react";
 import ChannelFeeEditor from "@/components/ChannelFeeEditor";
-import PricingTargetCard from "@/components/PricingTargetCard";
 import ShippingRatesCard from "@/components/ShippingRatesCard";
 import { feeText } from "@/lib/fees";
 import { toast } from "sonner";
@@ -203,8 +202,6 @@ export default function Pengaturan() {
       </div>
 
       <ShippingRatesCard />
-
-      <PricingTargetCard />
     </div>
   );
 }

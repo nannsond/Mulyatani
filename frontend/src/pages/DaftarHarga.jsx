@@ -3,13 +3,11 @@ import { api, apiError } from "@/lib/api";
 import { rupiah } from "@/lib/format";
 import { useAuth } from "@/context/AuthContext";
 import { useSettings } from "@/context/SettingsContext";
-import { Plus, Pencil, Trash2, FileDown, FileSpreadsheet, X, Search, User, Users, Printer, AlertTriangle, ShoppingBag, Package, Boxes, Wand2 } from "lucide-react";
+import { Plus, Pencil, Trash2, FileDown, FileSpreadsheet, X, Search, User, Users, Printer, AlertTriangle, ShoppingBag, Package, Boxes } from "lucide-react";
 import BundlingPanel from "@/components/BundlingPanel";
 import { exportPDF, exportExcel, printPriceList } from "@/lib/exporter";
 import { toast } from "sonner";
-import { calcFees, suggestPrice, targetProfit, catTarget, saranOf } from "@/lib/fees";
-import SuggestPricePanel, { TargetInput } from "@/components/SuggestPricePanel";
-import { usePricingTarget } from "@/lib/usePricingTarget";
+import { calcFees } from "@/lib/fees";
 
 const EMPTY = { sku: "", name: "", category: "Pupuk", unit: "pcs", harga_beli: 0, harga_jual: 0, harga_reseller: 0, harga_online: 0, harga_channel: {}, stok: 0, stok_minimal: 10, berat: 0 };
 const CATS = ["Pupuk", "Benih", "Pestisida", "Alat Tani", "Lainnya"];
@@ -28,17 +26,6 @@ export default function DaftarHarga() {
   const [modal, setModal] = useState(null);
   const [view, setView] = useState("satuan");
   const [channels, setChannels] = useState([]);
-  const [suggestOpen, setSuggestOpen] = useState(false);
-  const target = usePricingTarget();
-  const [tMode, setTMode] = useState("percent");
-  const [tValue, setTValue] = useState(20);
-  const modalCat = modal?.category;
-  useEffect(() => { if (target.loaded) { const t = catTarget(target, modalCat); setTMode(t.mode); setTValue(t.value); } }, [target, modalCat]);
-  const saranFor = (p, c) => saranOf(c.fees, p.harga_beli, target, p.category);
-  const fillSuggest = () => {
-    const target = targetProfit(modal.harga_beli, tMode, tValue);
-    setModal({ ...modal, harga_channel: Object.fromEntries(channels.map((c) => [c.name, suggestPrice(c.fees, modal.harga_beli, target)])) });
-  };
 
   const load = () => api.get("/products").then((r) => setProducts(r.data));
   useEffect(() => { load(); api.get("/channels").then((r) => setChannels(r.data.filter((c) => c.active))); }, []);
@@ -102,7 +89,7 @@ export default function DaftarHarga() {
         </button>
       </div>
 
-      {view === "bundling" ? <BundlingPanel isAdmin={isAdmin} onChanged={load} channels={channels} pricingTarget={target} /> : (
+      {view === "bundling" ? <BundlingPanel isAdmin={isAdmin} onChanged={load} channels={channels} /> : (
       <>
       <div className="flex rounded-xl border border-input overflow-hidden w-fit" data-testid="price-tab">
         <button onClick={() => setTab("normal")} data-testid="price-tab-normal"
@@ -145,10 +132,6 @@ export default function DaftarHarga() {
             className="flex items-center gap-2 px-3 py-2.5 rounded-xl border border-input text-sm hover:bg-secondary"><FileDown className="w-4 h-4" /> PDF</button>
           <button onClick={() => exportExcel({ filename: exportTitle.replace(/\s+/g, "_"), sheetName: "Produk", columns: cols, rows })} data-testid="export-excel-button"
             className="flex items-center gap-2 px-3 py-2.5 rounded-xl border border-input text-sm hover:bg-secondary"><FileSpreadsheet className="w-4 h-4" /> Excel</button>
-          {isAdmin && isOnline && channels.length > 0 && (
-            <button onClick={() => setSuggestOpen(true)} data-testid="suggest-price-open"
-              className="flex items-center gap-2 px-3 py-2.5 rounded-xl border border-[#2563EB] text-[#2563EB] text-sm font-semibold hover:bg-blue-50"><Wand2 className="w-4 h-4" /> Harga Saran</button>
-          )}
           {isAdmin && (
             <button onClick={() => setModal({ ...EMPTY })} data-testid="product-add-modal-trigger"
               className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#1B5E3B] text-white text-sm font-semibold hover:bg-[#143D2B]"><Plus className="w-4 h-4" /> Tambah</button>
@@ -203,9 +186,6 @@ export default function DaftarHarga() {
                       const net = price - calcFees(c.fees, price).total;
                       return <div className={`text-[10px] ${net < p.harga_beli ? "text-destructive font-semibold" : "text-muted-foreground"}`}>bersih {rupiah(net)}</div>;
                     })()}
-                    {p.harga_beli > 0 && (
-                      <div className="text-[10px] text-[#2563EB] font-semibold" data-testid={`channel-saran-${p.id}-${c.name.replace(/\s+/g, "-").toLowerCase()}`}>saran {rupiah(saranFor(p, c))}</div>
-                    )}
                   </td>
                 ))}
                 <td className="px-4 py-3 text-right font-mono"><span className={p.stok <= p.stok_minimal ? "text-destructive font-semibold" : ""}>{p.stok} {p.unit}</span></td>
@@ -224,8 +204,6 @@ export default function DaftarHarga() {
       </div>
       </>
       )}
-
-      {suggestOpen && <SuggestPricePanel products={sorted} channels={channels} pricingTarget={target} onClose={() => setSuggestOpen(false)} onApplied={() => { setSuggestOpen(false); load(); }} />}
 
       {modal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -253,11 +231,6 @@ export default function DaftarHarga() {
               {channels.length > 0 && (
                 <div className="col-span-2 rounded-xl border border-dashed border-[#2563EB]/40 p-3">
                   <p className="text-sm font-medium">Harga per Platform <span className="text-xs text-muted-foreground font-normal">(kosongkan = pakai Harga Online)</span></p>
-                  <div className="flex flex-wrap items-center gap-2 mt-2" data-testid="product-suggest-row">
-                    <TargetInput mode={tMode} value={tValue} onMode={setTMode} onValue={setTValue} prefix="product-suggest" />
-                    <button type="button" onClick={fillSuggest} data-testid="product-suggest-fill"
-                      className="flex items-center gap-1 px-3 py-2 rounded-xl bg-[#2563EB] text-white text-xs font-semibold hover:bg-[#1D4ED8]"><Wand2 className="w-3.5 h-3.5" /> Isi Harga Saran</button>
-                  </div>
                   <div className="grid grid-cols-2 gap-2 mt-2">
                     {channels.map((c) => (
                       <div key={c.name}>

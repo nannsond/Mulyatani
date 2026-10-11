@@ -254,3 +254,6 @@ Aplikasi laporan penjualan sederhana untuk bisnis toko pertanian: laporan harian
 - Penjualan Online: daerah select, berat total, estimated ongkir = ceil(max(berat,min_kg)) × tarif (overridable); sale stores daerah, berat_total, ongkir_final=false.
 - Sales table Ongkir column; admin sets final ongkir when funds disburse (PUT /api/ecommerce/sales/{id}/ongkir recalculates total_fee & laba_bersih). Tested iter 32: 100%.
 - TikTok Shop Biaya Layanan Logistik (from user xlsx) stored in /app/backend/logistics_tiktok.json, seeded to settings key platform_logistics; returned as platform_tables in GET /api/shipping/rates. TikTok Shop sales estimate ongkir by layanan + rute + weight tier; read-only table in Pengaturan. Other channels keep per-kg daerah. Tested iter 33: 100%.
+
+## Update
+- Fitur Harga Saran dihapus seluruhnya (Daftar Harga, Paket Bundling, Penjualan Online, Dashboard, Pengaturan; endpoint /api/pricing/settings dihapus)

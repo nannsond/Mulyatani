@@ -1,20 +1,13 @@
-import { useEffect, useState } from "react";
-import { catTarget, suggestPrice, targetProfit } from "@/lib/fees";
 import { rupiah } from "@/lib/format";
-import { TargetInput } from "@/components/SuggestPricePanel";
-import { Trash2, X, Wand2 } from "lucide-react";
+import { Trash2, X } from "lucide-react";
 import ProductSearchPicker from "@/components/ProductSearchPicker";
 
 const slug = (s) => s.replace(/\s+/g, "-").toLowerCase();
 const inputCls = "mt-1 w-full px-3 py-2.5 rounded-xl border border-input text-sm font-mono focus:outline-none focus:ring-2";
 
-export default function BundleModal({ modal, setModal, products, channels, pricingTarget, onSubmit }) {
-  const [tMode, setTMode] = useState("percent");
-  const [tValue, setTValue] = useState(20);
-  useEffect(() => { const t = catTarget(pricingTarget, "Paket"); setTMode(t.mode); setTValue(t.value); }, [pricingTarget]);
+export default function BundleModal({ modal, setModal, products, channels, onSubmit }) {
   const pOf = (id) => products.find((p) => p.id === id);
   const cost = modal.components.reduce((t, c) => t + (Number(c.qty) || 1) * (pOf(c.product_id)?.harga_beli || 0), 0);
-  const fillSuggest = () => setModal((m) => ({ ...m, harga_channel: Object.fromEntries(channels.map((c) => [c.name, suggestPrice(c.fees, cost, targetProfit(cost, tMode, tValue))])) }));
   const addComp = (pid) => setModal((m) => {
     const p = pOf(pid);
     if (!p || m.components.some((c) => c.product_id === pid)) return m;
@@ -65,11 +58,6 @@ export default function BundleModal({ modal, setModal, products, channels, prici
           {channels.length > 0 && (
             <div className="rounded-xl border border-dashed border-[#2563EB]/40 p-3">
               <p className="text-sm font-medium">Harga per Platform <span className="text-xs text-muted-foreground font-normal">(kosongkan = pakai Harga Online)</span></p>
-              <div className="flex flex-wrap items-center gap-2 mt-2" data-testid="bundle-suggest-row">
-                <TargetInput mode={tMode} value={tValue} onMode={setTMode} onValue={setTValue} prefix="bundle-suggest" />
-                <button type="button" onClick={fillSuggest} disabled={!(cost > 0)} data-testid="bundle-suggest-fill"
-                  className="flex items-center gap-1 px-3 py-2 rounded-xl bg-[#2563EB] text-white text-xs font-semibold hover:bg-[#1D4ED8] disabled:opacity-50"><Wand2 className="w-3.5 h-3.5" /> Isi Harga Saran</button>
-              </div>
               <div className="grid grid-cols-2 gap-2 mt-2">
                 {channels.map((c) => (
                   <div key={c.name}>
