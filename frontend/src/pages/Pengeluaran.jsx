@@ -20,6 +20,7 @@ export default function Pengeluaran() {
   const startEdit = (x) => {
     setEditId(x.id);
     setForm({ category: x.category, amount: String(x.amount), note: x.note || "", date: x.created_at.slice(0, 10) });
+    window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   const submit = async (e) => {
