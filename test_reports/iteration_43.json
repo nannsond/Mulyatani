@@ -1,0 +1,30 @@
+{
+  "summary": "Iter 43 - Verified Hutang pay-date routing and Cash Flow line chart. Backend 5/5 pytest passed: credit purchase (amount_paid < total) emits only initial 'Bayar awal' pembelian event on PO date; POST /api/purchases/{id}/pay with explicit date stores payment at that date with info 'Bayar hutang supplier (pembelian <PO_DATE>)' and populates /reports/cash/day on the pay date; /reports/cash/daily rows for pay month include the pembelian + keluar + saldo_berjalan (chart-ready); amount<=0 => 400; overpayment capped to total (status lunas); total kas (no period) >= sum of per-month pembelian so no double counting across months; /hutang listing shows sebagian entries with correct sisa. Also re-ran iter42 piutang suite: 5/5 still green. Frontend: Hutang & Piutang pay modal on HUTANG tab now exposes data-testid=hp-pay-date with label 'Tanggal uang dibayarkan' (seeded sebagian purchase via API; UI click Bayar opened modal; submitted amount 10k + date 2026-01-05; backend persisted payments[0].date='2026-01-05T...'; toast 'Pembayaran dicatat'). Laba Rugi 'Rincian Arus Kas Harian' card renders a line chart data-testid=cash-flow-chart ABOVE the table, with 3 lines (Saldo Berjalan, Uang Keluar, Uang Masuk) in both Bulanan and Tahunan modes; tooltip shows date + 'Rp 0' / 'Rp 251.200' etc. for the three series. No blocking console errors (only initial recharts 'width(-1)/height(-1)' warnings on first mount — self-resolving once ResponsiveContainer measures; non-blocking).",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter43_hutang_cashflow.py",
+    "/app/backend/tests/test_iter42_piutang_cair.py",
+    "/app/test_reports/pytest/iter43.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "server.py pay_purchase (line 1166): stores payments[].date as f'{data.date[:10]}T{now_iso()[11:]}' (date + current time-of-day). Consistent with pay_transaction, so cash_events slicing [:10] works. Minor: consider storing pure YYYY-MM-DD or a separate 'at' timestamp for clarity (same note as iter42).",
+    "pay_purchase does NOT require admin (uses get_current_user) — kasir can pay hutang. Matches pay_transaction behavior but may be intentional/unintentional; flagging for product owner.",
+    "CashFlowChart.jsx: initial render produces recharts warning 'width(-1) and height(-1)' until ResponsiveContainer measures; harmless but noisy. Can wrap in a style={{ width: '100%' }} or render only after rows load to suppress.",
+    "CashFlowChart.fillDays uses new Date().toISOString().slice(0,10) for today — fine, but server clock is 2026-10, so for 2027+ periods the chart will stop at 'today'. Expected per app design.",
+    "Still no DELETE endpoint for /api/purchases/{id} — leftover test data from UI flows requires direct Mongo cleanup. Minor dev-ergonomics issue (not user-facing)."
+  ],
+  "updated_files": ["/app/backend/tests/test_iter43_hutang_cashflow.py"],
+  "success_rate": {"backend": "100% (5/5 iter43, 5/5 iter42)", "frontend": "100%"},
+  "test_credentials": "Admin nannsond@gmail.com / admin123, Kasir kasir@tokotani.com / kasir123",
+  "seed_data_creation": "Backend tests created and backdated: 1 product sku TEST_ITER43-* and 3 purchases supplier TEST_ITER43_supp (po dates 2097-05-05). All deleted in teardown_module via Mongo. UI test created product sku TEST_UI43 + 1 purchase supplier TEST_UI43_supp and manually cleaned via Mongo after.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Hutang pay-date (POST /purchases/{id}/pay with {amount,date}) now mirrors piutang: cash_events() uses paid_cash_events() to split initial vs later payments, info 'Bayar hutang supplier (pembelian <PO_date>)' on pay date. Key data-testids: hp-pay-date (now on both piutang+hutang modal), cash-flow-chart (LineChart with 3 series inside cash-daily-card). cash/daily rows carry masuk/keluar/bersih/saldo_berjalan for the chart. No regressions observed in iter38-42 suites.",
+  "rca of the issue": "N/A - all tests passed"
+}

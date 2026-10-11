@@ -1,0 +1,24 @@
+{
+  "summary": "Iter 44 - Riwayat Pembayaran (payment history for piutang & hutang). Backend 5/5 pytest passed: GET /api/piutang default returns only belum/sebagian (lunas sales excluded); GET /api/piutang?all=true additionally includes lunas sales that have payments[], each row carries sisa; GET /api/hutang mirrors the same semantics for purchases; lunas sale without any payments entry is NOT included even with all=true (verified by seeding a cash-complete sale and asserting absence); payment dates (via /transactions/{id}/pay and /purchases/{id}/pay) persisted correctly (date[:10] matches input). Frontend: Hutang & Piutang page (/hutang-piutang) renders expandable history toggle hp-history-toggle-{id} with payment count. Expanded PaymentHistory table renders first-row 'Bayar awal (saat transaksi)' / 'Bayar awal (saat pembelian)' (date = sale/PO created_at) when initial amount_paid > sum(payments), followed by 'Cicilan ke-N' rows with Tanggal Bayar, Dicatat oleh, Jumlah and running 'Sisa Setelah Bayar'. Checkbox hp-show-lunas reloads with ?all=true: lunas sale/purchase appears with hp-lunas-{id} badge and no Bayar button. Bayar modal on Hutang tab: hp-pay-amount + hp-pay-date -> hp-pay-submit; after submit new 'Cicilan ke-1' row appears in history with the selected date (20 Jan 2026) and 'Admin' as recorder.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_iter44_payment_history.py",
+    "/app/test_reports/pytest/iter44.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "list_piutang/list_hutang (server.py L1063, L1159): using {'$or': [q, {'payments.0': {'$exists': True}}]} is correct; however the inner q uses $in which is fine. Note that a sale that was fully paid at creation (amount_paid = total, payments=[]) is intentionally excluded from all=true since there is nothing to show. Behavior matches spec.",
+    "PaymentHistory.jsx 'initial' uses doc.amount_paid - sum(payments). When a sale was fully paid upfront (payments=[]) and show-lunas is checked, this never surfaces because the backend filter payments.0 excludes it (good). But a mixed case 'initial=0 and payments non-empty' renders only cicilan rows (correct).",
+    "server.py pay_transaction/pay_purchase still store payments[].date as f'{date[:10]}T{now_iso()[11:]}'. Consistent, but a dedicated 'date' (YYYY-MM-DD) vs 'at' (full timestamp) separation would improve clarity (previously noted).",
+    "Frontend load() fires two parallel GETs on every showAll toggle - fine today, but a shared loader guard would avoid race in slow networks."
+  ],
+  "updated_files": ["/app/backend/tests/test_iter44_payment_history.py"],
+  "success_rate": {"backend": "100% (5/5)", "frontend": "100% (all testids verified end-to-end)"},
+  "test_credentials": "Admin nannsond@gmail.com / admin123",
+  "seed_data_creation": "Backend tests: product TEST_ITER44*, 3 transactions (customer_name TEST_ITER44_A/B/C) and 2 purchases (supplier TEST_ITER44_SUP_A/B). All cleaned in teardown_module via Mongo. UI test: product TEST_UI44, 2 transactions (TEST_UI44_A/B), 1 purchase (TEST_UI44_SUP). All cleaned via Mongo after test.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Riwayat Pembayaran feature live on /hutang-piutang. Key endpoints: GET /api/piutang?all={bool}, GET /api/hutang?all={bool} - all=true includes lunas docs with payments[0]. Key testids: hp-tab-piutang, hp-tab-hutang, hp-show-lunas, hp-row-{id}, hp-history-toggle-{id}, hp-history-{id}, hp-history-row-{id}-{i}, hp-lunas-{id}, hp-pay-{id}, hp-pay-modal, hp-pay-amount, hp-pay-date, hp-pay-submit. No regressions in iter42/43 pay-date logic.",
+  "rca of the issue": "N/A - all tests passed"
+}

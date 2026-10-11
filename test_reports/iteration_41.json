@@ -1,0 +1,23 @@
+{
+  "summary": "Iter 41 - Verified cair-tanggal routing (online Selesai with cair.tanggal counts in cair month, not order month) and new /api/reports/cash/day detail endpoint. UI dialog (CashDayDialog) opens from CashDailyTable row click, shows per-kind items with correct net total, closes on Escape.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_iter41_cash_day.py",
+    "/app/test_reports/pytest/iter41.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "report_cash_day doesn't validate date format - a malformed date like 'abc' falls back to cash_events('ab') and returns a non-empty list. Minor: add YYYY-MM-DD regex validation (same for /reports/cash/daily period).",
+    "cash_events() iterates all ecommerce_sales (status Selesai) across all time then filters by prefix in Python; for scale, add an index-friendly $or query on either cair.tanggal or created_at prefix.",
+    "CASH_KINDS ordering in cash_day: 'toko' before 'online' but TikTok Shop cair example shows single online kind - ordering only matters when multiple kinds present on same day; verified correct in test."
+  ],
+  "updated_files": ["/app/backend/tests/test_iter41_cash_day.py"],
+  "success_rate": {"backend": "100% (7/7)", "frontend": "100%"},
+  "test_credentials": "Admin nannsond@gmail.com / admin123",
+  "seed_data_creation": "Test period 2098-04 (order month) + 2098-05 (cair month): 1 Selesai sale with cair.tanggal=2098-05-07 cair.nominal=900000 (created 2098-04-28), 1 Selesai sale without cair (created 2098-04-28), plus POS 250k, loan 2M, expense 150k, purchase 400k all on 2098-05-07. All tagged test_mark=TEST_ITER41_* and cleaned up in fixture teardown.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Backend /api/reports/cash/day?date=YYYY-MM-DD returns {date, items:[{kind,amount,title,desc,info,date}]} sorted by CASH_KINDS order with zero-amount filtered and bruto/fee stripped. Per-kind sums == daily row for same date. Online Selesai with cair.tanggal correctly routes to cair month (not created_at month); without cair, uses created_at. UI: data-testids cash-day-dialog, cash-day-item-{i}, cash-day-net all present; dialog closes on Escape. Verified against real DB TikTok Shop sale (2026-10-11 cair, Rp 251.200). CashDayDialog is in /app/frontend/src/components/CashDayDialog.jsx.",
+  "rca of the issue": "N/A - all tests passed"
+}
