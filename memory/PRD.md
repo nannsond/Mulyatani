@@ -280,3 +280,4 @@ Aplikasi laporan penjualan sederhana untuk bisnis toko pertanian: laporan harian
 - Bayar cicilan otomatis membuat Pengeluaran kategori 'Cicilan Pinjaman'; hapus pembayaran/pengeluaran saling sinkron. Endpoints /api/loans*. Tested iter 38: 100%.
 - Backlog: pengingat jatuh tempo cicilan, ekspor PDF/Excel jadwal angsuran.
 - Dana Masuk Kas: loan disbursed/disbursed_date, PATCH /api/loans/{id}/disbursement, /api/reports/cash pinjaman_masuk; Laba Rugi baris 'Dana Pinjaman Masuk (Modal)'. Tested iter 39: 100%.
+- Kas Bersih Online: /api/reports/cash omzet online = nominal cair (jika dicatat) atau omzet − admin_fee; field omzet_offline, omzet_online_bruto, potongan_marketplace, omzet_online_cair; Laba Rugi menampilkan rincian.

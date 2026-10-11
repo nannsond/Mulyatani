@@ -926,27 +926,31 @@ async def report_cash(period: Optional[str] = None, user: dict = Depends(get_cur
     if period:
         rx = {"created_at": {"$regex": f"^{re.escape(period)}"}}
         txs = await db.transactions.find(rx).to_list(100000)
-        online, fee = await fetch_online_selesai(period)
         purchases = await db.purchases.find(rx).to_list(100000)
         exps = await db.expenses.find(rx).to_list(100000)
         saldo = 0
     else:
         saldo = s.get("saldo_awal_kas", 0) or 0
         txs = await db.transactions.find().to_list(100000)
-        online, fee = await fetch_online_selesai("")
         purchases = await db.purchases.find().to_list(100000)
         exps = await db.expenses.find().to_list(100000)
     omzet_offline = sum(t["total"] * tx_fraction(t) for t in txs)
-    omzet_online = sum(t["total"] for t in online)
+    online_docs = await db.ecommerce_sales.find({"status": "Selesai", "created_at": {"$regex": f"^{re.escape(period or '')}"}}).to_list(20000)
+    omzet_online_bruto = sum(d.get("omzet", 0) for d in online_docs)
+    online_cair = sum(d["cair"]["nominal"] if d.get("cair") else diterima_of(d) for d in online_docs)
+    potongan_marketplace = omzet_online_bruto - online_cair
+    fee = sum(d.get("total_fee", 0) for d in online_docs)
     pembelian = sum(p.get("amount_paid", 0) for p in purchases)
     pengeluaran = sum(e.get("amount", 0) for e in exps)
-    omzet = omzet_offline + omzet_online
+    omzet = omzet_offline + online_cair
     lq = {"disbursed": True}
     if period:
         lq["disbursed_date"] = {"$regex": f"^{re.escape(period)}"}
     pinjaman_masuk = sum(l["principal"] for l in await db.loans.find(lq).to_list(10000))
     kas = saldo + omzet + pinjaman_masuk - pembelian - pengeluaran
-    return {"saldo_awal_kas": saldo, "omzet": omzet, "pinjaman_masuk": pinjaman_masuk, "pembelian": pembelian,
+    return {"saldo_awal_kas": saldo, "omzet": omzet, "omzet_offline": omzet_offline,
+            "omzet_online_bruto": omzet_online_bruto, "potongan_marketplace": potongan_marketplace,
+            "omzet_online_cair": online_cair, "pinjaman_masuk": pinjaman_masuk, "pembelian": pembelian,
             "pengeluaran": pengeluaran, "biaya_marketplace": fee, "kas_saat_ini": kas,
             "is_period": bool(period)}
 

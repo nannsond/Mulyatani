@@ -184,14 +184,17 @@ export default function LabaRugi() {
               </div>
             </div>
             {!cash.is_period && <Line label="Saldo Awal Kas" value={cash.saldo_awal_kas} testid="kas-saldo-awal" />}
-            <Line label="Omzet Diterima (Kas)" value={cash.omzet} testid="kas-omzet" />
+            <Line label="Omzet Toko Fisik (Dibayar)" value={cash.omzet_offline || 0} testid="kas-omzet-offline" />
+            <Line label="Omzet Online (Bruto, Selesai)" value={cash.omzet_online_bruto || 0} testid="kas-omzet-online-bruto" />
+            <Line label="Potongan Marketplace" value={cash.potongan_marketplace || 0} negative testid="kas-potongan-marketplace" />
+            <Line label="Omzet Diterima (Kas)" value={cash.omzet} bold testid="kas-omzet" />
             <Line label="Dana Pinjaman Masuk (Modal)" value={cash.pinjaman_masuk || 0} testid="kas-pinjaman-masuk" />
             <Line label="Pembelian Dibayar" value={cash.pembelian} negative testid="kas-pembelian" />
             <Line label="Pengeluaran" value={cash.pengeluaran} negative testid="kas-pengeluaran" />
             <Line label={cash.is_period ? "Arus Kas Bersih Periode" : "Kas Saat Ini"} value={cash.kas_saat_ini} bold accent testid="kas-total" />
             <p className="text-xs text-muted-foreground mt-3">{cash.is_period
               ? "Arus Kas = Omzet Diterima + Dana Pinjaman Masuk − Pembelian Dibayar − Pengeluaran pada periode ini (basis kas)."
-              : "Kas = Saldo Awal + Omzet Diterima + Dana Pinjaman Masuk − Pembelian Dibayar − Pengeluaran. Hutang pembelian & piutang belum dihitung sampai benar-benar dibayar."}</p>
+              : "Kas = Saldo Awal + Omzet Diterima + Dana Pinjaman Masuk − Pembelian Dibayar − Pengeluaran. Online dihitung dari dana cair (nominal cair jika sudah dicatat, selain itu omzet − potongan platform). Hutang pembelian & piutang belum dihitung sampai benar-benar dibayar."}</p>
           </div>
         )}
         </>
