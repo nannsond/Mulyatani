@@ -53,16 +53,15 @@ export default function BundleModal({ modal, setModal, products, channels, onSub
           <div className="grid grid-cols-2 gap-3">
             {field("harga_jual", "Harga Normal", "focus:ring-[#1B5E3B]", "bundle-harga-input")}
             {field("harga_reseller", "Harga Reseller", "focus:ring-[#C85A32]", "bundle-reseller-input")}
-            {field("harga_online", "Harga Online", "focus:ring-[#2563EB]", "bundle-online-input")}
           </div>
           {channels.length > 0 && (
             <div className="rounded-xl border border-dashed border-[#2563EB]/40 p-3">
-              <p className="text-sm font-medium">Harga per Platform <span className="text-xs text-muted-foreground font-normal">(kosongkan = pakai Harga Online)</span></p>
+              <p className="text-sm font-medium">Harga per Platform</p>
               <div className="grid grid-cols-2 gap-2 mt-2">
                 {channels.map((c) => (
                   <div key={c.name}>
                     <label className="text-xs font-semibold" style={{ color: c.color }}>{c.name}</label>
-                    <input type="number" min="0" value={modal.harga_channel?.[c.name] ?? ""} placeholder={String(modal.harga_online || 0)}
+                    <input type="number" min="0" value={modal.harga_channel?.[c.name] ?? ""} placeholder="0"
                       onChange={(e) => setModal({ ...modal, harga_channel: { ...(modal.harga_channel || {}), [c.name]: e.target.value } })}
                       data-testid={`bundle-channel-price-${slug(c.name)}`}
                       className="mt-1 w-full px-3 py-2 rounded-xl border border-input text-sm focus:outline-none focus:ring-2 focus:ring-[#2563EB]" />

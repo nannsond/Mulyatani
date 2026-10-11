@@ -120,7 +120,7 @@ export async function printReceipt(tx, logoUrl, info = {}) {
   doc.save(`Struk_${tx.invoice_no}.pdf`);
 }
 
-export async function printPriceList({ products, mode, logoUrl, info }) {
+export async function printPriceList({ products, mode, channels = [], logoUrl, info }) {
   const doc = new jsPDF();
   if (logoUrl) { try { const d = await loadImageData(logoUrl); doc.addImage(d, "PNG", 14, 8, 16, 16); } catch (e) { /* skip */ } }
   const x = logoUrl ? 34 : 14;
@@ -130,11 +130,12 @@ export async function printPriceList({ products, mode, logoUrl, info }) {
   if (info?.address) { doc.text(info.address, x, hy); hy += 5; }
   if (info?.phone) { doc.text("Telp: " + info.phone, x, hy); hy += 5; }
   doc.setFontSize(12); doc.setTextColor(20, 20, 20);
-  const title = mode === "reseller" ? "DAFTAR HARGA RESELLER" : mode === "online" ? "DAFTAR HARGA ONLINE" : "DAFTAR HARGA NORMAL";
+  const title = mode === "reseller" ? "DAFTAR HARGA RESELLER" : mode === "online" ? "DAFTAR HARGA PLATFORM" : "DAFTAR HARGA NORMAL";
   doc.text(title, 14, hy + 4);
-  const priceOf = (p) => mode === "reseller" ? (p.harga_reseller || p.harga_jual) : mode === "online" ? (p.harga_online || 0) : p.harga_jual;
-  const cols = ["SKU", "Produk", "Kategori", "Satuan", "Harga"];
-  const rows = products.map((p) => [p.sku, p.name, p.category, p.unit, rp(priceOf(p))]);
+  const online = mode === "online";
+  const pricesOf = (p) => online ? channels.map((c) => p.harga_channel?.[c.name] || 0) : [mode === "reseller" ? (p.harga_reseller || p.harga_jual) : p.harga_jual];
+  const cols = ["SKU", "Produk", "Kategori", "Satuan", ...(online ? channels.map((c) => c.name) : ["Harga"])];
+  const rows = products.map((p) => [p.sku, p.name, p.category, p.unit, ...pricesOf(p).map(rp)]);
   autoTable(doc, { startY: hy + 8, head: [cols], body: rows, headStyles: { fillColor: [27, 94, 59] }, styles: { fontSize: 8 } });
   doc.save(`Daftar_Harga_${mode}.pdf`);
 }

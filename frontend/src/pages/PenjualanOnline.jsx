@@ -56,9 +56,9 @@ export default function PenjualanOnline() {
 
   const sellable = [
     ...products,
-    ...bundles.map((b) => ({ id: b.id, name: b.name, category: "Paket", berat: b.berat, harga_online: b.harga_online, harga_channel: b.harga_channel, hpp: b.hpp, stok: b.stok, stok_minimal: 0, is_bundle: true, hemat: b.hemat })),
+    ...bundles.map((b) => ({ id: b.id, name: b.name, category: "Paket", berat: b.berat, harga_channel: b.harga_channel, hpp: b.hpp, stok: b.stok, stok_minimal: 0, is_bundle: true, hemat: b.hemat })),
   ];
-  const priceFor = (p) => p.harga_channel?.[channel] || p.harga_online || 0;
+  const priceFor = (p) => p.harga_channel?.[channel] || 0;
   useEffect(() => {
     setCart((c) => c.map((i) => { const p = sellable.find((x) => x.id === i.product_id); return p ? { ...i, harga: priceFor(p) } : i; }));
   }, [channel]);
@@ -179,7 +179,7 @@ export default function PenjualanOnline() {
                 <span className={`text-[10px] uppercase tracking-wider font-semibold ${p.is_bundle ? "text-[#2563EB]" : "text-[#C85A32]"}`}>{p.is_bundle ? "★ Paket Bundling" : p.category}</span>
                 <p className="font-medium text-sm text-[#0F281E] mt-1 line-clamp-2 min-h-[2.5rem]">{p.name}</p>
                 <div className="flex items-center justify-between mt-2">
-                  <span className={`font-mono font-bold ${priceFor(p) ? "text-[#1B5E3B]" : "text-muted-foreground text-xs"}`}>{priceFor(p) ? rupiah(priceFor(p)) : "Harga online belum diatur"}</span>
+                  <span className={`font-mono font-bold ${priceFor(p) ? "text-[#1B5E3B]" : "text-muted-foreground text-xs"}`}>{priceFor(p) ? rupiah(priceFor(p)) : `Harga ${channel} belum diatur`}</span>
                   <span className={`text-xs ${p.stok <= p.stok_minimal ? "text-destructive" : "text-muted-foreground"}`}>Stok: {p.stok}</span>
                 </div>
                 {p.is_bundle && p.hemat > 0 && <span className="inline-block mt-1.5 text-[10px] font-bold px-2 py-0.5 rounded-full bg-green-100 text-green-700">Hemat {rupiah(p.hemat)}</span>}

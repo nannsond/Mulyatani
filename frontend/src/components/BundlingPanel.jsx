@@ -7,12 +7,12 @@ import { toast } from "sonner";
 import { Plus, Pencil, Trash2, Boxes, AlertTriangle, PackageMinus, Loader2, Search, User, Users, ShoppingBag, FileDown, FileSpreadsheet } from "lucide-react";
 import BundleModal from "@/components/BundleModal";
 
-const EMPTY = { name: "", category: "Paket", harga_jual: 0, harga_reseller: 0, harga_online: 0, harga_channel: {}, components: [] };
+const EMPTY = { name: "", category: "Paket", harga_jual: 0, harga_reseller: 0, harga_channel: {}, components: [] };
 const slug = (s) => s.replace(/\s+/g, "-").toLowerCase();
 const TABS = [
   { key: "normal", label: "Harga Normal", icon: User, color: "#1B5E3B" },
   { key: "reseller", label: "Harga Reseller", icon: Users, color: "#C85A32" },
-  { key: "online", label: "Harga Online", icon: ShoppingBag, color: "#2563EB" },
+  { key: "online", label: "Harga Platform", icon: ShoppingBag, color: "#2563EB" },
 ];
 
 export default function BundlingPanel({ isAdmin, onChanged, channels = [] }) {
@@ -33,7 +33,7 @@ export default function BundlingPanel({ isAdmin, onChanged, channels = [] }) {
     if (modal.components.length === 0) { toast.error("Tambahkan minimal 1 komponen"); return; }
     const body = {
       name: modal.name, category: modal.category || "Paket", harga_jual: Number(modal.harga_jual) || 0,
-      harga_reseller: Number(modal.harga_reseller) || 0, harga_online: Number(modal.harga_online) || 0,
+      harga_reseller: Number(modal.harga_reseller) || 0,
       harga_channel: Object.fromEntries(Object.entries(modal.harga_channel || {}).map(([k, v]) => [k, Number(v)]).filter(([, v]) => v > 0)),
       components: modal.components.map((c) => ({ product_id: c.product_id, name: products.find((p) => p.id === c.product_id)?.name || c.name, qty: Number(c.qty) || 1 })),
     };
@@ -65,19 +65,19 @@ export default function BundlingPanel({ isAdmin, onChanged, channels = [] }) {
 
   const openEdit = (b) => setModal({
     id: b.id, name: b.name, category: b.category || "Paket", harga_jual: b.harga_jual, harga_reseller: b.harga_reseller || 0,
-    harga_online: b.harga_online || 0, harga_channel: b.harga_channel || {},
+    harga_channel: b.harga_channel || {},
     components: b.components.map((c) => ({ product_id: c.product_id, name: c.name, qty: c.qty })),
   });
 
   if (loading) return <div className="flex justify-center py-20"><Loader2 className="w-8 h-8 animate-spin text-[#1B5E3B]" /></div>;
 
   const isOnline = tab === "online";
-  const priceKey = { normal: "harga_jual", reseller: "harga_reseller", online: "harga_online" }[tab];
   const priceLabel = TABS.find((t) => t.key === tab).label;
+  const pricesOf = (b) => isOnline ? channels.map((c) => b.harga_channel?.[c.name] || 0) : [b[tab === "reseller" ? "harga_reseller" : "harga_jual"] || 0];
   const sorted = bundles.filter((b) => b.name.toLowerCase().includes(search.toLowerCase()))
     .sort((a, b) => (sortBy === "name_desc" ? b.name.localeCompare(a.name, "id") : a.name.localeCompare(b.name, "id")));
-  const cols = ["Nama Paket", "Komposisi", "Modal", priceLabel, "Stok"];
-  const rows = sorted.map((b) => [b.name, b.components.map((c) => `${c.qty}x ${c.name}`).join(", "), b.hpp, b[priceKey] || 0, b.stok]);
+  const cols = ["Nama Paket", "Komposisi", "Modal", ...(isOnline ? channels.map((c) => c.name) : [priceLabel]), "Stok"];
+  const rows = sorted.map((b) => [b.name, b.components.map((c) => `${c.qty}x ${c.name}`).join(", "), b.hpp, ...pricesOf(b), b.stok]);
   const exportTitle = `Daftar ${priceLabel} Paket`;
 
   return (
@@ -122,7 +122,6 @@ export default function BundlingPanel({ isAdmin, onChanged, channels = [] }) {
               <th className="px-4 py-3 font-semibold text-right">Modal</th>
               <th className={`px-4 py-3 font-semibold text-right ${tab === "normal" ? "text-[#1B5E3B]" : ""}`}>Harga Normal</th>
               <th className={`px-4 py-3 font-semibold text-right ${tab === "reseller" ? "text-[#C85A32]" : ""}`}>Harga Reseller</th>
-              <th className={`px-4 py-3 font-semibold text-right ${isOnline ? "text-[#2563EB]" : ""}`}>Harga Online</th>
               {isOnline && channels.map((c) => <th key={c.name} className="px-4 py-3 font-semibold text-right" style={{ color: c.color }}>{c.name}</th>)}
               <th className="px-4 py-3 font-semibold text-right">Stok</th>
               {isAdmin && <th className="px-4 py-3 font-semibold text-center">Aksi</th>}
@@ -130,7 +129,7 @@ export default function BundlingPanel({ isAdmin, onChanged, channels = [] }) {
           </thead>
           <tbody>
             {sorted.length === 0 && (
-              <tr><td colSpan={8 + (isOnline ? channels.length : 0)} className="px-4 py-10 text-center text-muted-foreground" data-testid="bundle-empty">
+              <tr><td colSpan={7 + (isOnline ? channels.length : 0)} className="px-4 py-10 text-center text-muted-foreground" data-testid="bundle-empty">
                 <Boxes className="w-8 h-8 mx-auto mb-2 opacity-40" /> Belum ada paket bundling. {isAdmin && "Klik \"Tambah\" untuk membuat."}
               </td></tr>
             )}
@@ -170,13 +169,12 @@ function BundleRow({ b, tab, channels, isAdmin, onEdit, onDelete, onReduce }) {
       <td className="px-4 py-3 text-right font-mono">{rupiah(b.hpp)}</td>
       <td className={`px-4 py-3 text-right font-mono ${tab === "normal" ? "font-semibold text-[#1B5E3B]" : "text-muted-foreground"}`}>{rupiah(b.harga_jual)}</td>
       <td className={`px-4 py-3 text-right font-mono ${tab === "reseller" ? "font-semibold text-[#C85A32]" : "text-muted-foreground"}`}>{rupiah(b.harga_reseller || 0)}</td>
-      <td className={`px-4 py-3 text-right font-mono ${isOnline ? "font-semibold text-[#2563EB]" : "text-muted-foreground"}`}>{b.harga_online ? rupiah(b.harga_online) : <span className="text-xs italic">belum diatur</span>}</td>
       {isOnline && channels.map((c) => {
-        const price = b.harga_channel?.[c.name] || b.harga_online;
+        const price = b.harga_channel?.[c.name] || 0;
         const net = price - calcFees(c.fees, price).total;
         return (
           <td key={c.name} className="px-4 py-3 text-right font-mono" data-testid={`bundle-channel-price-${b.id}-${slug(c.name)}`}>
-            {b.harga_channel?.[c.name] ? rupiah(b.harga_channel[c.name]) : <span className="text-xs italic text-muted-foreground">= online</span>}
+            {b.harga_channel?.[c.name] ? rupiah(b.harga_channel[c.name]) : <span className="text-xs italic text-muted-foreground">belum diatur</span>}
             {price > 0 && <div className={`text-[10px] ${net < b.hpp ? "text-destructive font-semibold" : "text-muted-foreground"}`}>bersih {rupiah(net)}</div>}
           </td>
         );
