@@ -1,0 +1,24 @@
+{
+  "summary": "Iteration 20 – Payslip (Slip Gaji) reference layout. Backend (5/5 pytest) + Frontend (full E2E incl. PDF extraction) all PASS. Settings kota/penandatangan persist; Bonus/Pot.Lain dialog updates row & grand total immediately; save persists after reload; printed PDF filename Slip_Gaji_<name>_<Bulan>_<Tahun>.pdf and contains all required sections, correct net amount Rp 1.785.433 and terbilang 'Satu Juta Tujuh Ratus Delapan Puluh Lima Ribu Empat Ratus Tiga Puluh Tiga Rupiah'.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_iter20_payslip.py",
+    "/app/test_reports/pytest/iter20.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "server.py (~1843 lines) is well past the 700-line guideline — consider splitting into routers (auth, products, payroll, ecommerce, attendance).",
+    "GET /api/payroll/settings is admin-aware via get_current_user but POST is admin-only; consistent, OK. _compute_payroll iterates all users with to_list(500) – fine for small shops; add pagination/index on attendance.date and ecommerce_sales.created_at for scale.",
+    "exporter.printPayslip builds PDF client-side; terbilang handles negative via 'Minus' prefix but final 'Rupiah' always appended – OK. Signature block uses fixed y+26 offset; if bonus list grows, pagination relies on `if y>240` only (works for current body).",
+    "No server-side validation on bonus_items keterangan length / jumlah max — malicious client could store huge strings; add length cap."
+  ],
+  "updated_files": ["/app/backend/tests/test_iter20_payslip.py"],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "test_credentials": "Admin nannsond@gmail.com / admin123",
+  "seed_data_creation": "Created TEST_PayslipUI kasir for UI test and TEST_Payslip for pytest – both deleted during teardown. Admin override for current month cleaned. Payroll settings reset to empty kota/penandatangan, potongan_telat=0, hari_kerja=26.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Iter20 covered backend payroll kota/ttd + bonus_items/potongan_lain and frontend Rekap Gaji dialog + payslip PDF (reference layout from Slip_Gaji Mulya Tani). PDF text extracted via pypdf verified all required labels and correct terbilang. employee_salary doc for TEST_PayslipUI may remain orphaned after user deletion (no API to remove) – harmless.",
+  "rca of the issue": "N/A – no issues found."
+}

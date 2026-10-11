@@ -1,0 +1,26 @@
+{
+  "summary": "Iteration 21 – Rekap Gaji extras (delete archive, WhatsApp slip, multi-row Potongan Lain-lain, editable Hadir/Telat/Alpha/Izin counts). Backend: 4/4 pytest PASS. Frontend E2E PASS: amber-border diff indicator + 'diedit' badge on count edits, auto-recalculate potongan on telat/alpha change (3×10000 + round(2×2600000/26) = 230000 ✓), multi-row Potongan Lain-lain (Kasbon 150k + Barang rusak 50k = Rp 200.000), bonus Lembur 100k, row total Rp 2.270.000, persistence after reload (hadir=20, telat=3, alpha=2, izin=1), WA dialog prefills saved phone, send button disabled <9 digits & enabled on valid number, archive card appears after Arsipkan, trash icon deletes with confirm + toast 'Arsip Agustus 2099 dihapus (2 slip)' and card removed. Admin-only guard on DELETE /payroll/archive/{month} and POST /payroll/phone verified (403 for kasir).",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_iter21_payroll_extras.py",
+    "/app/test_reports/pytest/iter21.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "server.py still ~1873 lines – should be split into routers; carried over from iter20.",
+    "payroll_save upserts counts with max(0, ...) but doesn't validate upper bound (e.g. hadir>31). Minor; UI uses min=0.",
+    "PayslipWhatsAppDialog opens window.open('','_blank') synchronously then awaits POST /payroll/phone – if phone save fails the blank window stays open briefly before win?.close(); acceptable UX.",
+    "_compute_payroll fetches all users with to_list(500) and attendance to_list(5000) – fine for small shop. Add indexes on attendance.date and ecommerce_sales.created_at when scaling.",
+    "deleteArchive uses window.confirm (native). PRD-ish may prefer AlertDialog; acceptable given scope.",
+    "No server-side cap on potongan_items length / keterangan size — malicious client could spam huge list. Add length cap (same note as bonus_items from iter20)."
+  ],
+  "updated_files": ["/app/backend/tests/test_iter21_payroll_extras.py"],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "test_credentials": "Admin nannsond@gmail.com / admin123",
+  "seed_data_creation": "Created TEST_UI21 (test_iter21_ui@example.com) kasir in UI test and TEST_Iter21 kasir in pytest – both deleted during teardown. Payroll docs for month 2099-08 archived and then deleted. payroll settings reset to potongan_telat=0, hari_kerja=26, kota='', penandatangan=''.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Iter21 verified: (1) DELETE /api/payroll/archive/{month} + archives list refresh (2) POST /api/payroll/phone -> telepon stored & returned in report rows (3) POST /api/payroll/save potongan_items multi-row with empty rows dropped, total formula = gaji_pokok+komisi+sum(bonus)-potongan-sum(potongan_items), and persisted hadir/telat/alpha/izin override (4) Frontend amber-border 'diedit' indicator + auto-recalc potongan on telat/alpha (5) PayrollDetailDialog potlain-add/ket/jumlah/remove/total selectors (6) PayslipWhatsAppDialog prefill + disabled threshold + save phone. Did NOT verify actual wa.me URL navigation and PDF download content (iter20 already covered PDF content); escape-closed dialog before send to avoid popup. Also did NOT re-verify the Kehadiran line text containing Izin/Sakit inside the generated PDF (unchanged exporter.js line checked statically).",
+  "rca of the issue": "N/A – no issues found."
+}

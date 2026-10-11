@@ -1,0 +1,19 @@
+{
+  "summary": "Tested the new multi-product Stok Opname (bulk) feature end-to-end. Backend: 8/8 pytest cases pass covering single POST regression, bulk empty/duplicate/negative/unknown-product validation, atomicity (no partial write on 404), success path (session_id + stock update + history), and kasir role access. Frontend: product search input (type/suggestions), add row, duplicate-prevention toast, counter badge, live selisih badges (Sesuai/Kurang/Lebih), remove row, dynamic save button label 'Simpan & Sesuaikan N Stok', validation toasts for empty rows and empty stok fisik, success toast 'X produk disesuaikan (Y sesuai)', rows cleared, and history table refresh all verified. InventoryValuePanel on top refreshes after save (refreshKey=history.length). Sample CONTOH-001..005 stocks restored to 44/36/30/1/25 via the restore test.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": ["/app/backend/tests/test_iter28_opname_bulk.py", "/app/test_reports/pytest/iter28_opname.xml"],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "Minor: /api/stok-opname/bulk performs insert_many then per-product update_one in a loop; not transactional. If a later update fails mid-loop, prior stocks already changed. Acceptable for this app but worth noting.",
+    "Minor: invalid (non-24-hex) product_id in bulk would raise InvalidId from bson and surface as 500 instead of 400/404. Consider wrapping ObjectId conversion.",
+    "Nit: OpnameSessionForm pmap recomputed every render; fine for small product lists."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "test_credentials": "Admin nannsond@gmail.com/admin123, Kasir kasir@tokotani.com/kasir123",
+  "seed_data_creation": "No new seeds. CONTOH-001..005 stocks restored to 44/36/30/1/25 at end of test run.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Opname bulk feature (iteration 28) fully verified. Regression test at /app/backend/tests/test_iter28_opname_bulk.py (8 tests, all pass). Sample stocks restored via test_restore_sample_stocks."
+}

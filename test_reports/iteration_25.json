@@ -1,0 +1,28 @@
+{
+  "summary": "Validated new iteration 25 features: per-category pricing targets, Paket Bundling saran, Dashboard price warning. Backend /api/pricing/settings now accepts 'categories' map (admin only; kasir=403; negative values clamped to 0; persists). Pengaturan UI: pricing-cat-row-{slug} for pupuk/benih/pestisida/alat-tani/lainnya/paket, with per-cat toggles, mode/value inputs that persist after reload. Daftar Harga Harga Online tab shows per-category saran: Benih Jagung (modal 20.000, Benih fixed 5.000) -> Shopee saran Rp 29.900; Pupuk Urea 1kg (modal 52.000, default 25%) -> Shopee Rp 75.300. Product edit modal prefills product-suggest-target-mode/value from category (fixed/5000 for Benih) and updates when category select changes to Pupuk (percent/25). product-suggest-fill button present. Bulk suggest-price-open modal defaults suggest-target-mode='settings' with value input hidden; switching to percent shows the value input. Paket Bundling panel renders bundle-saran-{id} with per-channel saran computed using 'Paket' category target (15% -> Shopee Rp 121.700). bundle-modal-saran + bundle-modal-saran-use sets bundle-online-input to the max saran (Rp 135.600 TikTok Shop). Penjualan Online shows ecom-saran-{bundle_id} = 'Saran Shopee: Rp 121.700'. Dashboard price-warning-card lists the bundle with harga_online 50.000 < saran (price-warning-count=1, price-warning-{bundle_id} present). Kasir dashboard does NOT render price-warning-card as expected.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Daftar Harga - Paket Bundling edit modal", "issues": ["Console hydration warning: '<span> cannot be a child of <option>' in BundlingPanel line 206 (product select options). React 19 strict hydration warning; non-blocking but should be cleaned up by removing span inside <option> or using plain text."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_iter25_pricing_categories.py", "/app/test_reports/pytest/iter25.xml"],
+  "action_items": [
+    "(Optional) Clean up BundlingPanel.jsx <option> content to avoid React hydration warning for <span> inside <option>."
+  ],
+  "critical_code_review_comments": [
+    "PricingTarget model stores categories as free-form Dict[str, CategoryTarget] - frontend uses mixed casing (e.g. 'Benih', 'Paket'). Make sure matching in saranOf is case-sensitive consistent (currently works).",
+    "PriceWarningCard filters only channels with active=true; if no channel active the card always shows empty state. OK for current UX but worth documenting.",
+    "Bundle API uses `components` field; previous iteration tests used `items`. Payload shape is correct per BundleInput schema."
+  ],
+  "updated_files": ["/app/backend/tests/test_iter25_pricing_categories.py"],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "test_credentials": "Admin nannsond@gmail.com/admin123, Kasir kasir@tokotani.com/kasir123",
+  "seed_data_creation": "Pricing settings now: default percent/25, Benih fixed/5000, Paket percent/15. All TEST_ products/bundles created during the test were deleted at the end.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Iteration 25 fully verified E2E. Testids verified: pricing-cat-row-{slug}, pricing-cat-toggle-{slug}, pricing-cat-{slug}-target-mode/value, product-suggest-target-mode/value, product-suggest-fill, product-category select, suggest-target-mode (default 'settings'), bundle-saran-{id}, bundle-modal-saran, bundle-modal-saran-use, bundle-online-input, bundle-edit-{id}, ecom-saran-{id}, price-warning-card, price-warning-count, price-warning-{id}, price-warning-empty. Shopee saran formulas confirmed: Benih fixed 5000 -> Rp 29.900; default 25% on Pupuk 52000 -> Rp 75.300; Paket 15% on bundle hpp 92000 -> Rp 121.700. Kasir cannot see price-warning-card.",
+  "rca of the issue": "N/A - no issues found."
+}

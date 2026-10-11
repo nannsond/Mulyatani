@@ -1,0 +1,39 @@
+{
+  "summary": "Fresh import E2E test. Backend: 42/42 pytest cases pass (auth, roles, products CRUD, bundles RBAC, POS transaction with partial payment + delivery creation + pay rest, deliveries list/archived, cron auto-archive, pricing/channels/logo settings, dashboard, daily/monthly/cash reports, inventory value, customers, purchases, hutang, piutang, expenses, stok-opname, ecommerce sales/reports, users admin-only, attendance today, payroll settings/report, commission settings, targets, leave). Seed data created via /app/scripts/seed_sample.py (5 CONTOH-* products, bundle 'Paket Tanam Cabai (Contoh)', 4 transactions including 2 with delivery to 'Pak Budi (Contoh)'). Frontend: login works for admin and kasir, correct role-based sidebar separation (admin sees Pembelian/Hutang&Piutang/Pengeluaran/Laba Rugi/Komisi Online/Rekap Gaji + Total Aset dashboard card + 'Harga Online di Bawah Saran' alert; kasir does NOT, matches PRD). POS loads products+bundle, Normal/Reseller tabs, Diskon Rp/%, Ongkir, Alamat, Bayar sebagian/Piutang, Tunai/Transfer/QRIS. Pengantaran page shows seeded deliveries with tabs Semua/Belum Diantar/Sedang Diantar/Selesai/Arsip. Daftar Harga page: tabs Harga Normal/Reseller/Online, PDF/Excel/Cetak buttons, Harga Saran button, per-channel columns Shopee/Tokopedia/Lazada/TikTok Shop with 'bersih/saran' rows, Paket Bundling sub-tab. Dashboard renders charts + stok menipis warnings for both roles.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {
+        "endpoint": "POST /api/cron/auto-archive-deliveries",
+        "issue": "Returns 401 Unauthorized when WEBHOOK_CRON_SECRET env var is empty. User task statement expects this endpoint to work without a secret when WEBHOOK_CRON_SECRET is empty. Current code at server.py:600-609 fails fast with `if not secret or not token or ...` which means an empty secret always rejects the request. Either (a) treat empty secret as 'unauthenticated allowed' (public cron) and still run the background task, or (b) document the requirement that WEBHOOK_CRON_SECRET must be set. Currently the auto-archive-after-3-days functionality effectively cannot run via HTTP in this env."
+      }
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_e2e_smoke.py",
+    "/app/test_reports/pytest/iter27_e2e.xml"
+  ],
+  "action_items": [
+    "Decide on expected behavior for POST /api/cron/auto-archive-deliveries when WEBHOOK_CRON_SECRET='' – either make endpoint public in that case (likely intended per user statement) or set a secret in backend/.env."
+  ],
+  "critical_code_review_comments": [
+    "server.py is 1931 lines — exceeds the 700-line guideline and would benefit from splitting into routers (auth, products, bundles, transactions, deliveries, payroll, ecommerce, pricing, etc.).",
+    "cron_auto_archive handler short-circuits when WEBHOOK_CRON_SECRET is empty (both `not secret` and `not token` are true) — inconsistent with user expectation of running without secret.",
+    "Many endpoints require query params (reports/daily, reports/monthly, targets, payroll/report) and return 422 if omitted; OK but front-end must always supply them."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_e2e_smoke.py"
+  ],
+  "success_rate": {"backend": "100% (42/42)", "frontend": "100% smoke"},
+  "test_credentials": "Admin nannsond@gmail.com/admin123, Kasir kasir@tokotani.com/kasir123",
+  "seed_data_creation": "Ran /app/scripts/seed_sample.py: 5 CONTOH-* products, 1 bundle 'Paket Tanam Cabai (Contoh)', 4 sample transactions (2 with delivery to Pak Budi (Contoh)). Not deleted — these are the intended sample dataset.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Login key is `token` (not `access_token`). Product POST requires `sku`. Reports endpoints need query params. Dashboard aggregates work. Cron auto-archive requires non-empty WEBHOOK_CRON_SECRET + matching Bearer token. All CONTOH-* seed data should be preserved per task instruction.",
+  "rca of the issue": "cron/auto-archive-deliveries: condition `if not secret or not token or not hmac.compare_digest(token, secret)` treats empty env secret as auth failure. To match user expectation of 'without secret since WEBHOOK_CRON_SECRET empty', change logic to: if secret is set, require matching bearer; if secret is empty, allow unauthenticated (and still enqueue background task). Reproduction: `curl -X POST $BASE/api/cron/auto-archive-deliveries` → 401."
+}

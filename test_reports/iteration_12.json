@@ -1,0 +1,31 @@
+{
+  "summary": "Iter12 tested Alpha deduction in payroll + Leave request/approval workflow + removal of self-mark Izin/Sakit. Backend: 12/12 pytest passed. Frontend: all expected UI elements present (hari_kerja input, Alpha column, leave form+cancel+approve/reject buttons, Pengajuan Izin nav, Tandai Kehadiran admin form, self-mark Izin/Sakit buttons removed and replaced with hint).",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "/kehadiran (admin Tandai form)", "issues": ["React hydration warning: <span> cannot be a child of <option> in the mark-employee-select (dev-mode source instrumentation wrapping option children). Non-blocking but logs error in console."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter12_leave_alpha.py",
+    "/app/test_reports/pytest/iter12.xml"
+  ],
+  "action_items": [
+    "Optional: investigate <option> hydration warning in Kehadiran employee select (likely from source-instrumentation of option label; wrap employee name in plain text instead of expression to avoid dev-mode wrapper)."
+  ],
+  "critical_code_review_comments": [
+    "potongan_alpha math is correct: round(alpha * gaji_pokok / hari_kerja); 2500000/25*2 = 200000 verified in /api/payroll/report.",
+    "Leave approval upserts attendance by (user_id,date) correctly; rejection does not create attendance.",
+    "RBAC on /api/leave: kasir list filtered to own; kasir review -> 403; non-pending cancel by kasir -> 403; admin can review/delete.",
+    "server.py is now ~1428 lines; consider splitting into feature modules (products, sales, payroll, leave, attendance) soon."
+  ],
+  "updated_files": ["/app/backend/tests/test_iter12_leave_alpha.py"],
+  "success_rate": {"backend": "100% (12/12)", "frontend": "100% (all expected selectors + flows verified)"},
+  "test_credentials": "Admin nannsond@gmail.com / T0k0Mulya#Tani2026; Kasir kasir@tokotani.com / Kasir#Mulya2026",
+  "seed_data_creation": "Created and cleaned up TEST_iter12 leave requests for 2026-10-28 (approved -> attendance Izin), 2026-10-29 (rejected, cleaned), 2026-10-30 (kasir self-cancel), 2026-11-02 (approved + admin-cleaned), 2026-10-31 (UI pending submission). Payroll settings reset to potongan_telat=10000, hari_kerja=25.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "iter12 feature set is stable. Backend tests live at /app/backend/tests/test_iter12_leave_alpha.py. The preview DB has duplicate kasir users (user_id 6ac7a32ac5b58f981b372ab2 is the one with Alpha marks + gaji_pokok=2500000). Oct 2026 attendance now includes an approved Izin on 2026-10-28 from this testing run. GET /api/attendance returns {'month','records':[...]} (not 'items'). Login response uses 'token' key (not 'access_token')."
+}

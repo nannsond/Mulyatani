@@ -1,0 +1,25 @@
+{
+  "summary": "Iteration 22 — Ganti Password admin feature. Backend 6/6 pytest PASS: no-token→401, wrong current→400 'Password lama salah', new<6→400 'minimal 6', same-as-old→400 'berbeda', success→200 {ok:true} with old-pw login 401 and new-pw login 200, backend restart does NOT revert (seed_admin only inserts if missing — verified via sudo supervisorctl restart backend then re-login with newAdmin456), kasir (TEST_Iter22) can change own password & relogin (cleaned up). Frontend desktop E2E PASS: change-password-button opens change-pw-dialog, change-pw-error shows 'Password baru minimal 6 karakter' for <6 chars, 'Konfirmasi password tidak sama' for mismatch, server 'Password lama salah' for wrong current; change-pw-toggle flips input type password↔text; success closes dialog, fields cleared on reopen; after logout old pw login redirects back to /login and new pw logs in. Mobile (390x844) verified: mobile-menu-button opens sidebar with 'Ganti Password' visible at bottom (screenshot captured) and change-pw-dialog opens (verified earlier). Admin password restored to admin123 at end (both verified via /api/auth/login 200 for admin123 and 401 for newAdmin456).",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_iter22_change_password.py",
+    "/app/test_reports/pytest/iter22.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "server.py change_password validates current_password BEFORE length/same-as-old checks. If current is wrong you can never surface the length/same errors. Current order is actually safe (fail-fast on auth) and matches tests, but UI client-validates length/mismatch first so the server-side 'minimal 6' / 'berbeda' branches are mostly dead paths unless a non-UI client is used. Acceptable.",
+    "ChangePasswordDialog uses a single 'show' toggle for all 3 fields — fine for an admin-only screen but could leak the current password shoulder-surf. Low priority.",
+    "No rate limiting / brute-force protection on /auth/change-password — a stolen session token could brute-force the current_password. Consider throttling repeated wrong-current attempts (iter21 note still applies for /auth/login).",
+    "Login form (/login) inputs lack data-testid attributes (login-email/password/submit used but only present on Login page? Mobile verify used input[type=email] fallback). Not a bug for this iteration but worth adding for consistent E2E coverage.",
+    "server.py still ~1889 lines – carried-over suggestion to split into routers."
+  ],
+  "updated_files": ["/app/backend/tests/test_iter22_change_password.py"],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "test_credentials": "Admin: nannsond@gmail.com / admin123 (RESTORED and verified at end)",
+  "seed_data_creation": "Created TEST_Iter22_Kasir (test_iter22_kasir@example.com) during pytest and deleted in teardown. Admin password temporarily set to newAdmin456 during tests then restored to admin123 (verified via API + explicit curl).",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Change-password feature fully covered: backend endpoint /api/auth/change-password with 4 validation branches + success + restart-persistence + kasir flow (test_iter22_change_password.py — RUN WITH -n0 to disable xdist since the admin-flow test temporarily changes the shared admin password, which breaks parallel validation tests). Frontend selectors: change-password-button (in Layout.jsx, rendered in both desktop sidebar and mobile sidebar — 2 DOM nodes; on desktop viewport the first is visible, on mobile only one is rendered inside the open sheet). Dialog selectors: change-pw-dialog, change-pw-current, change-pw-new, change-pw-confirm, change-pw-toggle, change-pw-submit, change-pw-error. Login form uses input[type=email]/input[type=password]/button[type=submit] (no login-* data-testids on login page itself). Admin password is admin123 at handoff.",
+  "rca of the issue": "N/A — no issues found."
+}

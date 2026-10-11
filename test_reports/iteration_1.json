@@ -1,0 +1,34 @@
+{
+  "summary": "Smoke-tested backend auth + core endpoints and ran one end-to-end UI flow (admin login -> POS checkout -> daftar harga -> stok opname -> all 3 reports) plus kasir role restriction. All backend endpoints returned expected data; all critical frontend flows worked including a successful POS transaction (INV-20261008-3575 Rp 56.000). Kasir role correctly hides add/edit/delete on Daftar Harga.",
+  "tested_scope": ["backend", "frontend", "auth", "integration"],
+  "passed": [
+    "POST /api/auth/login admin returns JWT token + user",
+    "POST /api/auth/login kasir returns JWT token + user",
+    "GET /api/dashboard returns omzet, transaksi, series7, low_stock",
+    "GET /api/products returns 13 seeded products",
+    "GET /api/reports/daily?date=... returns summary + transactions",
+    "GET /api/reports/monthly?month&year returns daily series",
+    "GET /api/reports/yearly?year returns monthly series",
+    "GET /api/stok-opname returns [] initially",
+    "Frontend: admin login -> sidebar + dashboard with stats and 7-day chart",
+    "POS: add product, Tunai payment, checkout succeeded with success toast and invoice shown",
+    "Daftar Harga: admin sees add + export PDF/Excel buttons",
+    "Stok Opname: product select rendered",
+    "Laporan Harian/Bulanan/Tahunan: filters (date/month/year) render and charts load",
+    "Kasir role: no add/edit/delete controls visible on Daftar Harga"
+  ],
+  "failed": [
+    {
+      "area": "frontend/Stok Opname",
+      "issue": "React hydration warning: <span> rendered as child of <option> in StokOpname select",
+      "evidence": "Console error: 'In HTML, <span> cannot be a child of <option>. This will cause a hydration error.' at StokOpname line 55 (<option> for products loop). Functionally the select still renders.",
+      "priority": "LOW"
+    }
+  ],
+  "action_items": [
+    "(Optional/LOW) Remove the <span> wrapper inside <option> in src/pages/StokOpname.jsx around line 55 to eliminate React hydration warning"
+  ],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "retest_needed": false,
+  "full_testing_deferred": true
+}

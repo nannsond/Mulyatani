@@ -1,0 +1,19 @@
+{
+  "summary": "Iteration 29 verified the reverted flat Stok Opname history + per-row DELETE for admin + month filter. Backend: 7/7 pytest cases pass (GET /stok-opname flat list shape, DELETE as admin 200 + stock unchanged, DELETE as kasir 403, invalid-id 404, unknown-id 404, unauth 401/403, sample stocks preserved). Frontend: /stok-opname renders month filter (data-testid opname-month-filter) defaulting to current month 2026-10 with options ['Semua Bulan','Oktober 2026','November 2025']; summary line (opname-month-summary) shows correct counts e.g. 'Oktober 2026: 17 catatan · 9 sesuai · 4 kurang · 4 lebih'; switching to 'Semua Bulan' and '2025-11' filters rows correctly; admin sees per-row trash button (opname-delete-{id}); confirm dialog opens with cancel/confirm testids; Cancel keeps row, Confirm deletes it and triggers reload; Kasir role sees zero delete buttons on same page. Seeded Nov-2025 doc inserted via Mongo and cleaned up via UI delete. CONTOH-001..005 stocks preserved at 44/36/30/1/25.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": ["/app/backend/tests/test_iter29_opname_delete.py", "/app/test_reports/pytest/iter29.xml"],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "StokOpname.jsx line 25: months list is deduped from history created_at keys; if history is empty for current month, filter still defaults to current monthKey which is also prepended — correct. However, Excel filename for 'all' uses 'Semua' (matches spec) and periode label uses 'Semua Bulan'. OK.",
+    "delete_opname properly validates ObjectId and returns 404 for both invalid and unknown ids (consistent). Good.",
+    "Minor: GET /stok-opname has no pagination (to_list(1000)); may become slow with large history. Not blocking."
+  ],
+  "updated_files": ["/app/backend/tests/test_iter29_opname_delete.py"],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "test_credentials": "Admin nannsond@gmail.com/admin123, Kasir kasir@tokotani.com/kasir123",
+  "seed_data_creation": "Temporarily inserted one stok_opname doc dated 2025-11-15 (note=TEST_iter29_seed) via Mongo to validate month filter; deleted via UI delete flow during test. CONTOH-001..005 stocks remain 44/36/30/1/25.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "iter29 regression test at /app/backend/tests/test_iter29_opname_delete.py (7 tests, pytest). It uses /auth/login response key 'token' (not access_token). Note: pytest.ini has xdist auto; invoke with -o addopts='' if needing single-worker. Session-grouped history + /stok-opname/session/{key} endpoint fully removed and replaced with flat GET + DELETE /stok-opname/{id}."
+}

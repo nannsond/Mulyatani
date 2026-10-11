@@ -1,0 +1,66 @@
+{
+  "summary": "Tested 4 iter-3 features (Riwayat Transaksi, Target Tahunan, Laba per Produk, Logo Toko) + regression. 14/14 backend pytest cases pass. All frontend testids present and flows work end-to-end (admin + kasir, including role gating). One integration bug found: SettingsContext does not refetch after login so sidebar-logo and logo-current only appear after a hard page reload.",
+  "tested_scope": ["backend", "frontend", "auth", "integration", "rbac", "file-upload"],
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [
+      {
+        "flow": "Logo display after login",
+        "issue": "SettingsContext.refresh() is called only on provider mount; if the user is not yet authenticated at that moment (login page) no fetch happens, and because the useEffect dep is the stable useCallback it never re-runs post-login. Result: after successful admin/kasir login the sidebar-logo and logo-current <img> tags are not rendered until the user does a full page reload (F5). Confirmed: `has_logo:true` from /api/settings, sidebar-logo missing right after login, present after reload.",
+        "affected_selectors": ["sidebar-logo", "logo-current"],
+        "fix_hint": "Call refresh() inside AuthContext login success, OR add `user` from useAuth as a dependency / effect trigger in SettingsProvider, OR gate the SettingsProvider below the auth-protected route tree so it remounts when user logs in."
+      }
+    ],
+    "design_issues": []
+  },
+  "passed": [
+    "Backend GET /api/transactions returns list with id/invoice_no/items/total (no _id leak)",
+    "Backend GET /api/transactions?q=INV-20261008 filters by invoice substring",
+    "Backend GET /api/transactions?q=ZZNOMATCH returns []",
+    "Backend kasir can GET /api/transactions (200)",
+    "Backend POST /api/targets {month:0} admin -> 200; yearly report returns matching target_omzet",
+    "Backend POST /api/targets {month:0} kasir -> 403",
+    "Backend GET /api/targets?month=0 returns saved value",
+    "Backend /api/reports/monthly has product_laba.tertinggi/terendah with name/qty/omzet/laba",
+    "Backend /api/reports/yearly has product_laba with populated tertinggi",
+    "Backend GET /api/settings has_logo flag",
+    "Backend GET /api/settings/logo public (no auth) returns 200 image/*",
+    "Backend POST /api/settings/logo kasir -> 403",
+    "Backend POST /api/settings/logo admin PNG -> 200 ok",
+    "Backend POST /api/settings/logo invalid text/plain -> 400",
+    "Frontend admin login shows nav-riwayat, nav-pengaturan, nav-kelola-kasir",
+    "Frontend Riwayat page lists 100 rows (riwayat-row-<id>), search works (9 rows for INV-20261008), Cetak button triggers without JS error",
+    "Frontend Laporan Tahunan: target-tahunan-panel renders, 12 tahunan-month-<n> rows, product-laba + tertinggi + terendah all present",
+    "Frontend target-tahunan-input + save-button => target-tahunan-progress-bar + target-tahunan-status reflect '100.0% tercapai Target terlampaui'",
+    "Frontend Laporan Bulanan shows product-laba component",
+    "Frontend Pengaturan: logo-file-input + logo-save-button present",
+    "Frontend kasir login: nav-pengaturan & nav-kelola-kasir hidden; nav-riwayat/nav-pos/nav-laporan-harian visible; kasir can read Riwayat (100 rows)",
+    "Frontend after page reload sidebar-logo and logo-current images render (confirms backend+DB wired)"
+  ],
+  "test_report_links": [
+    "/app/backend/tests/test_iter3_features.py",
+    "/app/backend/tests/test_new_features.py",
+    "/app/test_reports/pytest/iteration3.xml"
+  ],
+  "action_items": [
+    "Fix SettingsContext to refetch settings when user logs in (dependency on auth user or trigger from AuthContext on login success) so sidebar-logo & logo-current appear without a manual page reload. See fix_hint above."
+  ],
+  "critical_code_review_comments": [
+    "SettingsContext useEffect dep is the stable useCallback refresh; initial run returns early when token missing (login page) and never re-runs after login - integration bug.",
+    "server.py update_user accepts empty password to skip rehash (OK) but no min length validation when password is non-empty.",
+    "CORS still allow_origins=['*'] with allow_credentials=False; httpOnly cookies not used (JWT via Bearer only). Not blocking.",
+    "gen_invoice() uses count+1 which is race-prone under concurrent checkout; could collide. Not blocking seed data has unique numbers.",
+    "POST /api/settings/logo size check happens after full read; for very large uploads memory could spike. 2MB cap is tight so fine."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter3_features.py"
+  ],
+  "success_rate": {"backend": "100% (14/14)", "frontend": "95% (one post-login logo refresh gap)"},
+  "test_credentials": "Admin nannsond@gmail.com/admin123; Kasir kasir@tokotani.com/kasir123",
+  "seed_data_creation": "Set yearly target year=2026 month=0 = 123,456,789 (pytest) then overwritten to 50,000,000 via UI test. Uploaded a 1x1 transparent PNG test logo via pytest+admin which replaced the pre-existing logo (sidebar now shows a nearly-blank 1x1 image after reload). Main agent may want to re-upload a real logo.",
+  "retest_needed": true,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "All iter-3 testids and APIs verified. Only outstanding bug: SettingsContext refetch after login. Backend regression suite at /app/backend/tests/test_iter3_features.py (14 tests) + /app/backend/tests/test_new_features.py (iter-2). Note: logo file in object storage was overwritten by a tiny 1x1 test PNG during this run.",
+  "rca of the issue": "SettingsProvider mounts once at app root. On fresh page load without token, refresh() short-circuits. After successful login, no state change triggers the useEffect because refresh (useCallback with []) is stable. Thus settings stays {has_logo:false}. On full page reload the token is already present at mount so fetch succeeds. Fix: either (a) add dependency on useAuth().user, (b) expose refresh via a login-success callback in AuthContext, or (c) nest SettingsProvider inside an auth-protected route so it remounts on login."
+}
