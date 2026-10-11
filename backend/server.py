@@ -1596,23 +1596,33 @@ async def set_commission(data: CommissionSetting, admin: dict = Depends(require_
     await db.settings.update_one({"key": "commission"}, {"$set": {"rate": rate}}, upsert=True)
     return {"ok": True, "rate": rate}
 
+COMMISSION_STATUSES = ["Dikirim", "Selesai"]
+
+async def _commission_split(month: str) -> dict:
+    """Pool komisi dari laba kotor online Dikirim/Selesai, dibagi ke kasir sesuai jumlah hari hadir."""
+    rate = ((await db.settings.find_one({"key": "commission"})) or {}).get("rate", 0)
+    mrx = {"$regex": f"^{re.escape(month)}"}
+    sales = await db.ecommerce_sales.find({"status": {"$in": COMMISSION_STATUSES}, "created_at": mrx}).to_list(20000)
+    laba = sum(sl.get("laba_kotor", 0) for sl in sales)
+    pool = laba * rate / 100
+    kasir = await db.users.find({"role": "kasir"}).sort("created_at", 1).to_list(500)
+    hadir = {}
+    for a in await db.attendance.find({"date": mrx, "status": "Hadir"}).to_list(5000):
+        hadir[a["user_id"]] = hadir.get(a["user_id"], 0) + 1
+    total_hadir = sum(hadir.get(str(u["_id"]), 0) for u in kasir)
+    rows = []
+    for u in kasir:
+        h = hadir.get(str(u["_id"]), 0)
+        share = h / total_hadir if total_hadir else 0
+        rows.append({"user_id": str(u["_id"]), "user_name": u["name"], "hadir": h, "porsi": share * 100, "komisi": round(pool * share)})
+    rows.sort(key=lambda x: x["komisi"], reverse=True)
+    return {"month": month, "rate": rate, "rows": rows, "total_hadir": total_hadir,
+            "total": {"transaksi": len(sales), "omzet": sum(sl.get("omzet", 0) for sl in sales), "laba_kotor": laba,
+                      "komisi": pool, "terbagi": sum(r["komisi"] for r in rows)}}
+
 @api_router.get("/commission/report")
 async def commission_report(month: str, admin: dict = Depends(require_admin)):
-    s = await db.settings.find_one({"key": "commission"})
-    rate = (s or {}).get("rate", 0)
-    sales = await db.ecommerce_sales.find({"status": "Selesai", "created_at": {"$regex": f"^{re.escape(month)}"}}).to_list(20000)
-    users = await db.users.find().sort("created_at", 1).to_list(500)
-    agg = laba_by_user(sales, users)
-    rows = []
-    for e in agg.values():
-        if e["transaksi"] == 0:
-            continue
-        e["komisi"] = e["laba_kotor"] * rate / 100
-        rows.append(e)
-    rows.sort(key=lambda x: x["komisi"], reverse=True)
-    total = {"transaksi": sum(r["transaksi"] for r in rows), "omzet": sum(r["omzet"] for r in rows),
-             "laba_kotor": sum(r["laba_kotor"] for r in rows), "komisi": sum(r["komisi"] for r in rows)}
-    return {"month": month, "rate": rate, "rows": rows, "total": total}
+    return await _commission_split(month)
 
 # ---------------- Kehadiran (employee attendance) ----------------
 WIB = timezone(timedelta(hours=7))
@@ -1815,8 +1825,7 @@ async def _compute_payroll(month: str):
     pay = await db.settings.find_one({"key": "payroll"}) or {}
     pot_rate = pay.get("potongan_telat", 0)
     hari_kerja = pay.get("hari_kerja", 26) or 26
-    sales = await db.ecommerce_sales.find({"status": "Selesai", "created_at": {"$regex": f"^{re.escape(month)}"}}).to_list(20000)
-    komisi_agg = laba_by_user(sales, users)
+    komisi_by_uid = {r["user_id"]: r["komisi"] for r in (await _commission_split(month))["rows"]}
     att = await db.attendance.find({"date": {"$regex": f"^{re.escape(month)}"}}).to_list(5000)
     telat_by_uid = {}; hadir_by_uid = {}; alpha_by_uid = {}; izin_by_uid = {}
     for a in att:
@@ -1841,7 +1850,7 @@ async def _compute_payroll(month: str):
                        "alpha": alpha_by_uid.get(uid, 0), "izin": izin_by_uid.get(uid, 0)}
         counts = {k: v if (ov or {}).get(k) is None else ov[k] for k, v in counts_auto.items()}
         hadir, telat, alpha, izin = counts["hadir"], counts["telat"], counts["alpha"], counts["izin"]
-        komisi_calc = komisi_agg.get(uid, {}).get("laba_kotor", 0) * comm / 100
+        komisi_calc = komisi_by_uid.get(uid, 0)
         base = bases.get(uid, 0)
         potongan_alpha = round(alpha * base / hari_kerja) if hari_kerja else 0
         potongan_calc = telat * pot_rate + potongan_alpha
