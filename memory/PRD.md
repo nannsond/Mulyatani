@@ -260,3 +260,4 @@ Aplikasi laporan penjualan sederhana untuk bisnis toko pertanian: laporan harian
 - Harga Online dihapus; hanya harga per platform (harga_channel). Tab "Harga Platform". Migrasi otomatis isi harga_channel kosong dari harga_online lama.
 - Tarif Ongkir per Daerah dihapus dari Pengaturan (card + POST /api/shipping/rates). Estimasi ongkir hanya dari tabel logistik platform (TikTok Shop); channel lain isi ongkir manual.
 - Biaya Layanan Logistik TikTok Shop dihapus dari Penjualan Online (tabel logistik, endpoint /api/shipping/rates, seed platform_logistics). Ongkir diisi manual.
+- Kotak berat/ongkir di Penjualan Online dihapus; ongkir diketik manual per pesanan.
