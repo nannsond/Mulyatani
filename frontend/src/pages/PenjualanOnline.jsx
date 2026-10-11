@@ -85,7 +85,7 @@ export default function PenjualanOnline() {
   const effAdmin = isAutoFee ? autoFee.total : Number(adminFee) || 0;
   const effOngkir = Number(ongkir) || 0;
   const totalFee = effAdmin + effOngkir + (Number(biayaLain) || 0);
-  const estNet = omzet - totalFee;
+  const estNet = omzet - effAdmin;
 
   const submit = async () => {
     if (!channel) { toast.error("Pilih channel"); return; }
@@ -229,7 +229,7 @@ export default function PenjualanOnline() {
             <div className="space-y-1 text-sm pt-1">
               <div className="flex justify-between text-muted-foreground"><span>Omzet</span><span className="font-mono">{rupiah(omzet)}</span></div>
               <div className="flex justify-between text-destructive"><span>Total biaya</span><span className="font-mono">-{rupiah(totalFee)}</span></div>
-              <div className="flex items-center justify-between pt-1"><span className="font-medium">Est. diterima</span><span className="font-mono font-bold text-xl text-[#1B5E3B]" data-testid="ecom-net">{rupiah(estNet)}</span></div>
+              <div className="flex items-center justify-between pt-1"><span className="font-medium">Est. diterima <span className="text-xs font-normal text-muted-foreground">(omzet − potongan)</span></span><span className="font-mono font-bold text-xl text-[#1B5E3B]" data-testid="ecom-net">{rupiah(estNet)}</span></div>
             </div>
             <button onClick={submit} disabled={!cart.length || saving} data-testid="ecom-submit-button"
               className="w-full bg-[#C85A32] hover:bg-[#B04B26] text-white py-3 rounded-xl font-semibold transition-colors flex items-center justify-center gap-2 disabled:opacity-50">
@@ -263,17 +263,18 @@ export default function PenjualanOnline() {
           <table className="w-full text-sm">
             <thead><tr className="border-b border-slate-200 bg-secondary/50 text-left">
               <th className="px-3 py-2.5 font-semibold">No</th><th className="px-3 py-2.5 font-semibold">Channel</th><th className="px-3 py-2.5 font-semibold">Tanggal</th>
-              <th className="px-3 py-2.5 font-semibold text-right">Omzet</th><th className="px-3 py-2.5 font-semibold text-right">Ongkir</th><th className="px-3 py-2.5 font-semibold text-right">Total Biaya</th>
+              <th className="px-3 py-2.5 font-semibold text-right">Omzet</th><th className="px-3 py-2.5 font-semibold text-right">Diterima</th><th className="px-3 py-2.5 font-semibold text-right">Ongkir</th><th className="px-3 py-2.5 font-semibold text-right">Total Biaya</th>
               <th className="px-3 py-2.5 font-semibold text-right">Laba Bersih</th><th className="px-3 py-2.5 font-semibold text-center">Status</th>{isAdmin && <th className="px-3 py-2.5 font-semibold text-center">Aksi</th>}
             </tr></thead>
             <tbody>
-              {recent.length === 0 && <tr><td colSpan={isAdmin ? 9 : 8} className="px-3 py-8 text-center text-muted-foreground">Belum ada penjualan online.</td></tr>}
+              {recent.length === 0 && <tr><td colSpan={isAdmin ? 10 : 9} className="px-3 py-8 text-center text-muted-foreground">Belum ada penjualan online.</td></tr>}
               {recent.map((s) => (
                 <tr key={s.id} className="border-b border-slate-100" data-testid={`ecom-row-${s.id}`}>
                   <td className="px-3 py-2.5 font-mono text-xs">{s.ecom_no}</td>
                   <td className="px-3 py-2.5"><span className="text-xs px-2 py-1 rounded-lg text-white font-semibold" style={{ backgroundColor: colorOf(s.channel) }}>{s.channel}</span></td>
                   <td className="px-3 py-2.5 text-xs text-muted-foreground">{fmtDate(s.created_at)}</td>
                   <td className="px-3 py-2.5 text-right font-mono">{rupiah(s.omzet)}</td>
+                  <td className="px-3 py-2.5 text-right font-mono font-semibold text-[#2563EB]" data-testid={`ecom-diterima-${s.id}`} title={`Potongan ${rupiah(s.admin_fee || 0)}`}>{rupiah((s.omzet || 0) - (s.admin_fee || 0))}</td>
                   <td className="px-3 py-2.5 text-right text-xs"><OngkirCell sale={s} isAdmin={isAdmin} onSaved={loadRecent} /></td>
                   <td className="px-3 py-2.5 text-right font-mono text-destructive">{rupiah(s.total_fee)}</td>
                   <td className="px-3 py-2.5 text-right font-mono font-semibold text-[#1B5E3B]">{rupiah(s.laba_bersih)}</td>
