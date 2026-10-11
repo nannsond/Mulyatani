@@ -264,3 +264,5 @@ Aplikasi laporan penjualan sederhana untuk bisnis toko pertanian: laporan harian
 - Isian berat produk dihapus; Satuan produk jadi dropdown (pcs, zak, kg).
 - Daftar Harga & Paket Bundling: tab harga digabung jadi satu tabel (Normal, Reseller, per platform); cetak/PDF/Excel ikut semua kolom.
 - Edit harga langsung di sel tabel (admin): PATCH /api/products/{id}/price & /api/bundles/{id}/price; komponen PriceCell.
+- Komisi online: pool % laba kotor pesanan Dikirim+Selesai, dibagi ke kasir sesuai hari hadir (juga dipakai Rekap Gaji).
+- Tabel Penjualan Online Terbaru bisa diedit admin (PUT /api/ecommerce/sales/{id}, EcomEditDialog).

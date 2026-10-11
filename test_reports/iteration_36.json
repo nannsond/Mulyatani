@@ -1,0 +1,18 @@
+{
+  "summary": "Iteration 36: Admin edit on Penjualan Online recent table. Backend PUT /api/ecommerce/sales/{id} and frontend EcomEditDialog tested end-to-end. 6/6 pytest tests pass; full Playwright flow (admin edit + save + row refresh + kasir hidden) passes.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": ["/app/backend/tests/test_iter36_ecom_edit.py", "/app/test_reports/pytest/iter36.xml"],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "Minor: EcomEditDialog send items without product_id (backend ignores, OK). Backend only writes fee_breakdown override when admin_fee changes; may leave stale breakdown entries if other fees edited but admin_fee unchanged (acceptable).",
+    "server.py is 2116 lines - consider splitting into modules (sales, products, auth, etc.) per guideline (>700 lines)."
+  ],
+  "updated_files": ["/app/backend/tests/test_iter36_ecom_edit.py"],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "test_credentials": "admin nannsond@gmail.com/admin123, kasir kasir@tokotani.com/kasir123",
+  "seed_data_creation": "Created and deleted TEST_ITER36 products and online sales (ECOM-20261011-0003 cleaned up). No lingering real-data mutations.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Feature verified: pencil button opens EcomEditDialog modal (data-testid ecom-edit-modal), all expected fields present, live omzet preview correct, save shows success toast and refreshes recent table. Kasir role correctly hidden. Backend validates channel, qty>=1, len match, non-negative fees, returns 404 for unknown id and 403 for kasir; qty delta adjusts product stock; same-date preserves created_at."
+}
