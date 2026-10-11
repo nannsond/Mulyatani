@@ -1,0 +1,19 @@
+{
+  "summary": "Tested new Pinjaman Modal feature end-to-end. Backend: 12/12 pytest cases pass (admin create/list/delete, kasir 403, installment calc 12M/6%/12m => Rp 1.060.000, payment creates expense in Pengeluaran with category 'Cicilan Pinjaman', overpay rejected 400, pay full marks Lunas with next_due_date null, deleting payment removes expense, deleting expense removes payment from loan, deleting loan cleans all expenses, due_date = start+tenor months). Frontend: Admin sees sidebar 'Pinjaman Modal', loan form preview installment shows Rp 1.060.000, loan card renders pokok/total/cicilan/sisa/status Aktif, pay dialog pre-fills installment 1060000, overpay triggers 400 and dialog stays open, history toggle works, delete loan shows success toast and card disappears, stats update correctly. Kasir does NOT see menu and is redirected to / on direct URL access.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": ["/app/backend/tests/test_iter38_loans.py", "/app/test_reports/pytest/iter38_loans.xml"],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "server.py line 1221: created_at uses provided date string with hardcoded '+00:00' TZ suffix – acceptable but inconsistent with other now_iso() usages; expense date filtering by month depends on this format working with existing month query (verified in tests).",
+    "loan_out() returns raw payments array including user_name; fine for admin-only endpoint.",
+    "Delete loan does not use transactions – a crash between delete_expenses and delete_loan could leave orphan loan; low risk for this app size."
+  ],
+  "updated_files": ["/app/backend/tests/test_iter38_loans.py"],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "test_credentials": "admin nannsond@gmail.com/admin123, kasir kasir@tokotani.com/kasir123",
+  "seed_data_creation": "Created transient 'TEST_UI_BankBRI' loan during UI test – deleted at end. Backend test cleanup task removed any leftover 'TEST_*' and 'Bank BRI' loans.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Pinjaman Modal fully working. Login API returns 'token' field (not 'access_token'). Dashboard redirect is '/' not '/dashboard'."
+}

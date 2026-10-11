@@ -274,3 +274,8 @@ Aplikasi laporan penjualan sederhana untuk bisnis toko pertanian: laporan harian
 
 ## Import (2026-06) 
 - Project diimpor dari GitHub nannsond/Mulyatani branch conflict_121026_0025; dependencies terinstall, backend/.env dikonfigurasi (JWT_SECRET, ADMIN/KASIR, EMERGENT_LLM_KEY).
+
+## Implemented (2026-06) — Pinjaman Modal
+- Menu admin /pinjaman-modal: catat pinjaman modal (pemberi, pokok, bunga %/thn flat, tenor bulan, tanggal mulai), hitung total bunga, cicilan/bulan, jatuh tempo, sisa hutang, status Aktif/Lunas.
+- Bayar cicilan otomatis membuat Pengeluaran kategori 'Cicilan Pinjaman'; hapus pembayaran/pengeluaran saling sinkron. Endpoints /api/loans*. Tested iter 38: 100%.
+- Backlog: pengingat jatuh tempo cicilan, ekspor PDF/Excel jadwal angsuran.
