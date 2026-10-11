@@ -1145,7 +1145,97 @@ async def list_expenses(month: Optional[str] = None, user: dict = Depends(get_cu
 @api_router.delete("/expenses/{eid}")
 async def delete_expense(eid: str, admin: dict = Depends(require_admin)):
     await db.expenses.delete_one({"_id": ObjectId(eid)})
+    await db.loans.update_many({}, {"$pull": {"payments": {"expense_id": eid}}})
     return {"ok": True}
+
+# ---------------- Pinjaman Modal (loans) ----------------
+import calendar as _cal
+
+def add_months(date_str: str, n: int) -> str:
+    y, m, d = map(int, date_str[:10].split("-"))
+    m0 = m - 1 + n
+    y, m = y + m0 // 12, m0 % 12 + 1
+    return f"{y:04d}-{m:02d}-{min(d, _cal.monthrange(y, m)[1]):02d}"
+
+class LoanInput(BaseModel):
+    lender: str
+    principal: float = Field(gt=0)
+    interest_rate: float = Field(ge=0)
+    tenor: int = Field(gt=0)
+    start_date: str
+    note: str = ""
+
+class LoanPaymentInput(BaseModel):
+    amount: float = Field(gt=0)
+    date: str
+    note: str = ""
+
+def loan_out(doc: dict) -> dict:
+    total_interest = round(doc["principal"] * doc["interest_rate"] / 100 * doc["tenor"] / 12)
+    total_due = doc["principal"] + total_interest
+    paid = sum(p["amount"] for p in doc.get("payments", []))
+    n_paid = len(doc.get("payments", []))
+    remaining = max(0, total_due - paid)
+    out = {k: v for k, v in doc.items() if k != "_id"}
+    out.update({
+        "id": str(doc["_id"]), "total_interest": total_interest, "total_due": total_due,
+        "installment": round(total_due / doc["tenor"]), "paid": paid, "remaining": remaining,
+        "due_date": add_months(doc["start_date"], doc["tenor"]),
+        "next_due_date": None if remaining <= 0 else add_months(doc["start_date"], min(n_paid + 1, doc["tenor"])),
+        "status": "Lunas" if remaining <= 0 else "Aktif",
+    })
+    return out
+
+@api_router.post("/loans")
+async def create_loan(data: LoanInput, admin: dict = Depends(require_admin)):
+    doc = {**data.model_dump(), "payments": [], "user_name": admin["name"], "created_at": now_iso()}
+    res = await db.loans.insert_one(doc)
+    doc["_id"] = res.inserted_id
+    return loan_out(doc)
+
+@api_router.get("/loans")
+async def list_loans(admin: dict = Depends(require_admin)):
+    docs = await db.loans.find().sort("start_date", -1).to_list(1000)
+    return [loan_out(d) for d in docs]
+
+@api_router.delete("/loans/{lid}")
+async def delete_loan(lid: str, admin: dict = Depends(require_admin)):
+    doc = await db.loans.find_one({"_id": ObjectId(lid)})
+    if not doc:
+        raise HTTPException(status_code=404, detail="Pinjaman tidak ditemukan")
+    ids = [ObjectId(p["expense_id"]) for p in doc.get("payments", []) if p.get("expense_id")]
+    if ids:
+        await db.expenses.delete_many({"_id": {"$in": ids}})
+    await db.loans.delete_one({"_id": doc["_id"]})
+    return {"ok": True}
+
+@api_router.post("/loans/{lid}/payments")
+async def pay_loan(lid: str, data: LoanPaymentInput, admin: dict = Depends(require_admin)):
+    doc = await db.loans.find_one({"_id": ObjectId(lid)})
+    if not doc:
+        raise HTTPException(status_code=404, detail="Pinjaman tidak ditemukan")
+    if data.amount > loan_out(doc)["remaining"]:
+        raise HTTPException(status_code=400, detail="Jumlah melebihi sisa hutang")
+    exp = {"category": "Cicilan Pinjaman", "amount": data.amount,
+           "note": f"Cicilan ke-{len(doc.get('payments', [])) + 1} {doc['lender']}" + (f" - {data.note}" if data.note else ""),
+           "user_name": admin["name"], "created_at": data.date[:10] + "T00:00:00+00:00", "loan_id": lid}
+    res = await db.expenses.insert_one(exp)
+    pay = {"id": str(ObjectId()), "amount": data.amount, "date": data.date[:10], "note": data.note,
+           "expense_id": str(res.inserted_id), "user_name": admin["name"]}
+    await db.loans.update_one({"_id": doc["_id"]}, {"$push": {"payments": pay}})
+    return loan_out(await db.loans.find_one({"_id": doc["_id"]}))
+
+@api_router.delete("/loans/{lid}/payments/{pid}")
+async def delete_loan_payment(lid: str, pid: str, admin: dict = Depends(require_admin)):
+    doc = await db.loans.find_one({"_id": ObjectId(lid)})
+    if not doc:
+        raise HTTPException(status_code=404, detail="Pinjaman tidak ditemukan")
+    pay = next((p for p in doc.get("payments", []) if p["id"] == pid), None)
+    if not pay:
+        raise HTTPException(status_code=404, detail="Pembayaran tidak ditemukan")
+    await db.expenses.delete_one({"_id": ObjectId(pay["expense_id"])})
+    await db.loans.update_one({"_id": doc["_id"]}, {"$pull": {"payments": {"id": pid}}})
+    return loan_out(await db.loans.find_one({"_id": doc["_id"]}))
 
 # ---------------- Stok Opname ----------------
 @api_router.get("/stok-opname")

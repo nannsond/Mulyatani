@@ -2,7 +2,7 @@ import { useState } from "react";
 import { NavLink, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import { useSettings } from "@/context/SettingsContext";
-import { LayoutDashboard, ShoppingCart, Tag, Boxes, Calendar, BarChart3, TrendingUp, LogOut, Menu, X, Sprout, Users, ReceiptText, Settings, Truck, HandCoins, Banknote, Scale, ShoppingBag, Globe, Percent, Clock, Wallet, ClipboardList, MapPin } from "lucide-react";
+import { LayoutDashboard, ShoppingCart, Tag, Boxes, Calendar, BarChart3, TrendingUp, LogOut, Menu, X, Sprout, Users, ReceiptText, Settings, Truck, HandCoins, Banknote, Scale, ShoppingBag, Globe, Percent, Clock, Wallet, ClipboardList, MapPin, Landmark } from "lucide-react";
 
 const LINKS = [
   { label: "Dashboard", icon: LayoutDashboard, path: "/" },
@@ -13,6 +13,7 @@ const LINKS = [
   { label: "Pembelian", icon: Truck, path: "/pembelian", adminOnly: true },
   { label: "Hutang & Piutang", icon: HandCoins, path: "/hutang-piutang" },
   { label: "Pengeluaran", icon: Banknote, path: "/pengeluaran", adminOnly: true },
+  { label: "Pinjaman Modal", icon: Landmark, path: "/pinjaman-modal", adminOnly: true },
   { label: "Daftar Harga", icon: Tag, path: "/daftar-harga" },
   { label: "Stok Opname", icon: Boxes, path: "/stok-opname" },
   { label: "Laporan Harian", icon: Calendar, path: "/laporan/harian" },
