@@ -1,0 +1,23 @@
+{
+  "summary": "Iter 40 - Validated new cash-report features: online_belum_cair totals in /api/reports/cash and new /api/reports/cash/daily endpoint; verified Laba Rugi UI kas-belum-cair amber box + Rincian Arus Kas Harian table with PDF/Excel exports.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_iter40_cash_daily.py",
+    "/app/test_reports/pytest/iter40.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "cash_events() uses re.escape(period or '') with a $regex on created_at; works, but a plain string prefix match (e.g. {'$gte': period, '$lt': next}) would be more index-friendly if the collection grows large.",
+    "report_cash_daily does not expose saldo_awal_kas (always starts cumulative at 0 for the period), matching the UI note - OK, but worth documenting.",
+    "Pending online sales are excluded from kas_saat_ini (good) and surfaced separately as online_belum_cair - matches spec."
+  ],
+  "updated_files": ["/app/backend/tests/test_iter40_cash_daily.py"],
+  "success_rate": {"backend": "100% (3/3)", "frontend": "100%"},
+  "test_credentials": "Admin nannsond@gmail.com / admin123",
+  "seed_data_creation": "Test period 2097-03: inserted 2 Selesai + 2 pending ecommerce_sales, 1 transaction, 1 disbursed loan, 1 expense, 1 purchase - all tagged test_mark and cleaned up in fixture teardown. No persistent seed left.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Backend endpoints /api/reports/cash (with online_belum_cair fields) and /api/reports/cash/daily behave per spec. Daily rows sum equals /api/reports/cash totals for same period, and last saldo_berjalan == kas_saat_ini. Pending ecommerce (Diproses/Dikirim) correctly excluded from omzet/kas. Laba Rugi page renders data-testids kas-belum-cair, kas-belum-cair-amount, kas-belum-cair-count, cash-daily-card, cash-daily-table, cash-daily-row-{date}, cash-daily-total, cash-daily-export-pdf, cash-daily-export-excel. Export buttons do not throw.",
+  "rca of the issue": "N/A - no issues found"
+}
