@@ -266,3 +266,4 @@ Aplikasi laporan penjualan sederhana untuk bisnis toko pertanian: laporan harian
 - Edit harga langsung di sel tabel (admin): PATCH /api/products/{id}/price & /api/bundles/{id}/price; komponen PriceCell.
 - Komisi online: pool % laba kotor pesanan Dikirim+Selesai, dibagi ke kasir sesuai hari hadir (juga dipakai Rekap Gaji).
 - Tabel Penjualan Online Terbaru bisa diedit admin (PUT /api/ecommerce/sales/{id}, EcomEditDialog).
+- Pembagian komisi memakai hari absensi Hadir + Izin/Sakit (Alpha tidak).

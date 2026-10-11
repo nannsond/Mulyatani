@@ -32,7 +32,7 @@ export default function Komisi() {
       <div className="grid lg:grid-cols-3 gap-6">
         <div className="bg-card rounded-2xl border border-slate-200 p-6 h-fit space-y-4">
           <h3 className="font-heading font-semibold text-lg flex items-center gap-2"><Percent className="w-5 h-5 text-[#1B5E3B]" /> Tarif Komisi</h3>
-          <p className="text-sm text-muted-foreground">Komisi dihitung sebagai persentase dari <b>laba kotor</b> semua penjualan online berstatus <span className="text-blue-700 font-semibold">Dikirim</span> dan <span className="text-green-700 font-semibold">Selesai</span>, lalu dibagi ke semua <b>kasir</b> sesuai jumlah hari hadir di bulan tersebut.</p>
+          <p className="text-sm text-muted-foreground">Komisi dihitung sebagai persentase dari <b>laba kotor</b> semua penjualan online berstatus <span className="text-blue-700 font-semibold">Dikirim</span> dan <span className="text-green-700 font-semibold">Selesai</span>, lalu dibagi ke semua <b>kasir</b> sesuai jumlah hari absensi di bulan tersebut (<b>Hadir + Izin/Sakit</b>; Alpha tidak dihitung).</p>
           <div>
             <label className="text-sm font-medium">Persentase komisi (%)</label>
             <div className="mt-1 flex gap-2">
@@ -62,13 +62,13 @@ export default function Komisi() {
                 <PoolStat label={`Total Komisi (${report.rate}%)`} value={rupiah(report.total.komisi)} accent testid="commission-pool-total" />
               </div>
               {report.total_hadir === 0 && report.total.komisi > 0 && (
-                <p className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2" data-testid="commission-no-attendance">Belum ada kehadiran kasir bulan ini, komisi belum bisa dibagikan.</p>
+                <p className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2" data-testid="commission-no-attendance">Belum ada absensi kasir bulan ini, komisi belum bisa dibagikan.</p>
               )}
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead><tr className="border-b border-slate-200 bg-secondary/50 text-left">
                     <th className="px-3 py-2.5 font-semibold">Kasir</th>
-                    <th className="px-3 py-2.5 font-semibold text-right">Hari Hadir</th>
+                    <th className="px-3 py-2.5 font-semibold text-right">Hari Absensi</th>
                     <th className="px-3 py-2.5 font-semibold text-right">Porsi</th>
                     <th className="px-3 py-2.5 font-semibold text-right">Komisi</th>
                   </tr></thead>

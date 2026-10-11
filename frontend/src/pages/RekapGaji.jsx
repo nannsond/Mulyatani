@@ -133,7 +133,7 @@ export default function RekapGaji() {
           <div className="w-11 h-11 rounded-xl bg-[#1B5E3B] flex items-center justify-center"><Wallet className="w-6 h-6 text-white" /></div>
           <div>
             <h2 className="font-heading font-bold text-xl text-[#0F281E]">Rekap Gaji Karyawan</h2>
-            <p className="text-sm text-muted-foreground">{monthLabel} • Komisi {report?.commission_rate ?? 0}% dari laba kotor online "Dikirim" & "Selesai", dibagi ke kasir sesuai hari hadir</p>
+            <p className="text-sm text-muted-foreground">{monthLabel} • Komisi {report?.commission_rate ?? 0}% dari laba kotor online "Dikirim" & "Selesai", dibagi ke kasir sesuai hari absensi (Hadir + Izin/Sakit)</p>
           </div>
         </div>
         {!report ? <div className="flex justify-center py-16"><Loader2 className="w-8 h-8 animate-spin text-[#1B5E3B]" /></div> : (

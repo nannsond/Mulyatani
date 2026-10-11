@@ -1654,7 +1654,7 @@ async def set_commission(data: CommissionSetting, admin: dict = Depends(require_
 COMMISSION_STATUSES = ["Dikirim", "Selesai"]
 
 async def _commission_split(month: str) -> dict:
-    """Pool komisi dari laba kotor online Dikirim/Selesai, dibagi ke kasir sesuai jumlah hari hadir."""
+    """Pool komisi dari laba kotor online Dikirim/Selesai, dibagi ke kasir sesuai hari absensi (Hadir + Izin/Sakit)."""
     rate = ((await db.settings.find_one({"key": "commission"})) or {}).get("rate", 0)
     mrx = {"$regex": f"^{re.escape(month)}"}
     sales = await db.ecommerce_sales.find({"status": {"$in": COMMISSION_STATUSES}, "created_at": mrx}).to_list(20000)
@@ -1662,7 +1662,7 @@ async def _commission_split(month: str) -> dict:
     pool = laba * rate / 100
     kasir = await db.users.find({"role": "kasir"}).sort("created_at", 1).to_list(500)
     hadir = {}
-    for a in await db.attendance.find({"date": mrx, "status": "Hadir"}).to_list(5000):
+    for a in await db.attendance.find({"date": mrx, "status": {"$in": ["Hadir", "Izin", "Sakit"]}}).to_list(5000):
         hadir[a["user_id"]] = hadir.get(a["user_id"], 0) + 1
     total_hadir = sum(hadir.get(str(u["_id"]), 0) for u in kasir)
     rows = []
