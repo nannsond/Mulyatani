@@ -283,3 +283,4 @@ Aplikasi laporan penjualan sederhana untuk bisnis toko pertanian: laporan harian
 - Kas Bersih Online: /api/reports/cash omzet online = nominal cair (jika dicatat) atau omzet − admin_fee; field omzet_offline, omzet_online_bruto, potongan_marketplace, omzet_online_cair; Laba Rugi menampilkan rincian.
 - Online Belum Cair (Diproses/Dikirim, estimasi omzet−admin_fee) di kotak Kas + Rincian Arus Kas Harian (GET /api/reports/cash/daily, tabel + PDF/Excel) di Laba Rugi. Tested iter 40: 100%.
 - Klik baris arus kas harian → dialog rincian transaksi (GET /api/reports/cash/day). Dana online masuk kas pada cair.tanggal bila dicatat. Tested iter 41.
+- Piutang Sesuai Tanggal: pembayaran piutang (POST /transactions/{id}/pay {amount,date}) masuk kas di tanggal diterima (tx_cash_events). Pengingat Catat Cair: GET /api/ecommerce/belum-cair + CairReminder di kotak Kas. Tested iter 42.

@@ -1,0 +1,24 @@
+{
+  "summary": "Iter 42 - Verified piutang pay-date routing & cair reminder. Backend 5/5 pytest passed: POS credit sale events on sale date only count initial amount_paid; /transactions/{id}/pay with explicit date moves pelunasan to that date with info 'Pelunasan piutang (transaksi <sale_date>)'; overpayment capped; amount<=0 => 400; total kas (no period) >= sum of per-month omzet_offline (no double counting); /api/ecommerce/belum-cair admin-only (kasir 403). Frontend: Hutang & Piutang piutang modal shows hp-pay-date defaulting to today, saving with custom date persists correctly ('payments[].date' honored); Hutang tab modal does NOT show hp-pay-date. Laba Rugi: cair-reminder visible when belum-cair exists with cair-reminder-count '1 pesanan Selesai belum dicatat cair'; cair-reminder-open opens cair-reminder-dialog with cair-reminder-row-{id} and CairCell (ecom-cair-open/date/nominal/save). After saving cair, row disappears and card switches to cair-reminder-done. Seeded data was cleaned up.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_iter42_piutang_cair.py",
+    "/app/test_reports/pytest/iter42.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "server.py line 1079: payments[].date is stored as full ISO (e.g. '2097-04-20T18:39:04+00:00') built from `data.date[:10]`+current time; this is fine since cash_events slices [:10]. But if a client sends an ISO like '2097-04-20T...' then `data.date[:10]` still works. OK.",
+    "pay_transaction attributes payment to current server time-of-day on client-supplied date. Minor: consider storing just the YYYY-MM-DD for payments or including a separate 'at' timestamp like cair does, for clarity.",
+    "In HutangPiutang.jsx submitPay, when kind=='piutang' the request body is {amount, date} but if payDate is empty string the backend will treat as None (today). Guard against empty string in UI (currently default=todayStr(), so unlikely).",
+    "CairReminder.jsx line 46: `{list.length === 0}` is dead code — the component returns early when list is empty (line 17), so this empty-row never renders. Minor cleanup only."
+  ],
+  "updated_files": ["/app/backend/tests/test_iter42_piutang_cair.py"],
+  "success_rate": {"backend": "100% (5/5)", "frontend": "100%"},
+  "test_credentials": "Admin nannsond@gmail.com / admin123, Kasir kasir@tokotani.com / kasir123",
+  "seed_data_creation": "Temporarily seeded: 1 product (sku TEST_ITER42_SEED), 1 sebagian POS tx (invoice TEST_ITER42_INV, created 2097-03-05, total 50k paid 10k) and 1 Selesai online sale (ecom_no TEST_ITER42_ECOM, Shopee, 2097-03-10, omzet 100k fee 10k) for UI reminder test. All deleted after test. Backend tests use create+backdate via mongo and delete in teardown_module.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Piutang pay-date and belum-cair reminder are fully working. Key data-testids: hp-pay-date (piutang modal only), cair-reminder, cair-reminder-count, cair-reminder-open, cair-reminder-dialog, cair-reminder-row-{id}, ecom-cair-open/date/nominal/save-{id}, cair-reminder-done. CashDailyTable & CashDayDialog from iter41 still consume these payments correctly: pelunasan rows appear on their pay date with info 'Pelunasan piutang (transaksi <sale_date>)' in /api/reports/cash/day items.",
+  "rca of the issue": "N/A - all tests passed"
+}
