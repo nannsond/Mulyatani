@@ -6,6 +6,7 @@ import { exportPDF, exportExcel } from "@/lib/exporter";
 import { toast } from "sonner";
 import { Plus, Pencil, Trash2, Boxes, AlertTriangle, PackageMinus, Loader2, Search, FileDown, FileSpreadsheet } from "lucide-react";
 import BundleModal from "@/components/BundleModal";
+import PriceCell from "@/components/PriceCell";
 
 const EMPTY = { name: "", category: "Paket", harga_jual: 0, harga_reseller: 0, harga_channel: {}, components: [] };
 const slug = (s) => s.replace(/\s+/g, "-").toLowerCase();
@@ -56,6 +57,8 @@ export default function BundlingPanel({ isAdmin, onChanged, channels = [] }) {
       load(); onChanged?.();
     } catch (err) { toast.error(apiError(err.response?.data?.detail)); }
   };
+
+  const setPrice = (b, field, value, channel) => api.patch(`/bundles/${b.id}/price`, { field, value, channel }).then(load);
 
   const openEdit = (b) => setModal({
     id: b.id, name: b.name, category: b.category || "Paket", harga_jual: b.harga_jual, harga_reseller: b.harga_reseller || 0,
@@ -116,7 +119,7 @@ export default function BundlingPanel({ isAdmin, onChanged, channels = [] }) {
               </td></tr>
             )}
             {sorted.map((b) => <BundleRow key={b.id} b={b} channels={channels} isAdmin={isAdmin}
-              onEdit={() => openEdit(b)} onDelete={() => del(b)} onReduce={() => reduce(b)} />)}
+              onPrice={(f, v, ch) => setPrice(b, f, v, ch)} onEdit={() => openEdit(b)} onDelete={() => del(b)} onReduce={() => reduce(b)} />)}
           </tbody>
         </table>
       </div>
@@ -126,7 +129,7 @@ export default function BundlingPanel({ isAdmin, onChanged, channels = [] }) {
   );
 }
 
-function BundleRow({ b, channels, isAdmin, onEdit, onDelete, onReduce }) {
+function BundleRow({ b, channels, isAdmin, onPrice, onEdit, onDelete, onReduce }) {
   const anyHabis = b.components.some((c) => c.habis || c.missing);
   return (
     <tr className="border-b border-slate-100 hover:bg-secondary/30 align-top" data-testid={`bundle-row-${b.id}`}>
@@ -148,16 +151,16 @@ function BundleRow({ b, channels, isAdmin, onEdit, onDelete, onReduce }) {
         {anyHabis && <p className="text-[11px] text-destructive font-semibold mt-0.5" data-testid={`bundle-warning-${b.id}`}>Ada komponen habis, paket tidak bisa dijual</p>}
       </td>
       <td className="px-4 py-3 text-right font-mono">{rupiah(b.hpp)}</td>
-      <td className="px-4 py-3 text-right font-mono font-semibold text-[#1B5E3B]">{rupiah(b.harga_jual)}</td>
-      <td className="px-4 py-3 text-right font-mono font-semibold text-[#C85A32]">{rupiah(b.harga_reseller || 0)}</td>
+      <PriceCell value={b.harga_jual} editable={isAdmin} onSave={(v) => onPrice("harga_jual", v)} testid={`bundle-price-normal-${b.id}`} className="font-semibold text-[#1B5E3B]" />
+      <PriceCell value={b.harga_reseller || 0} editable={isAdmin} onSave={(v) => onPrice("harga_reseller", v)} testid={`bundle-price-reseller-${b.id}`} className="font-semibold text-[#C85A32]" />
       {channels.map((c) => {
         const price = b.harga_channel?.[c.name] || 0;
         const net = price - calcFees(c.fees, price).total;
         return (
-          <td key={c.name} className="px-4 py-3 text-right font-mono" data-testid={`bundle-channel-price-${b.id}-${slug(c.name)}`}>
-            {b.harga_channel?.[c.name] ? rupiah(b.harga_channel[c.name]) : <span className="text-xs italic text-muted-foreground">belum diatur</span>}
+          <PriceCell key={c.name} value={price} editable={isAdmin} onSave={(v) => onPrice("channel", v, c.name)} testid={`bundle-channel-price-${b.id}-${slug(c.name)}`}
+            empty={<span className="text-xs italic text-muted-foreground">belum diatur</span>}>
             {price > 0 && <div className={`text-[10px] ${net < b.hpp ? "text-destructive font-semibold" : "text-muted-foreground"}`}>bersih {rupiah(net)}</div>}
-          </td>
+          </PriceCell>
         );
       })}
       <td className="px-4 py-3 text-right font-mono" data-testid={`bundle-stock-${b.id}`}><span className={b.stok <= 3 ? "text-destructive font-semibold" : ""}>{b.stok} paket</span></td>

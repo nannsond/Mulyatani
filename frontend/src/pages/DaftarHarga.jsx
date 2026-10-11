@@ -5,6 +5,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useSettings } from "@/context/SettingsContext";
 import { Plus, Pencil, Trash2, FileDown, FileSpreadsheet, X, Search, Printer, AlertTriangle, Package, Boxes } from "lucide-react";
 import BundlingPanel from "@/components/BundlingPanel";
+import PriceCell from "@/components/PriceCell";
 import { exportPDF, exportExcel, printPriceList } from "@/lib/exporter";
 import { toast } from "sonner";
 import { calcFees } from "@/lib/fees";
@@ -61,6 +62,8 @@ export default function DaftarHarga() {
       setModal(null); load();
     } catch (err) { toast.error(apiError(err.response?.data?.detail)); }
   };
+
+  const setPrice = (p, field, value, channel) => api.patch(`/products/${p.id}/price`, { field, value, channel }).then(load);
 
   const del = async (id) => {
     if (!window.confirm("Hapus produk ini?")) return;
@@ -154,19 +157,19 @@ export default function DaftarHarga() {
                   </div>
                 </td>
                 <td className="px-4 py-3"><span className="text-xs px-2 py-1 rounded-lg bg-secondary">{p.category}</span></td>
-                <td className="px-4 py-3 text-right font-mono">{rupiah(p.harga_beli)}</td>
-                <td className="px-4 py-3 text-right font-mono font-semibold text-[#1B5E3B]">{rupiah(p.harga_jual)}</td>
-                <td className="px-4 py-3 text-right font-mono font-semibold text-[#C85A32]">{rupiah(p.harga_reseller || 0)}</td>
-                {channels.map((c) => (
-                  <td key={c.name} className="px-4 py-3 text-right font-mono" data-testid={`channel-price-${p.id}-${c.name.replace(/\s+/g, "-").toLowerCase()}`}>
-                    {p.harga_channel?.[c.name] ? rupiah(p.harga_channel[c.name]) : <span className="text-xs italic text-muted-foreground">belum diatur</span>}
-                    {p.harga_channel?.[c.name] > 0 && (() => {
-                      const price = p.harga_channel[c.name];
-                      const net = price - calcFees(c.fees, price).total;
-                      return <div className={`text-[10px] ${net < p.harga_beli ? "text-destructive font-semibold" : "text-muted-foreground"}`}>bersih {rupiah(net)}</div>;
-                    })()}
-                  </td>
-                ))}
+                <PriceCell value={p.harga_beli} editable={isAdmin} onSave={(v) => setPrice(p, "harga_beli", v)} testid={`price-beli-${p.id}`} />
+                <PriceCell value={p.harga_jual} editable={isAdmin} onSave={(v) => setPrice(p, "harga_jual", v)} testid={`price-normal-${p.id}`} className="font-semibold text-[#1B5E3B]" />
+                <PriceCell value={p.harga_reseller || 0} editable={isAdmin} onSave={(v) => setPrice(p, "harga_reseller", v)} testid={`price-reseller-${p.id}`} className="font-semibold text-[#C85A32]" />
+                {channels.map((c) => {
+                  const price = p.harga_channel?.[c.name] || 0;
+                  const net = price - calcFees(c.fees, price).total;
+                  return (
+                    <PriceCell key={c.name} value={price} editable={isAdmin} onSave={(v) => setPrice(p, "channel", v, c.name)}
+                      testid={`channel-price-${p.id}-${c.name.replace(/\s+/g, "-").toLowerCase()}`} empty={<span className="text-xs italic text-muted-foreground">belum diatur</span>}>
+                      {price > 0 && <div className={`text-[10px] ${net < p.harga_beli ? "text-destructive font-semibold" : "text-muted-foreground"}`}>bersih {rupiah(net)}</div>}
+                    </PriceCell>
+                  );
+                })}
                 <td className="px-4 py-3 text-right font-mono"><span className={p.stok <= p.stok_minimal ? "text-destructive font-semibold" : ""}>{p.stok} {p.unit}</span></td>
                 {isAdmin && (
                   <td className="px-4 py-3">

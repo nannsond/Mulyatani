@@ -356,6 +356,28 @@ async def update_product(pid: str, data: ProductInput, admin: dict = Depends(req
         raise HTTPException(status_code=404, detail="Produk tidak ditemukan")
     return Product(**doc).model_dump()
 
+class PriceUpdate(BaseModel):
+    field: Literal["harga_beli", "harga_jual", "harga_reseller", "channel"]
+    channel: Optional[str] = None
+    value: float
+
+def _price_update(data: PriceUpdate) -> dict:
+    if data.value < 0:
+        raise HTTPException(status_code=400, detail="Harga tidak boleh negatif")
+    if data.field != "channel":
+        return {"$set": {data.field: data.value}}
+    if not data.channel or "." in data.channel or data.channel.startswith("$"):
+        raise HTTPException(status_code=400, detail="Channel tidak valid")
+    key = f"harga_channel.{data.channel}"
+    return {"$set": {key: data.value}} if data.value > 0 else {"$unset": {key: ""}}
+
+@api_router.patch("/products/{pid}/price")
+async def update_product_price(pid: str, data: PriceUpdate, admin: dict = Depends(require_admin)):
+    r = await db.products.update_one({"_id": ObjectId(pid)}, _price_update(data))
+    if r.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Produk tidak ditemukan")
+    return {"ok": True}
+
 @api_router.delete("/products/{pid}")
 async def delete_product(pid: str, admin: dict = Depends(require_admin)):
     await db.products.delete_one({"_id": ObjectId(pid)})
@@ -399,6 +421,15 @@ async def _bundle_view(b: dict, pmap: dict) -> dict:
             "harga_channel": b.get("harga_channel", {}), "components": comps,
             "stok": max(0, stok or 0), "hpp": hpp, "harga_satuan_total": satuan_total,
             "hemat": max(0, satuan_total - b.get("harga_jual", 0)), "is_bundle": True}
+
+@api_router.patch("/bundles/{bid}/price")
+async def update_bundle_price(bid: str, data: PriceUpdate, admin: dict = Depends(require_admin)):
+    if data.field == "harga_beli":
+        raise HTTPException(status_code=400, detail="Modal paket dihitung dari komponen")
+    r = await db.bundles.update_one({"_id": ObjectId(bid)}, _price_update(data))
+    if r.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Paket tidak ditemukan")
+    return {"ok": True}
 
 @api_router.get("/bundles")
 async def list_bundles(user: dict = Depends(get_current_user)):
