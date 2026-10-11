@@ -267,3 +267,4 @@ Aplikasi laporan penjualan sederhana untuk bisnis toko pertanian: laporan harian
 - Komisi online: pool % laba kotor pesanan Dikirim+Selesai, dibagi ke kasir sesuai hari hadir (juga dipakai Rekap Gaji).
 - Tabel Penjualan Online Terbaru bisa diedit admin (PUT /api/ecommerce/sales/{id}, EcomEditDialog).
 - Pembagian komisi memakai hari absensi Hadir + Izin/Sakit (Alpha tidak).
+- Komisi kembali dibagi berdasarkan hari Hadir saja. Potongan gaji = telat x tarif + (Alpha + Izin/Sakit) x gaji harian.

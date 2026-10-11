@@ -56,9 +56,9 @@ export default function RekapGaji() {
   const rowTotal = (uid) => { const e = edits[uid] || {}; return (e.gaji_pokok || 0) + (e.komisi || 0) + bonusSum(e) - (e.potongan || 0) - (e.potongan_lain || 0); };
   const setCount = (uid, field, v) => setEdits((all) => {
     const e = { ...all[uid], [field]: Math.max(0, parseInt(v, 10) || 0) };
-    if (field === "telat" || field === "alpha") {
+    if (field === "telat" || field === "alpha" || field === "izin") {
       const hk = report?.hari_kerja || 26;
-      e.potongan = (e.telat || 0) * (report?.potongan_telat || 0) + Math.round((e.alpha || 0) * (e.gaji_pokok || 0) / hk);
+      e.potongan = (e.telat || 0) * (report?.potongan_telat || 0) + Math.round(((e.alpha || 0) + (e.izin || 0)) * (e.gaji_pokok || 0) / hk);
     }
     return { ...all, [uid]: e };
   });
@@ -133,7 +133,7 @@ export default function RekapGaji() {
           <div className="w-11 h-11 rounded-xl bg-[#1B5E3B] flex items-center justify-center"><Wallet className="w-6 h-6 text-white" /></div>
           <div>
             <h2 className="font-heading font-bold text-xl text-[#0F281E]">Rekap Gaji Karyawan</h2>
-            <p className="text-sm text-muted-foreground">{monthLabel} • Komisi {report?.commission_rate ?? 0}% dari laba kotor online "Dikirim" & "Selesai", dibagi ke kasir sesuai hari absensi (Hadir + Izin/Sakit)</p>
+            <p className="text-sm text-muted-foreground">{monthLabel} • Komisi {report?.commission_rate ?? 0}% dari laba kotor online "Dikirim" & "Selesai", dibagi ke kasir sesuai hari hadir</p>
           </div>
         </div>
         {!report ? <div className="flex justify-center py-16"><Loader2 className="w-8 h-8 animate-spin text-[#1B5E3B]" /></div> : (
@@ -168,7 +168,7 @@ export default function RekapGaji() {
                         <td key={k} className="px-2 py-2.5 text-center">
                           <input type="number" min="0" value={e[k] ?? 0} onChange={(ev) => setCount(row.user_id, k, ev.target.value)} data-testid={`payroll-${k}-${row.user_id}`}
                             title={`Otomatis: ${row.counts_auto?.[k] ?? 0}`}
-                            className={`w-14 px-1.5 py-1 rounded-lg border text-xs text-center font-mono ${e[k] !== row.counts_auto?.[k] ? "border-amber-400 bg-amber-50" : "border-input"} ${(k === "telat" || k === "alpha") && e[k] > 0 ? "text-red-700 font-semibold" : ""}`} />
+                            className={`w-14 px-1.5 py-1 rounded-lg border text-xs text-center font-mono ${e[k] !== row.counts_auto?.[k] ? "border-amber-400 bg-amber-50" : "border-input"} ${(k === "telat" || k === "alpha" || k === "izin") && e[k] > 0 ? "text-red-700 font-semibold" : ""}`} />
                         </td>
                       ))}
                       <td className="px-3 py-2.5 text-right"><input type="number" value={e.gaji_pokok ?? ""} onChange={(ev) => setField(row.user_id, "gaji_pokok", ev.target.value)} data-testid={`payroll-gaji-${row.user_id}`} className="w-28 px-2 py-1 rounded-lg border border-input text-xs font-mono text-right" /></td>
@@ -199,7 +199,7 @@ export default function RekapGaji() {
                 </tr>
               </tbody>
             </table>
-            <p className="text-xs text-muted-foreground mt-3">Total = Gaji Pokok + Komisi + Bonus − Potongan − Potongan Lain. Potongan = (telat × tarif) + (Alpha × gaji harian), gaji harian = gaji pokok ÷ hari kerja. Hadir/Telat/Alpha/Izin bisa diedit (kotak kuning = beda dari absensi; mengubah Telat/Alpha menghitung ulang potongan). Nilai lain juga bisa diedit; simpan untuk menyimpan slip bulan ini (gaji pokok dipakai ulang bulan berikutnya).</p>
+            <p className="text-xs text-muted-foreground mt-3">Total = Gaji Pokok + Komisi + Bonus − Potongan − Potongan Lain. Potongan = (telat × tarif) + ((Alpha + Izin/Sakit) × gaji harian), gaji harian = gaji pokok ÷ hari kerja. Hadir/Telat/Alpha/Izin bisa diedit (kotak kuning = beda dari absensi; mengubah Telat/Alpha/Izin menghitung ulang potongan). Nilai lain juga bisa diedit; simpan untuk menyimpan slip bulan ini (gaji pokok dipakai ulang bulan berikutnya).</p>
           </div>
         )}
       </div>

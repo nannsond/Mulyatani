@@ -191,16 +191,17 @@ export async function printPayslip({ row, monthLabel, info, logoUrl, payroll = {
   y = slipTable(doc, y + 3, "Komponen Pendapatan", pend, "TOTAL PENDAPATAN KOTOR", rp(bruto)) + 9;
 
   const harian = Math.round((row.gaji_pokok || 0) / hk);
-  const potAlpha = Math.round((row.alpha || 0) * (row.gaji_pokok || 0) / hk);
+  const absen = (row.alpha || 0) + (row.izin || 0);
+  const potAlpha = Math.round(absen * (row.gaji_pokok || 0) / hk);
   const potTelat = (row.telat || 0) * (payroll.potongan_telat || 0);
   const autoPot = potAlpha + Math.round(potTelat);
   const pot = [];
   if (Math.round(row.potongan || 0) === autoPot) {
-    pot.push(["Potongan Absensi", `${row.alpha || 0} Hari x ${rp(harian)}`, potAlpha ? rp(potAlpha) : "-"]);
+    pot.push(["Potongan Absensi", `${absen} Hari (Alpha ${row.alpha || 0}, Izin/Sakit ${row.izin || 0}) x ${rp(harian)}`, potAlpha ? rp(potAlpha) : "-"]);
     if (potTelat > 0)
       pot.push(["Potongan Keterlambatan", `${row.telat || 0} Kali x ${rp(payroll.potongan_telat || 0)}`, rp(potTelat)]);
   } else {
-    pot.push(["Potongan Absensi", `Alpha ${row.alpha || 0} hari, Telat ${row.telat || 0} kali`, row.potongan ? rp(row.potongan) : "-"]);
+    pot.push(["Potongan Absensi", `Alpha ${row.alpha || 0} hari, Izin/Sakit ${row.izin || 0} hari, Telat ${row.telat || 0} kali`, row.potongan ? rp(row.potongan) : "-"]);
   }
   const lain = row.potongan_items || [];
   if (lain.length) lain.forEach((p) => pot.push(["Potongan Lain-lain", p.keterangan || "-", rp(p.jumlah)]));
