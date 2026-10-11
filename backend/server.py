@@ -1377,6 +1377,32 @@ async def edit_ecom_sale(sid: str, data: EcomSaleEdit, admin: dict = Depends(req
     await db.ecommerce_sales.update_one({"_id": doc["_id"]}, {"$set": upd})
     return {"ok": True, **upd}
 
+class EcomCairInput(BaseModel):
+    tanggal: str
+    nominal: float
+
+@api_router.put("/ecommerce/sales/{sid}/cair")
+async def set_ecom_cair(sid: str, data: EcomCairInput, admin: dict = Depends(require_admin)):
+    if data.nominal < 0:
+        raise HTTPException(status_code=400, detail="Nominal tidak boleh negatif")
+    try:
+        datetime.strptime(data.tanggal, "%Y-%m-%d")
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Tanggal cair tidak valid")
+    doc = await db.ecommerce_sales.find_one({"_id": ObjectId(sid)})
+    if not doc:
+        raise HTTPException(status_code=404, detail="Penjualan tidak ditemukan")
+    cair = {"tanggal": data.tanggal, "nominal": data.nominal, "selisih": data.nominal - diterima_of(doc), "by": admin["name"], "at": now_iso()}
+    await db.ecommerce_sales.update_one({"_id": doc["_id"]}, {"$set": {"cair": cair}})
+    return {"ok": True, "cair": cair}
+
+@api_router.delete("/ecommerce/sales/{sid}/cair")
+async def clear_ecom_cair(sid: str, admin: dict = Depends(require_admin)):
+    r = await db.ecommerce_sales.update_one({"_id": ObjectId(sid)}, {"$unset": {"cair": ""}})
+    if r.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Penjualan tidak ditemukan")
+    return {"ok": True}
+
 class EcomOngkirInput(BaseModel):
     ongkir: float
 
@@ -1591,9 +1617,15 @@ async def ecom_reports(mode: str = "bulanan", date: Optional[str] = None, year: 
     if mode == "bulanan":
         dd = {}
         for sp in sales:
-            e = dd.setdefault(sp["created_at"][:10], {"date": sp["created_at"][:10], "transaksi": 0, "omzet": 0, "potongan": 0, "diterima": 0})
+            e = dd.setdefault(sp["created_at"][:10], {"date": sp["created_at"][:10], "transaksi": 0, "omzet": 0, "potongan": 0, "diterima": 0,
+                                                      "cair": 0, "selisih": 0, "belum_cair": 0})
             e["transaksi"] += 1; e["omzet"] += sp.get("omzet", 0)
             e["potongan"] += sp.get("admin_fee", 0); e["diterima"] += diterima_of(sp)
+            c = sp.get("cair")
+            if c:
+                e["cair"] += c.get("nominal", 0); e["selisih"] += c.get("nominal", 0) - diterima_of(sp)
+            else:
+                e["belum_cair"] += 1
         daily = [dd[k] for k in sorted(dd)]
     return {"mode": mode, "periode": periode, "summary": ecom_summary(sales), "daily": daily,
             "channels": channels, "series": series, "channel_names": names,

@@ -24,6 +24,7 @@ export default function DaftarHarga() {
   const [search, setSearch] = useState("");
   const [sortBy, setSortBy] = useState("name");
   const [lowOnly, setLowOnly] = useState(false);
+  const [catFilter, setCatFilter] = useState("");
   const [modal, setModal] = useState(null);
   const [view, setView] = useState("satuan");
   const [channels, setChannels] = useState([]);
@@ -36,7 +37,7 @@ export default function DaftarHarga() {
 
   const filtered = products.filter((p) =>
     (p.name.toLowerCase().includes(search.toLowerCase()) || p.category.toLowerCase().includes(search.toLowerCase()))
-    && (!lowOnly || stockLevel(p) > 0));
+    && (!lowOnly || stockLevel(p) > 0) && (!catFilter || p.category === catFilter));
 
   const sorted = [...filtered].sort((a, b) => {
     const la = stockLevel(a), lb = stockLevel(b);
@@ -101,6 +102,11 @@ export default function DaftarHarga() {
           <option value="name">Urutkan: Nama A-Z</option>
           <option value="name_desc">Urutkan: Nama Z-A</option>
           <option value="category">Urutkan: Kategori</option>
+        </select>
+        <select value={catFilter} onChange={(e) => setCatFilter(e.target.value)} data-testid="product-category-filter"
+          className={`px-3 py-2.5 rounded-xl border text-sm focus:outline-none focus:ring-2 focus:ring-[#1B5E3B] ${catFilter ? "border-[#1B5E3B] bg-green-50 font-semibold text-[#1B5E3B]" : "border-input bg-card"}`}>
+          <option value="">Semua Kategori</option>
+          {[...new Set([...CATS, ...products.map((p) => p.category)])].map((c) => <option key={c} value={c}>{c} ({products.filter((p) => p.category === c).length})</option>)}
         </select>
         <button onClick={() => setLowOnly((v) => !v)} data-testid="low-stock-filter-toggle"
           className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border text-sm font-semibold transition-colors ${lowOnly ? "bg-destructive text-white border-destructive" : "border-input bg-card hover:bg-secondary"}`}>

@@ -8,6 +8,7 @@ import { useAuth } from "@/context/AuthContext";
 import { calcFees } from "@/lib/fees";
 import { OngkirCell } from "@/components/OngkirCell";
 import EcomEditDialog from "@/components/EcomEditDialog";
+import { CairCell } from "@/components/CairCell";
 
 const STATUSES = ["Diproses", "Dikirim", "Selesai", "Dikembalikan"];
 const STATUS_STYLE = {
@@ -263,11 +264,11 @@ export default function PenjualanOnline() {
           <table className="w-full text-sm">
             <thead><tr className="border-b border-slate-200 bg-secondary/50 text-left">
               <th className="px-3 py-2.5 font-semibold">No</th><th className="px-3 py-2.5 font-semibold">Channel</th><th className="px-3 py-2.5 font-semibold">Tanggal</th>
-              <th className="px-3 py-2.5 font-semibold text-right">Omzet</th><th className="px-3 py-2.5 font-semibold text-right">Diterima</th><th className="px-3 py-2.5 font-semibold text-right">Ongkir</th><th className="px-3 py-2.5 font-semibold text-right">Total Biaya</th>
+              <th className="px-3 py-2.5 font-semibold text-right">Omzet</th><th className="px-3 py-2.5 font-semibold text-right">Diterima</th><th className="px-3 py-2.5 font-semibold text-right">Dana Cair</th><th className="px-3 py-2.5 font-semibold text-right">Ongkir</th><th className="px-3 py-2.5 font-semibold text-right">Total Biaya</th>
               <th className="px-3 py-2.5 font-semibold text-right">Laba Bersih</th><th className="px-3 py-2.5 font-semibold text-center">Status</th>{isAdmin && <th className="px-3 py-2.5 font-semibold text-center">Aksi</th>}
             </tr></thead>
             <tbody>
-              {recent.length === 0 && <tr><td colSpan={isAdmin ? 10 : 9} className="px-3 py-8 text-center text-muted-foreground">Belum ada penjualan online.</td></tr>}
+              {recent.length === 0 && <tr><td colSpan={isAdmin ? 11 : 10} className="px-3 py-8 text-center text-muted-foreground">Belum ada penjualan online.</td></tr>}
               {recent.map((s) => (
                 <tr key={s.id} className="border-b border-slate-100" data-testid={`ecom-row-${s.id}`}>
                   <td className="px-3 py-2.5 font-mono text-xs">{s.ecom_no}</td>
@@ -275,6 +276,7 @@ export default function PenjualanOnline() {
                   <td className="px-3 py-2.5 text-xs text-muted-foreground">{fmtDate(s.created_at)}</td>
                   <td className="px-3 py-2.5 text-right font-mono">{rupiah(s.omzet)}</td>
                   <td className="px-3 py-2.5 text-right font-mono font-semibold text-[#2563EB]" data-testid={`ecom-diterima-${s.id}`} title={`Potongan ${rupiah(s.admin_fee || 0)}`}>{rupiah((s.omzet || 0) - (s.admin_fee || 0))}</td>
+                  <td className="px-3 py-2.5 text-right text-xs"><CairCell sale={s} isAdmin={isAdmin} onSaved={loadRecent} /></td>
                   <td className="px-3 py-2.5 text-right text-xs"><OngkirCell sale={s} isAdmin={isAdmin} onSaved={loadRecent} /></td>
                   <td className="px-3 py-2.5 text-right font-mono text-destructive">{rupiah(s.total_fee)}</td>
                   <td className="px-3 py-2.5 text-right font-mono font-semibold text-[#1B5E3B]">{rupiah(s.laba_bersih)}</td>
