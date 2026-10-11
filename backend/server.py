@@ -1088,6 +1088,14 @@ async def pay_transaction(tid: str, data: PaymentInput, user: dict = Depends(get
     t.update({"amount_paid": paid, "status": status, "payments": payments, "id": str(t.pop("_id"))})
     return {"ok": True, "amount_paid": paid, "status": status, "transaction": t}
 
+@api_router.post("/transactions/{tid}/reminded")
+async def mark_reminded(tid: str, user: dict = Depends(get_current_user)):
+    r = await db.transactions.update_one({"_id": ObjectId(tid)}, {"$set": {"last_reminder_at": now_iso(), "last_reminder_by": user["name"]},
+                                                                   "$inc": {"reminder_count": 1}})
+    if r.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Transaksi tidak ditemukan")
+    return {"ok": True}
+
 # ---------------- Pembelian (purchases) ----------------
 class PurchaseItem(BaseModel):
     product_id: str

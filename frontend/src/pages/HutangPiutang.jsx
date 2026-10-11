@@ -1,9 +1,10 @@
 import { Fragment, useEffect, useState } from "react";
 import { PaymentHistory } from "@/components/PaymentHistory";
 import { InstallmentReceipt } from "@/components/InstallmentReceipt";
+import { DebtReminderModal } from "@/components/DebtReminderModal";
 import { api, apiError } from "@/lib/api";
 import { rupiah, fmtDateTime, todayStr } from "@/lib/format";
-import { HandCoins, X, History, ChevronDown } from "lucide-react";
+import { HandCoins, X, History, ChevronDown, MessageCircle } from "lucide-react";
 import { toast } from "sonner";
 
 export default function HutangPiutang() {
@@ -16,6 +17,7 @@ export default function HutangPiutang() {
   const [showAll, setShowAll] = useState(false);
   const [openId, setOpenId] = useState(null);
   const [receipt, setReceipt] = useState(null);
+  const [remind, setRemind] = useState(null);
 
   const load = () => {
     const qs = showAll ? "?all=true" : "";
@@ -74,6 +76,7 @@ export default function HutangPiutang() {
                   <td className="px-4 py-2.5">
                     <p className="font-mono text-xs">{tab === "piutang" ? x.invoice_no : x.po_no}</p>
                     <p className="text-xs text-muted-foreground">{tab === "piutang" ? (x.customer_name || "-") : x.supplier}</p>
+                    {tab === "piutang" && x.last_reminder_at && <p className="text-[11px] text-[#25D366] font-medium" data-testid={`hp-reminded-${x.id}`}>Ditagih {x.reminder_count || 1}x · terakhir {fmtDateTime(x.last_reminder_at)}</p>}
                   </td>
                   <td className="px-4 py-2.5 text-xs text-muted-foreground">{fmtDateTime(x.created_at)}</td>
                   <td className="px-4 py-2.5 text-right font-mono">{rupiah(x.total)}</td>
@@ -84,6 +87,8 @@ export default function HutangPiutang() {
                       className="inline-flex items-center gap-1 px-2.5 py-1.5 mr-2 rounded-lg border border-input text-xs hover:bg-secondary">
                       <History className="w-3.5 h-3.5" /> {(x.payments || []).length} <ChevronDown className={`w-3.5 h-3.5 transition-transform ${openId === x.id ? "rotate-180" : ""}`} />
                     </button>
+                    {tab === "piutang" && x.sisa > 0 && <button onClick={() => setRemind(x)} title="Tagih via WhatsApp" data-testid={`hp-remind-${x.id}`}
+                      className="inline-flex items-center gap-1 px-2.5 py-1.5 mr-2 rounded-lg bg-[#25D366] text-white text-xs font-semibold hover:bg-[#1EBE5A]"><MessageCircle className="w-3.5 h-3.5" /> Tagih</button>}
                     {x.sisa > 0 && <button onClick={() => { setPay({ id: x.id, kind: tab, sisa: x.sisa }); setAmount(String(x.sisa)); setPayDate(todayStr()); }} data-testid={`hp-pay-${x.id}`}
                       className="px-3 py-1.5 rounded-lg bg-[#1B5E3B] text-white text-xs font-semibold hover:bg-[#143D2B]">Bayar</button>}
                   </td>
@@ -117,6 +122,7 @@ export default function HutangPiutang() {
           </div>
         </div>
       )}
+      {remind && <DebtReminderModal tx={remind} onClose={() => setRemind(null)} onSent={load} />}
       {receipt && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/50" onClick={() => setReceipt(null)} />
