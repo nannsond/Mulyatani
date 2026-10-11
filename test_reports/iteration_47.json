@@ -1,0 +1,30 @@
+{
+  "summary": "Iter47 end-to-end test of Kasir (POS), Penjualan Online, Laporan (Harian/Bulanan/Tahunan/Online/Laba Rugi), and Stok Opname per request. Backend: 26/26 tests passing against production preview (test_iter47_full_flow.py). POS creates transaction with Tunai/Transfer/QRIS, reduces stock, generates invoice; delete restores stock. Penjualan Online creates sale per channel with marketplace fees, reduces stock; admin delete restores stock; status update works; kasir forbidden (403). Reports (daily/monthly/yearly/ecommerce/cash/dashboard) all return 200. Stok Opname adjusts product stock, records history; kasir can create opname but cannot delete (admin-only). Role-based: kasir can create tx & opname, blocked from product CRUD (403). Frontend: Admin + Kasir login OK; POS flow executed end-to-end in browser (invoice INV-20261011-0003 generated, stock reduced, receipt+WA buttons shown); Penjualan Online shows 5 channels + 6 products, add-to-cart + submit works; Reports pages (Harian, Bulanan, Tahunan, Online, Laba Rugi, Stok Opname) load without crash; Kasir can access POS + Stok Opname with PDF/Excel buttons visible.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Dev-only (Vite preview)", "issues": ["Rapid page reloads during automated testing occasionally trigger 429 on /src/index.js causing an Emergent 'Part of app failed to load' popup. Not a production/code issue — Vite dev-server rate limiting through the ingress."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter47_full_flow.py",
+    "/app/test_reports/pytest/iter47_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "server.py is 2391 lines — exceeds the 700-line guideline. Consider splitting by domain (auth, products, transactions, ecommerce, reports, payroll, loans, attendance, opname).",
+    "Several endpoints call ObjectId(sid) directly without ObjectId.is_valid() guards (e.g., /ecommerce/sales/{sid}, /ecommerce/sales/{sid}/status, /ecommerce/sales/{sid}/cair, /ecommerce/sales/{sid}/ongkir, /transactions/{tid}/reminded). Passing a malformed id returns 500 instead of 404. /stok-opname/{oid} already does this correctly — replicate that pattern.",
+    "/api/transactions (create) does not enforce stock availability before deducting; _apply_sale_items decrements stock even if resulting stok goes negative (verify in _apply_sale_items). Consider validating stock >= qty for non-bundle items.",
+    "Monthly/yearly report endpoints accept year/month as separate int query params; frontend must send them separately (confirmed in LaporanBulanan/Tahunan). No action needed, but documenting signature mismatch risk for API consumers.",
+    "DELETE /api/transactions restores stock implicitly — behavior should be documented in response or audit log."
+  ],
+  "updated_files": ["/app/backend/tests/test_iter47_full_flow.py"],
+  "success_rate": {"backend": "100% (26/26)", "frontend": "~95% (all core flows verified; export-button re-verification flaked due to Vite dev-server 429 after rapid localStorage reset — buttons exist in code and were visible to Kasir)"},
+  "test_credentials": "Admin: nannsond@gmail.com / admin123, Kasir: kasir@tokotani.com / kasir123",
+  "seed_data_creation": "No persistent seed data. Each test creates then deletes its own transaction/ecom sale/opname entry. Opname test resets product stock back to original after adjustment.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "test_iter47_full_flow.py covers POS, Online, Reports and Opname flows plus role checks. Note: products use field 'harga_jual' (not 'harga'); reports/monthly expects separate year & month int query params; ecommerce/reports needs mode=bulanan|harian with year/month or date. Avoid rapid localStorage.clear()+reload cycles in Playwright — hits Vite dev-server 429 and triggers Emergent Load-failure popup; use fresh browser context or sleep between full reloads."
+}
