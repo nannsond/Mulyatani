@@ -272,3 +272,39 @@ export async function readEcomExcel(file) {
   }
   return out;
 }
+
+export async function printInstallmentReceipt(tx, idx, logoUrl, info = {}) {
+  const pays = tx.payments || [];
+  const pay = pays[idx];
+  const paidUpTo = Math.max(0, (tx.amount_paid || 0) - pays.slice(idx + 1).reduce((s, p) => s + (p.amount || 0), 0));
+  const doc = new jsPDF({ unit: "mm", format: [80, 130] });
+  let y = 8;
+  if (logoUrl) {
+    try { doc.addImage(await loadImageData(logoUrl), "PNG", 30, y, 20, 20); y += 23; } catch (e) { /* abaikan */ }
+  }
+  doc.setFont("courier", "bold"); doc.setFontSize(12);
+  doc.text((info.store_name || "TOKO TANI MAKMUR").toUpperCase(), 40, y, { align: "center" }); y += 5;
+  doc.setFont("courier", "normal"); doc.setFontSize(7);
+  if (info.address) { const l = doc.splitTextToSize(info.address, 68); doc.text(l, 40, y, { align: "center" }); y += 3.5 * l.length; }
+  if (info.phone) { doc.text(`Telp: ${info.phone}`, 40, y, { align: "center" }); y += 4; }
+  y += 2;
+  doc.setFont("courier", "bold"); doc.setFontSize(10);
+  doc.text("BUKTI PEMBAYARAN CICILAN", 40, y, { align: "center" }); y += 6;
+  doc.setFont("courier", "normal"); doc.setFontSize(8);
+  const row = (k, v, bold) => { doc.setFont("courier", bold ? "bold" : "normal"); doc.text(k, 5, y); doc.text(v, 75, y, { align: "right" }); y += 4.5; };
+  row("No Invoice", tx.invoice_no);
+  row("Tgl Transaksi", new Date(tx.created_at).toLocaleDateString("id-ID"));
+  if (tx.customer_name) row("Pelanggan", tx.customer_name.slice(0, 22));
+  doc.text("--------------------------------", 5, y); y += 4.5;
+  row("Total Tagihan", rp(tx.total));
+  row(`Cicilan ke-${idx + 1}`, rp(pay.amount), true);
+  row("Tgl Bayar", new Date(pay.date).toLocaleDateString("id-ID"));
+  row("Total Dibayar", rp(paidUpTo));
+  const sisa = Math.max(0, tx.total - paidUpTo);
+  row("Sisa Piutang", sisa > 0 ? rp(sisa) : "LUNAS", true);
+  if (pay.by) row("Diterima oleh", pay.by);
+  y += 3;
+  doc.setFontSize(8);
+  doc.text(sisa > 0 ? "Terima kasih atas pembayarannya." : "Terima kasih, tagihan telah LUNAS.", 40, y, { align: "center" });
+  doc.save(`Cicilan_${tx.invoice_no}_ke-${idx + 1}.pdf`);
+}

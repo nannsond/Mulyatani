@@ -89,6 +89,7 @@ export default function Pembelian() {
   const [supplier, setSupplier] = useState("");
   const [lines, setLines] = useState([]);
   const [note, setNote] = useState("");
+  const [purchaseDate, setPurchaseDate] = useState(todayStr());
   const [hutang, setHutang] = useState(false);
   const [amountPaid, setAmountPaid] = useState("");
   const [suppliers, setSuppliers] = useState([]);
@@ -115,7 +116,7 @@ export default function Pembelian() {
   const openEdit = (p) => setEdit({
     id: p.id, po_no: p.po_no, supplier: p.supplier,
     items: p.items.map((i) => ({ product_id: i.product_id, name: i.name, qty: i.qty, harga_beli: i.harga_beli })),
-    note: p.note || "", amount_paid: p.amount_paid ?? p.total,
+    note: p.note || "", amount_paid: p.amount_paid ?? p.total, date: (p.created_at || "").slice(0, 10),
   });
   const eTotal = edit ? edit.items.reduce((s, l) => s + (Number(l.qty) || 0) * (Number(l.harga_beli) || 0), 0) : 0;
   const eSet = (idx, patch) => setEdit((e) => ({ ...e, items: e.items.map((it, k) => (k === idx ? { ...it, ...patch } : it)) }));
@@ -135,6 +136,7 @@ export default function Pembelian() {
         items: edit.items.map((l) => ({ product_id: l.product_id, name: l.name, qty: Number(l.qty), harga_beli: Number(l.harga_beli) })),
         amount_paid: Number(edit.amount_paid),
         note: edit.note,
+        date: edit.date,
       });
       toast.success("Pembelian diperbarui & stok disesuaikan"); setEdit(null); loadProducts(); loadPurchases();
     } catch (err) { toast.error(apiError(err.response?.data?.detail)); }
@@ -148,9 +150,10 @@ export default function Pembelian() {
         items: lines.map((l) => ({ product_id: l.product_id, name: l.name, qty: Number(l.qty), harga_beli: Number(l.harga_beli) })),
         amount_paid: hutang ? Number(amountPaid) || 0 : null,
         note,
+        date: purchaseDate,
       });
       toast.success("Pembelian disimpan & stok ditambah");
-      setSupplier(""); setLines([]); setNote(""); setHutang(false); setAmountPaid("");
+      setSupplier(""); setLines([]); setNote(""); setHutang(false); setAmountPaid(""); setPurchaseDate(todayStr());
       loadProducts(); loadPurchases(); loadSuppliers(); loadLastPrices();
     } catch (err) { toast.error(apiError(err.response?.data?.detail)); }
   };
@@ -186,8 +189,14 @@ export default function Pembelian() {
             ))}
           </div>
         )}
-        <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Catatan (opsional)" data-testid="purchase-note-input"
-          className="w-full px-3 py-2.5 rounded-xl border border-input text-sm mb-3" />
+        <div className="flex flex-col sm:flex-row gap-3 mb-3">
+          <label className="flex items-center gap-2 text-sm text-muted-foreground shrink-0">Tanggal pembelian
+            <input type="date" value={purchaseDate} max={todayStr()} onChange={(e) => setPurchaseDate(e.target.value)} data-testid="purchase-date-input"
+              className="px-3 py-2.5 rounded-xl border border-input text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-[#1B5E3B]" />
+          </label>
+          <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Catatan (opsional)" data-testid="purchase-note-input"
+            className="flex-1 px-3 py-2.5 rounded-xl border border-input text-sm" />
+        </div>
         <div className="flex flex-wrap items-center justify-between gap-3">
           <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={hutang} onChange={(e) => setHutang(e.target.checked)} data-testid="purchase-hutang-check" /> Hutang (bayar sebagian)</label>
           {hutang && <input type="number" value={amountPaid} onChange={(e) => setAmountPaid(e.target.value)} placeholder="Jumlah dibayar" data-testid="purchase-amount-paid" className="px-3 py-2 rounded-xl border text-sm w-40" />}
@@ -270,6 +279,12 @@ export default function Pembelian() {
 
             <input value={edit.note} onChange={(e) => setEdit({ ...edit, note: e.target.value })} placeholder="Catatan (opsional)" data-testid="edit-purchase-note"
               className="mt-3 w-full px-3 py-2 rounded-lg border border-input text-sm" />
+
+            <div className="mt-3">
+              <label className="text-sm font-medium">Tanggal Pembelian</label>
+              <input type="date" value={edit.date} max={todayStr()} onChange={(e) => setEdit({ ...edit, date: e.target.value })} data-testid="edit-purchase-date"
+                className="mt-1 w-full px-3 py-2 rounded-lg border border-input text-sm" />
+            </div>
 
             <div className="mt-3">
               <label className="text-sm font-medium">Jumlah Dibayar (Rp)</label>

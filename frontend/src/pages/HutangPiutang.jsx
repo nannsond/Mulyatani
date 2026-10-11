@@ -1,5 +1,6 @@
 import { Fragment, useEffect, useState } from "react";
 import { PaymentHistory } from "@/components/PaymentHistory";
+import { InstallmentReceipt } from "@/components/InstallmentReceipt";
 import { api, apiError } from "@/lib/api";
 import { rupiah, fmtDateTime, todayStr } from "@/lib/format";
 import { HandCoins, X, History, ChevronDown } from "lucide-react";
@@ -14,6 +15,7 @@ export default function HutangPiutang() {
   const [payDate, setPayDate] = useState(todayStr());
   const [showAll, setShowAll] = useState(false);
   const [openId, setOpenId] = useState(null);
+  const [receipt, setReceipt] = useState(null);
 
   const load = () => {
     const qs = showAll ? "?all=true" : "";
@@ -27,8 +29,9 @@ export default function HutangPiutang() {
     if (!amt || amt <= 0) { toast.error("Masukkan jumlah"); return; }
     try {
       const url = pay.kind === "piutang" ? `/transactions/${pay.id}/pay` : `/purchases/${pay.id}/pay`;
-      await api.post(url, { amount: amt, date: payDate });
+      const r = await api.post(url, { amount: amt, date: payDate });
       toast.success("Pembayaran dicatat");
+      if (pay.kind === "piutang" && r.data.transaction) setReceipt({ tx: r.data.transaction, idx: r.data.transaction.payments.length - 1 });
       setPay(null); setAmount(""); load();
     } catch (err) { toast.error(apiError(err.response?.data?.detail)); }
   };
@@ -111,6 +114,22 @@ export default function HutangPiutang() {
                 <p className="text-xs text-muted-foreground mt-1">{pay.kind === "piutang" ? "Masuk ke kas pada tanggal ini." : "Keluar dari kas pada tanggal ini."}</p>
             </div>
             <button onClick={submitPay} data-testid="hp-pay-submit" className="mt-4 w-full bg-[#1B5E3B] text-white py-2.5 rounded-xl font-semibold hover:bg-[#143D2B]">Simpan</button>
+          </div>
+        </div>
+      )}
+      {receipt && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/50" onClick={() => setReceipt(null)} />
+          <div className="relative bg-white rounded-2xl w-full max-w-sm p-6" data-testid="installment-receipt-modal">
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="font-heading font-bold text-lg">Pembayaran Tercatat</h3>
+              <button onClick={() => setReceipt(null)} data-testid="installment-receipt-close"><X className="w-5 h-5" /></button>
+            </div>
+            <p className="text-sm text-muted-foreground mb-4">
+              {receipt.tx.invoice_no} · Cicilan ke-{receipt.idx + 1}: <span className="font-mono font-semibold text-[#1B5E3B]">{rupiah(receipt.tx.payments[receipt.idx].amount)}</span>
+              <br />Sisa: <span className="font-mono font-semibold">{receipt.tx.total - receipt.tx.amount_paid > 0 ? rupiah(receipt.tx.total - receipt.tx.amount_paid) : "LUNAS"}</span>
+            </p>
+            <InstallmentReceipt tx={receipt.tx} idx={receipt.idx} />
           </div>
         </div>
       )}

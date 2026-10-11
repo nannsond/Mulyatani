@@ -1085,7 +1085,8 @@ async def pay_transaction(tid: str, data: PaymentInput, user: dict = Depends(get
     pdate = f"{data.date[:10]}T{now_iso()[11:]}" if data.date else now_iso()
     payments = t.get("payments", []) + [{"amount": paid - t.get("amount_paid", 0), "date": pdate, "by": user["name"]}]
     await db.transactions.update_one({"_id": ObjectId(tid)}, {"$set": {"amount_paid": paid, "status": status, "payments": payments}})
-    return {"ok": True, "amount_paid": paid, "status": status}
+    t.update({"amount_paid": paid, "status": status, "payments": payments, "id": str(t.pop("_id"))})
+    return {"ok": True, "amount_paid": paid, "status": status, "transaction": t}
 
 # ---------------- Pembelian (purchases) ----------------
 class PurchaseItem(BaseModel):
@@ -1099,6 +1100,18 @@ class PurchaseInput(BaseModel):
     items: List[PurchaseItem]
     amount_paid: Optional[float] = None
     note: str = ""
+    date: Optional[str] = None
+
+def purchase_created_at(date: Optional[str], fallback: Optional[str] = None) -> str:
+    if not date:
+        return fallback or now_iso()
+    try:
+        datetime.strptime(date[:10], "%Y-%m-%d")
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Tanggal pembelian tidak valid")
+    if fallback and fallback[:10] == date[:10]:
+        return fallback
+    return f"{date[:10]}T{now_iso()[11:]}"
 
 async def gen_purchase_no():
     count = await db.purchases.count_documents({})
@@ -1121,7 +1134,7 @@ async def create_purchase(data: PurchaseInput, admin: dict = Depends(require_adm
     status = "lunas" if amount_paid >= total else ("sebagian" if amount_paid > 0 else "belum")
     doc = {"po_no": await gen_purchase_no(), "supplier": data.supplier, "items": items, "total": total,
            "amount_paid": amount_paid, "status": status, "payments": [], "note": data.note,
-           "user_name": admin["name"], "created_at": now_iso()}
+           "user_name": admin["name"], "created_at": purchase_created_at(data.date)}
     res = await db.purchases.insert_one(doc)
     doc["id"] = str(res.inserted_id); doc.pop("_id", None)
     return doc
@@ -1205,7 +1218,8 @@ async def update_purchase(pid: str, data: PurchaseInput, admin: dict = Depends(r
     status = "lunas" if amount_paid >= total else ("sebagian" if amount_paid > 0 else "belum")
     await db.purchases.update_one({"_id": ObjectId(pid)}, {"$set": {
         "supplier": data.supplier, "items": items, "total": total, "amount_paid": amount_paid,
-        "status": status, "note": data.note, "edited_at": now_iso(), "edited_by": admin["name"]}})
+        "status": status, "note": data.note, "edited_at": now_iso(), "edited_by": admin["name"],
+        "created_at": purchase_created_at(data.date, old.get("created_at"))}})
     doc = await db.purchases.find_one({"_id": ObjectId(pid)})
     doc["id"] = str(doc["_id"]); doc.pop("_id", None)
     return doc
