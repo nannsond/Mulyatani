@@ -6,6 +6,7 @@ import { Loader2, FileDown, FileSpreadsheet, Globe, Wallet, TrendingUp, Receipt,
 import { BarChart, Bar, AreaChart, Area, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer, CartesianGrid, Cell } from "recharts";
 import { toast } from "sonner";
 import { useAuth } from "@/context/AuthContext";
+import DailyDiterima from "@/components/DailyDiterima";
 
 const now = new Date();
 const STATUSES = ["Diproses", "Dikirim", "Selesai", "Dikembalikan"];
@@ -168,6 +169,8 @@ export default function LaporanOnline() {
               )}
             </div>
           </div>
+
+          {mode === "bulanan" && <DailyDiterima rows={data.daily || []} periode={periodeLabel} />}
 
           {mode === "bulanan" && (
             <div className="bg-card rounded-2xl border border-slate-200 p-6" data-testid="ecom-rep-targets">

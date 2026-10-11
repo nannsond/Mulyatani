@@ -1587,7 +1587,15 @@ async def ecom_reports(mode: str = "bulanan", date: Optional[str] = None, year: 
             b = buckets.setdefault(mo, {})
             b[sp["channel"]] = b.get(sp["channel"], 0) + sp.get("omzet", 0)
         series = [{"label": k, **{n: buckets[k].get(n, 0) for n in names}} for k in sorted(buckets)]
-    return {"mode": mode, "periode": periode, "summary": ecom_summary(sales),
+    daily = []
+    if mode == "bulanan":
+        dd = {}
+        for sp in sales:
+            e = dd.setdefault(sp["created_at"][:10], {"date": sp["created_at"][:10], "transaksi": 0, "omzet": 0, "potongan": 0, "diterima": 0})
+            e["transaksi"] += 1; e["omzet"] += sp.get("omzet", 0)
+            e["potongan"] += sp.get("admin_fee", 0); e["diterima"] += diterima_of(sp)
+        daily = [dd[k] for k in sorted(dd)]
+    return {"mode": mode, "periode": periode, "summary": ecom_summary(sales), "daily": daily,
             "channels": channels, "series": series, "channel_names": names,
             "channel_colors": colors, "status_counts": status_counts}
 

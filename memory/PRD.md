@@ -270,3 +270,4 @@ Aplikasi laporan penjualan sederhana untuk bisnis toko pertanian: laporan harian
 - Komisi kembali dibagi berdasarkan hari Hadir saja. Potongan gaji = telat x tarif + (Alpha + Izin/Sakit) x gaji harian.
 - "Laba Kotor" online diganti "Diterima" = omzet - potongan platform (admin_fee). Dasar komisi = Diterima. Laporan Online kolom Diterima.
 - Kolom Diterima di tabel Penjualan Online Terbaru; Est. diterima di form = omzet - potongan.
+- Laporan Online (bulanan): Rekap Diterima Harian (tanggal, pesanan, omzet, potongan, diterima) + ekspor Excel.
