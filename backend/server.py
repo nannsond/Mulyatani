@@ -1061,8 +1061,11 @@ async def get_logo():
 
 # ---------------- Piutang (receivables from sales) ----------------
 @api_router.get("/piutang")
-async def list_piutang(user: dict = Depends(get_current_user)):
-    docs = await db.transactions.find({"status": {"$in": ["belum", "sebagian"]}}).sort("created_at", -1).to_list(500)
+async def list_piutang(all: bool = False, user: dict = Depends(get_current_user)):
+    q = {"status": {"$in": ["belum", "sebagian"]}}
+    if all:
+        q = {"$or": [q, {"payments.0": {"$exists": True}}]}
+    docs = await db.transactions.find(q).sort("created_at", -1).to_list(500)
     out = []
     for d in docs:
         d["id"] = str(d["_id"]); d.pop("_id", None)
@@ -1154,8 +1157,11 @@ async def purchase_last_prices(user: dict = Depends(get_current_user)):
     return out
 
 @api_router.get("/hutang")
-async def list_hutang(user: dict = Depends(get_current_user)):
-    docs = await db.purchases.find({"status": {"$in": ["belum", "sebagian"]}}).sort("created_at", -1).to_list(500)
+async def list_hutang(all: bool = False, user: dict = Depends(get_current_user)):
+    q = {"status": {"$in": ["belum", "sebagian"]}}
+    if all:
+        q = {"$or": [q, {"payments.0": {"$exists": True}}]}
+    docs = await db.purchases.find(q).sort("created_at", -1).to_list(500)
     out = []
     for d in docs:
         d["id"] = str(d["_id"]); d.pop("_id", None)
