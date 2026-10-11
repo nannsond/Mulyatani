@@ -1,0 +1,25 @@
+{
+  "summary": "Iter45 - Purchase date input + Installment receipt. Backend 9/9 pytest PASSED: POST /api/purchases with 'date': 'YYYY-MM-DD' sets created_at to that date (invalid date returns 400); without date uses current timestamp. PUT /api/purchases/{id} updates created_at via date; same-day update preserves original time via fallback. Purchase appears in GET /api/purchases?month=YYYY-MM filter. POST /api/transactions/{id}/pay returns {'ok', 'amount_paid', 'status', 'transaction'} with transaction containing id, invoice_no, total, amount_paid, payments[] (multiple pays append). Frontend UI verified end-to-end on /pembelian and /hutang-piutang: (1) purchase-date-input defaults to today and has max=today, (2) edit modal exposes edit-purchase-date prefilled with current created_at date in YYYY-MM-DD form; changing to 2026-05-15 persists and row shows '15 Mei 2026' under month 2026-05 filter, (3) paying a Piutang via hp-pay-amount + hp-pay-date + hp-pay-submit opens installment-receipt-modal showing invoice INV-20261011-0001, 'Cicilan ke-1: Rp 20.000', 'Sisa: Rp 50.000'; installment-wa-phone prefilled from tx.telepon; installment-wa-send opens new tab with URL containing BUKTI+PEMBAYARAN+CICILAN (wa.me redirects to api.whatsapp.com/send/); installment-receipt-close dismisses modal, (4) compact installment-print-{txid}-{idx} present in PaymentHistory table rows on Piutang tab. All existing testids match expected contract.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_iter45_purchase_date_and_installment_receipt.py",
+    "/app/test_reports/pytest/iter45.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "purchase_created_at (server.py L1105): correctly validates YYYY-MM-DD via strptime and preserves time-of-day on same-day edits by falling back to old created_at. Clean minimal change.",
+    "pay_transaction (server.py L1089) now returns the mutated transaction via t.update({...,'id':...}); t.pop('_id') prevents ObjectId serialization. Note pay_purchase intentionally does NOT return 'transaction' - UI only triggers installment-receipt-modal when kind==='piutang' and r.data.transaction present (HutangPiutang.jsx L34). Consistent with spec.",
+    "InstallmentReceipt (components/InstallmentReceipt.jsx L43): uses wa.me URL. Live browser redirects to api.whatsapp.com/send/ but the originating URL from window.open is wa.me/... per code, which satisfies spec. buildText correctly computes 'paidUpTo' including intermediate cicilan (not just full amount_paid), so sisa displayed per-row is accurate even for mid-history prints.",
+    "Compact installment-print-{tx.id}-{idx} is produced via tid=`${tx.id}-${idx}` ensuring uniqueness per cicilan. Good.",
+    "Pembelian.jsx edit modal uses testid 'purchase-edit-save' and the row trigger uses 'purchase-edit-{id}' - note request spec referred to 'edit-purchase-date' prefilled (confirmed working). The row Edit button testid prefix 'purchase-edit-' slightly diverges from input prefixes 'edit-purchase-*', harmless but could be unified."
+  ],
+  "updated_files": ["/app/backend/tests/test_iter45_purchase_date_and_installment_receipt.py"],
+  "success_rate": {"backend": "100% (9/9)", "frontend": "100% (all testids & flows verified)"},
+  "test_credentials": "Admin nannsond@gmail.com / admin123",
+  "seed_data_creation": "Backend tests created product TEST_ITER45_SKU and multiple purchases/transactions; teardown_module uses DELETE endpoints. UI test created product TEST_UI45 + credit transaction (customer TEST_UI45_CUST, telepon 081234567890). Final cleanup: TEST_UI45 tx+product deleted via API; residual TEST_ITER45 purchases removed via MongoDB (DELETE /api/purchases returns 405, not supported).",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Iter45 adds (a) PurchaseInput.date (optional YYYY-MM-DD) honored on POST/PUT /api/purchases with same-day time preservation; invalid date -> 400. (b) pay_transaction now returns 'transaction' object - frontend uses this to open installment-receipt-modal only for piutang. Key testids: purchase-date-input, edit-purchase-date, installment-receipt-modal, installment-receipt-close, installment-print-{txid}-{idx}, installment-wa-phone, installment-wa-send. DELETE /api/purchases not implemented - use mongo cleanup if needed. Server clock ~2026-10-11.",
+  "rca of the issue": "N/A - all tests passed"
+}
