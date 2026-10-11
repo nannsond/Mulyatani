@@ -1263,6 +1263,27 @@ async def list_expenses(month: Optional[str] = None, user: dict = Depends(get_cu
         d["id"] = str(d["_id"]); d.pop("_id", None)
     return docs
 
+@api_router.put("/expenses/{eid}")
+async def update_expense(eid: str, data: ExpenseInput, admin: dict = Depends(require_admin)):
+    if not ObjectId.is_valid(eid):
+        raise HTTPException(status_code=404, detail="Pengeluaran tidak ditemukan")
+    old = await db.expenses.find_one({"_id": ObjectId(eid)})
+    if not old:
+        raise HTTPException(status_code=404, detail="Pengeluaran tidak ditemukan")
+    if old.get("loan_id"):
+        raise HTTPException(status_code=400, detail="Cicilan pinjaman diubah lewat menu Pinjaman Modal")
+    if data.amount <= 0:
+        raise HTTPException(status_code=400, detail="Jumlah harus lebih dari 0")
+    created = old["created_at"]
+    if data.date and data.date[:10] != created[:10]:
+        created = data.date[:10] + "T00:00:00+00:00"
+    upd = {"category": data.category, "amount": data.amount, "note": data.note, "created_at": created,
+           "updated_at": now_iso(), "updated_by": admin["name"]}
+    await db.expenses.update_one({"_id": old["_id"]}, {"$set": upd})
+    doc = await db.expenses.find_one({"_id": old["_id"]})
+    doc["id"] = str(doc.pop("_id"))
+    return doc
+
 @api_router.delete("/expenses/{eid}")
 async def delete_expense(eid: str, admin: dict = Depends(require_admin)):
     await db.expenses.delete_one({"_id": ObjectId(eid)})

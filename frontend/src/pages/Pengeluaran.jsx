@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { api, apiError } from "@/lib/api";
 import { rupiah, fmtDate, todayStr } from "@/lib/format";
 import { exportPDF, exportExcel } from "@/lib/exporter";
-import { Banknote, Plus, Trash2, FileDown, FileSpreadsheet } from "lucide-react";
+import { Banknote, Plus, Trash2, FileDown, FileSpreadsheet, Pencil, Save, X } from "lucide-react";
 import { toast } from "sonner";
 
 const CATS = ["Gaji", "Listrik & Air", "Sewa", "Transport", "Operasional", "Perlengkapan", "Lainnya"];
@@ -11,17 +11,26 @@ export default function Pengeluaran() {
   const [items, setItems] = useState([]);
   const [month, setMonth] = useState(todayStr().slice(0, 7));
   const [form, setForm] = useState({ category: "Operasional", amount: "", note: "", date: todayStr() });
+  const [editId, setEditId] = useState(null);
 
   const load = () => api.get(`/expenses?month=${month}`).then((r) => setItems(r.data));
   useEffect(() => { load(); }, [month]);
 
+  const resetForm = () => { setEditId(null); setForm({ category: "Operasional", amount: "", note: "", date: todayStr() }); };
+  const startEdit = (x) => {
+    setEditId(x.id);
+    setForm({ category: x.category, amount: String(x.amount), note: x.note || "", date: x.created_at.slice(0, 10) });
+  };
+
   const submit = async (e) => {
     e.preventDefault();
     if (!form.amount || Number(form.amount) <= 0) { toast.error("Masukkan jumlah"); return; }
+    const body = { category: form.category, amount: Number(form.amount), note: form.note, date: form.date };
     try {
-      await api.post("/expenses", { category: form.category, amount: Number(form.amount), note: form.note, date: form.date });
-      toast.success("Pengeluaran dicatat");
-      setForm({ category: "Operasional", amount: "", note: "", date: todayStr() });
+      if (editId) await api.put(`/expenses/${editId}`, body);
+      else await api.post("/expenses", body);
+      toast.success(editId ? "Pengeluaran diperbarui" : "Pengeluaran dicatat");
+      resetForm();
       load();
     } catch (err) { toast.error(apiError(err.response?.data?.detail)); }
   };
@@ -38,12 +47,12 @@ export default function Pengeluaran() {
   return (
     <div className="grid lg:grid-cols-3 gap-6">
       <form onSubmit={submit} className="bg-card rounded-2xl border border-slate-200 p-6 h-fit space-y-4">
-        <h3 className="font-heading font-semibold text-lg flex items-center gap-2"><Banknote className="w-5 h-5 text-[#C85A32]" /> Catat Pengeluaran</h3>
+        <h3 className="font-heading font-semibold text-lg flex items-center gap-2"><Banknote className="w-5 h-5 text-[#C85A32]" /> {editId ? "Edit Pengeluaran" : "Catat Pengeluaran"}</h3>
         <div>
           <label className="text-sm font-medium">Kategori</label>
           <select value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} data-testid="expense-category-select"
             className="mt-1 w-full px-3 py-2.5 rounded-xl border border-input text-sm bg-white">
-            {CATS.map((c) => <option key={c}>{c}</option>)}
+            {(CATS.includes(form.category) ? CATS : [...CATS, form.category]).map((c) => <option key={c}>{c}</option>)}
           </select>
         </div>
         <div>
@@ -61,7 +70,8 @@ export default function Pengeluaran() {
           <input value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} data-testid="expense-note-input"
             className="mt-1 w-full px-3 py-2.5 rounded-xl border border-input text-sm" placeholder="Opsional" />
         </div>
-        <button type="submit" data-testid="expense-save-button" className="w-full bg-[#1B5E3B] text-white py-3 rounded-xl font-semibold hover:bg-[#143D2B] flex items-center justify-center gap-2"><Plus className="w-4 h-4" /> Simpan</button>
+        <button type="submit" data-testid="expense-save-button" className="w-full bg-[#1B5E3B] text-white py-3 rounded-xl font-semibold hover:bg-[#143D2B] flex items-center justify-center gap-2">{editId ? <Save className="w-4 h-4" /> : <Plus className="w-4 h-4" />} {editId ? "Simpan Perubahan" : "Simpan"}</button>
+        {editId && <button type="button" onClick={resetForm} data-testid="expense-cancel-edit-button" className="w-full py-2.5 rounded-xl border border-input text-sm font-semibold hover:bg-secondary flex items-center justify-center gap-2"><X className="w-4 h-4" /> Batal Edit</button>}
       </form>
 
       <div className="lg:col-span-2 bg-card rounded-2xl border border-slate-200 p-6">
@@ -82,12 +92,15 @@ export default function Pengeluaran() {
             <tbody>
               {items.length === 0 && <tr><td colSpan={5} className="px-4 py-8 text-center text-muted-foreground">Belum ada pengeluaran.</td></tr>}
               {items.map((x) => (
-                <tr key={x.id} className="border-b border-slate-100" data-testid={`expense-row-${x.id}`}>
+                <tr key={x.id} className={`border-b border-slate-100 ${editId === x.id ? "bg-amber-50" : ""}`} data-testid={`expense-row-${x.id}`}>
                   <td className="px-4 py-2.5 text-xs text-muted-foreground">{fmtDate(x.created_at)}</td>
                   <td className="px-4 py-2.5"><span className="text-xs px-2 py-1 rounded-lg bg-secondary">{x.category}</span></td>
                   <td className="px-4 py-2.5">{x.note}</td>
                   <td className="px-4 py-2.5 text-right font-mono font-semibold text-destructive">{rupiah(x.amount)}</td>
-                  <td className="px-4 py-2.5 text-center"><button onClick={() => del(x.id)} data-testid={`expense-delete-${x.id}`} className="text-destructive"><Trash2 className="w-4 h-4" /></button></td>
+                  <td className="px-4 py-2.5 text-center whitespace-nowrap">
+                    {!x.loan_id && <button onClick={() => startEdit(x)} data-testid={`expense-edit-${x.id}`} title="Edit" className="text-[#1B5E3B] mr-3"><Pencil className="w-4 h-4" /></button>}
+                    <button onClick={() => del(x.id)} data-testid={`expense-delete-${x.id}`} title="Hapus" className="text-destructive"><Trash2 className="w-4 h-4" /></button>
+                  </td>
                 </tr>
               ))}
             </tbody>
