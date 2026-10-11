@@ -286,6 +286,7 @@ class TransactionInput(BaseModel):
 
 class PaymentInput(BaseModel):
     amount: float
+    date: Optional[str] = None
 
 class OpnameInput(BaseModel):
     product_id: str
@@ -922,14 +923,35 @@ async def set_saldo_awal(data: SaldoAwal, admin: dict = Depends(require_admin)):
 
 CASH_KINDS = ["toko", "online", "pinjaman", "pembelian", "pengeluaran"]
 
+def tx_cash_events(t: dict) -> List[dict]:
+    """Split a POS sale into cash-in events: initial payment on sale date, piutang payments on their own dates."""
+    total = t.get("total", 0) or 0
+    paid = total if total <= 0 else max(0.0, min(t.get("amount_paid", total), total))
+    pays = t.get("payments", [])
+    initial = max(0.0, paid - sum(p.get("amount", 0) for p in pays))
+    base = {"kind": "toko", "title": t.get("invoice_no", "Transaksi"), "desc": t.get("customer_name") or t.get("payment_method", "")}
+    ev = []
+    if initial or not pays:
+        info = "" if initial >= total else f"Bayar awal dari total {rupiah_id(total)}"
+        ev.append({**base, "date": t["created_at"][:10], "amount": initial, "info": info})
+    budget = paid - initial
+    for p in pays:
+        amt = min(p.get("amount", 0), budget)
+        budget -= amt
+        if amt > 0:
+            ev.append({**base, "date": p["date"][:10], "amount": amt, "info": f"Pelunasan piutang (transaksi {t['created_at'][:10]})"})
+    return ev
+
+def rupiah_id(n: float) -> str:
+    return "Rp " + f"{n:,.0f}".replace(",", ".")
+
 async def cash_events(period: Optional[str]) -> List[dict]:
     pre = period or ""
     rx = {"created_at": {"$regex": f"^{re.escape(pre)}"}}
     ev = []
-    for t in await db.transactions.find(rx).to_list(100000):
-        ev.append({"date": t["created_at"][:10], "kind": "toko", "amount": t["total"] * tx_fraction(t),
-                   "title": t.get("invoice_no", "Transaksi"), "desc": t.get("customer_name") or t.get("payment_method", ""),
-                   "info": "" if t.get("status", "lunas") == "lunas" else f"Dibayar sebagian dari {t['total']:,.0f}".replace(",", ".")})
+    tq = {"$or": [rx, {"payments.date": {"$regex": f"^{re.escape(pre)}"}}]}
+    for t in await db.transactions.find(tq).to_list(100000):
+        ev.extend(e for e in tx_cash_events(t) if e["date"].startswith(pre))
     for d in await db.ecommerce_sales.find({"status": "Selesai"}).to_list(50000):
         cair = d.get("cair")
         date = cair["tanggal"] if cair else d["created_at"][:10]
@@ -950,6 +972,15 @@ async def cash_events(period: Optional[str]) -> List[dict]:
         ev.append({"date": e["created_at"][:10], "kind": "pengeluaran", "amount": e.get("amount", 0),
                    "title": e.get("category", "Pengeluaran"), "desc": e.get("note", ""), "info": ""})
     return ev
+
+@api_router.get("/ecommerce/belum-cair")
+async def list_belum_cair(admin: dict = Depends(require_admin)):
+    docs = await db.ecommerce_sales.find({"status": "Selesai", "cair": {"$exists": False}}).sort("created_at", 1).to_list(5000)
+    out = []
+    for d in docs:
+        d["id"] = str(d.pop("_id"))
+        out.append(d)
+    return out
 
 @api_router.get("/reports/cash")
 async def report_cash(period: Optional[str] = None, user: dict = Depends(get_current_user)):
@@ -1040,9 +1071,12 @@ async def pay_transaction(tid: str, data: PaymentInput, user: dict = Depends(get
     t = await db.transactions.find_one({"_id": ObjectId(tid)})
     if not t:
         raise HTTPException(status_code=404, detail="Transaksi tidak ditemukan")
+    if data.amount <= 0:
+        raise HTTPException(status_code=400, detail="Jumlah harus lebih dari 0")
     paid = min(t.get("amount_paid", 0) + data.amount, t["total"])
     status = "lunas" if paid >= t["total"] else ("sebagian" if paid > 0 else "belum")
-    payments = t.get("payments", []) + [{"amount": data.amount, "date": now_iso(), "by": user["name"]}]
+    pdate = f"{data.date[:10]}T{now_iso()[11:]}" if data.date else now_iso()
+    payments = t.get("payments", []) + [{"amount": paid - t.get("amount_paid", 0), "date": pdate, "by": user["name"]}]
     await db.transactions.update_one({"_id": ObjectId(tid)}, {"$set": {"amount_paid": paid, "status": status, "payments": payments}})
     return {"ok": True, "amount_paid": paid, "status": status}
 

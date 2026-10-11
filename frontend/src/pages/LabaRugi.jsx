@@ -4,6 +4,7 @@ import { rupiah, MONTHS } from "@/lib/format";
 import { exportPDF, exportExcel } from "@/lib/exporter";
 import { Scale, Loader2, FileDown, FileSpreadsheet, ArrowUp, ArrowDown, Minus, Wallet, Hourglass } from "lucide-react";
 import { CashDailyTable } from "@/components/CashDailyTable";
+import { CairReminder } from "@/components/CairReminder";
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 
 const now = new Date();
@@ -18,11 +19,12 @@ export default function LabaRugi() {
   const [prev, setPrev] = useState(null);
   const [cash, setCash] = useState(null);
   const [cashScope, setCashScope] = useState("total");
+  const [cashKey, setCashKey] = useState(0);
 
   useEffect(() => {
     const period = cashScope === "period" ? (mode === "bulanan" ? `${year}-${String(month).padStart(2, "0")}` : `${year}`) : null;
     api.get(`/reports/cash${period ? `?period=${period}` : ""}`).then((r) => setCash(r.data));
-  }, [cashScope, mode, year, month]);
+  }, [cashScope, mode, year, month, cashKey]);
 
   useEffect(() => {
     setData(null);
@@ -203,12 +205,13 @@ export default function LabaRugi() {
               </div>
               <span className="font-mono font-bold text-lg text-amber-800" data-testid="kas-belum-cair-amount">{rupiah(cash.online_belum_cair || 0)}</span>
             </div>
+            <CairReminder onChanged={() => setCashKey((k) => k + 1)} />
             <p className="text-xs text-muted-foreground mt-3">{cash.is_period
               ? "Arus Kas = Omzet Diterima + Dana Pinjaman Masuk − Pembelian Dibayar − Pengeluaran pada periode ini (basis kas)."
               : "Kas = Saldo Awal + Omzet Diterima + Dana Pinjaman Masuk − Pembelian Dibayar − Pengeluaran. Online dihitung dari dana cair pada tanggal cair (nominal cair jika sudah dicatat, selain itu estimasi omzet − potongan platform pada tanggal pesanan). Hutang pembelian & piutang belum dihitung sampai benar-benar dibayar."}</p>
           </div>
         )}
-        <CashDailyTable period={mode === "bulanan" ? `${year}-${String(month).padStart(2, "0")}` : `${year}`} label={periode} />
+        <CashDailyTable key={cashKey} period={mode === "bulanan" ? `${year}-${String(month).padStart(2, "0")}` : `${year}`} label={periode} />
         </>
       )}
     </div>

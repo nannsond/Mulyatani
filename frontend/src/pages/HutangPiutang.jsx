@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { api, apiError } from "@/lib/api";
-import { rupiah, fmtDateTime } from "@/lib/format";
+import { rupiah, fmtDateTime, todayStr } from "@/lib/format";
 import { HandCoins, X } from "lucide-react";
 import { toast } from "sonner";
 
@@ -10,6 +10,7 @@ export default function HutangPiutang() {
   const [hutang, setHutang] = useState([]);
   const [pay, setPay] = useState(null);
   const [amount, setAmount] = useState("");
+  const [payDate, setPayDate] = useState(todayStr());
 
   const load = () => {
     api.get("/piutang").then((r) => setPiutang(r.data));
@@ -22,7 +23,7 @@ export default function HutangPiutang() {
     if (!amt || amt <= 0) { toast.error("Masukkan jumlah"); return; }
     try {
       const url = pay.kind === "piutang" ? `/transactions/${pay.id}/pay` : `/purchases/${pay.id}/pay`;
-      await api.post(url, { amount: amt });
+      await api.post(url, pay.kind === "piutang" ? { amount: amt, date: payDate } : { amount: amt });
       toast.success("Pembayaran dicatat");
       setPay(null); setAmount(""); load();
     } catch (err) { toast.error(apiError(err.response?.data?.detail)); }
@@ -65,7 +66,7 @@ export default function HutangPiutang() {
                   <td className="px-4 py-2.5 text-right font-mono">{rupiah(x.amount_paid || 0)}</td>
                   <td className="px-4 py-2.5 text-right font-mono font-bold text-destructive">{rupiah(x.sisa)}</td>
                   <td className="px-4 py-2.5 text-center">
-                    <button onClick={() => { setPay({ id: x.id, kind: tab, sisa: x.sisa }); setAmount(String(x.sisa)); }} data-testid={`hp-pay-${x.id}`}
+                    <button onClick={() => { setPay({ id: x.id, kind: tab, sisa: x.sisa }); setAmount(String(x.sisa)); setPayDate(todayStr()); }} data-testid={`hp-pay-${x.id}`}
                       className="px-3 py-1.5 rounded-lg bg-[#1B5E3B] text-white text-xs font-semibold hover:bg-[#143D2B]">Bayar</button>
                   </td>
                 </tr>
@@ -86,6 +87,14 @@ export default function HutangPiutang() {
             <p className="text-sm text-muted-foreground mb-2">Sisa: <span className="font-mono font-semibold text-[#0F281E]">{rupiah(pay.sisa)}</span></p>
             <input type="number" value={amount} onChange={(e) => setAmount(e.target.value)} data-testid="hp-pay-amount"
               className="w-full px-3 py-2.5 rounded-xl border border-input text-sm focus:outline-none focus:ring-2 focus:ring-[#1B5E3B]" placeholder="Jumlah bayar" />
+            {pay.kind === "piutang" && (
+              <div className="mt-3">
+                <label className="text-sm font-medium">Tanggal uang diterima</label>
+                <input type="date" value={payDate} max={todayStr()} onChange={(e) => setPayDate(e.target.value)} data-testid="hp-pay-date"
+                  className="mt-1 w-full px-3 py-2.5 rounded-xl border border-input text-sm focus:outline-none focus:ring-2 focus:ring-[#1B5E3B]" />
+                <p className="text-xs text-muted-foreground mt-1">Masuk ke kas pada tanggal ini.</p>
+              </div>
+            )}
             <button onClick={submitPay} data-testid="hp-pay-submit" className="mt-4 w-full bg-[#1B5E3B] text-white py-2.5 rounded-xl font-semibold hover:bg-[#143D2B]">Simpan</button>
           </div>
         </div>
