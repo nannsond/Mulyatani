@@ -1521,20 +1521,23 @@ async def delete_channel(name: str, admin: dict = Depends(require_admin)):
     await db.settings.update_one({"key": "channels"}, {"$set": {"list": new}}, upsert=True)
     return {"ok": True, "list": new}
 
+def diterima_of(s: dict) -> float:
+    return s.get("omzet", 0) - s.get("admin_fee", 0)
+
 def ecom_channel_agg(sales: List[dict], names: List[str]):
-    agg = {n: {"channel": n, "omzet": 0, "fee": 0, "laba_kotor": 0, "laba_bersih": 0, "transaksi": 0, "item": 0} for n in names}
+    agg = {n: {"channel": n, "omzet": 0, "fee": 0, "diterima": 0, "laba_bersih": 0, "transaksi": 0, "item": 0} for n in names}
     for s in sales:
         c = s["channel"]
-        e = agg.setdefault(c, {"channel": c, "omzet": 0, "fee": 0, "laba_kotor": 0, "laba_bersih": 0, "transaksi": 0, "item": 0})
+        e = agg.setdefault(c, {"channel": c, "omzet": 0, "fee": 0, "diterima": 0, "laba_bersih": 0, "transaksi": 0, "item": 0})
         e["omzet"] += s.get("omzet", 0); e["fee"] += s.get("total_fee", 0)
-        e["laba_kotor"] += s.get("laba_kotor", 0); e["laba_bersih"] += s.get("laba_bersih", 0)
+        e["diterima"] += diterima_of(s); e["laba_bersih"] += s.get("laba_bersih", 0)
         e["transaksi"] += 1; e["item"] += sum(i["qty"] for i in s.get("items", []))
     return list(agg.values())
 
 def ecom_summary(sales: List[dict]):
     return {"omzet": sum(s.get("omzet", 0) for s in sales),
             "fee": sum(s.get("total_fee", 0) for s in sales),
-            "laba_kotor": sum(s.get("laba_kotor", 0) for s in sales),
+            "diterima": sum(diterima_of(s) for s in sales),
             "laba_bersih": sum(s.get("laba_bersih", 0) for s in sales),
             "transaksi": len(sales),
             "item": sum(i["qty"] for s in sales for i in s.get("items", []))}
@@ -1654,12 +1657,12 @@ async def set_commission(data: CommissionSetting, admin: dict = Depends(require_
 COMMISSION_STATUSES = ["Dikirim", "Selesai"]
 
 async def _commission_split(month: str) -> dict:
-    """Pool komisi dari laba kotor online Dikirim/Selesai, dibagi ke kasir sesuai jumlah hari Hadir."""
+    """Pool komisi dari Diterima (omzet - potongan platform) online Dikirim/Selesai, dibagi ke kasir sesuai jumlah hari Hadir."""
     rate = ((await db.settings.find_one({"key": "commission"})) or {}).get("rate", 0)
     mrx = {"$regex": f"^{re.escape(month)}"}
     sales = await db.ecommerce_sales.find({"status": {"$in": COMMISSION_STATUSES}, "created_at": mrx}).to_list(20000)
-    laba = sum(sl.get("laba_kotor", 0) for sl in sales)
-    pool = laba * rate / 100
+    diterima = sum(diterima_of(sl) for sl in sales)
+    pool = diterima * rate / 100
     kasir = await db.users.find({"role": "kasir"}).sort("created_at", 1).to_list(500)
     hadir = {}
     for a in await db.attendance.find({"date": mrx, "status": "Hadir"}).to_list(5000):
@@ -1672,7 +1675,7 @@ async def _commission_split(month: str) -> dict:
         rows.append({"user_id": str(u["_id"]), "user_name": u["name"], "hadir": h, "porsi": share * 100, "komisi": round(pool * share)})
     rows.sort(key=lambda x: x["komisi"], reverse=True)
     return {"month": month, "rate": rate, "rows": rows, "total_hadir": total_hadir,
-            "total": {"transaksi": len(sales), "omzet": sum(sl.get("omzet", 0) for sl in sales), "laba_kotor": laba,
+            "total": {"transaksi": len(sales), "omzet": sum(sl.get("omzet", 0) for sl in sales), "diterima": diterima,
                       "komisi": pool, "terbagi": sum(r["komisi"] for r in rows)}}
 
 @api_router.get("/commission/report")

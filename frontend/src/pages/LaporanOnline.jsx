@@ -58,13 +58,13 @@ export default function LaporanOnline() {
   const cards = [
     { label: "Total Omzet", value: s?.omzet, icon: Globe, color: "#1B5E3B" },
     { label: "Total Biaya Marketplace", value: s?.fee, icon: Wallet, color: "#C85A32" },
-    { label: "Laba Kotor", value: s?.laba_kotor, icon: Receipt, color: "#2E4CE5" },
+    { label: "Diterima", value: s?.diterima, icon: Receipt, color: "#2E4CE5" },
     { label: "Laba Bersih", value: s?.laba_bersih, icon: TrendingUp, color: "#0E7A4B" },
   ];
 
-  const exportCols = ["Channel", "Omzet", "Biaya", "Laba Kotor", "Laba Bersih", "Transaksi", "Item"];
-  const exportRows = channels.map((c) => [c.channel, c.omzet, c.fee, c.laba_kotor, c.laba_bersih, c.transaksi, c.item]);
-  const exportFoot = s ? ["TOTAL", s.omzet, s.fee, s.laba_kotor, s.laba_bersih, s.transaksi, s.item] : undefined;
+  const exportCols = ["Channel", "Omzet", "Biaya", "Diterima", "Laba Bersih", "Transaksi", "Item"];
+  const exportRows = channels.map((c) => [c.channel, c.omzet, c.fee, c.diterima, c.laba_bersih, c.transaksi, c.item]);
+  const exportFoot = s ? ["TOTAL", s.omzet, s.fee, s.diterima, s.laba_bersih, s.transaksi, s.item] : undefined;
 
   return (
     <div className="space-y-5">
@@ -208,7 +208,7 @@ export default function LaporanOnline() {
               <table className="w-full text-sm">
                 <thead><tr className="border-b border-slate-200 bg-secondary/50 text-left">
                   <th className="px-3 py-2.5 font-semibold">Channel</th><th className="px-3 py-2.5 font-semibold text-right">Omzet</th>
-                  <th className="px-3 py-2.5 font-semibold text-right">Biaya</th><th className="px-3 py-2.5 font-semibold text-right">Laba Kotor</th>
+                  <th className="px-3 py-2.5 font-semibold text-right">Biaya</th><th className="px-3 py-2.5 font-semibold text-right">Diterima</th>
                   <th className="px-3 py-2.5 font-semibold text-right">Laba Bersih</th><th className="px-3 py-2.5 font-semibold text-right">Transaksi</th><th className="px-3 py-2.5 font-semibold text-right">Item</th>
                 </tr></thead>
                 <tbody>
@@ -217,7 +217,7 @@ export default function LaporanOnline() {
                       <td className="px-3 py-2.5"><span className="text-xs px-2 py-1 rounded-lg text-white font-semibold" style={{ backgroundColor: colorOf(c.channel) }}>{c.channel}</span></td>
                       <td className="px-3 py-2.5 text-right font-mono">{rupiah(c.omzet)}</td>
                       <td className="px-3 py-2.5 text-right font-mono text-destructive">{rupiah(c.fee)}</td>
-                      <td className="px-3 py-2.5 text-right font-mono">{rupiah(c.laba_kotor)}</td>
+                      <td className="px-3 py-2.5 text-right font-mono">{rupiah(c.diterima)}</td>
                       <td className="px-3 py-2.5 text-right font-mono font-semibold text-[#1B5E3B]">{rupiah(c.laba_bersih)}</td>
                       <td className="px-3 py-2.5 text-right">{c.transaksi}</td>
                       <td className="px-3 py-2.5 text-right">{c.item}</td>
@@ -228,7 +228,7 @@ export default function LaporanOnline() {
                       <td className="px-3 py-2.5">TOTAL</td>
                       <td className="px-3 py-2.5 text-right font-mono">{rupiah(s.omzet)}</td>
                       <td className="px-3 py-2.5 text-right font-mono text-destructive">{rupiah(s.fee)}</td>
-                      <td className="px-3 py-2.5 text-right font-mono">{rupiah(s.laba_kotor)}</td>
+                      <td className="px-3 py-2.5 text-right font-mono">{rupiah(s.diterima)}</td>
                       <td className="px-3 py-2.5 text-right font-mono text-[#1B5E3B]">{rupiah(s.laba_bersih)}</td>
                       <td className="px-3 py-2.5 text-right">{s.transaksi}</td>
                       <td className="px-3 py-2.5 text-right">{s.item}</td>

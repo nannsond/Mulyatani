@@ -32,7 +32,7 @@ export default function Komisi() {
       <div className="grid lg:grid-cols-3 gap-6">
         <div className="bg-card rounded-2xl border border-slate-200 p-6 h-fit space-y-4">
           <h3 className="font-heading font-semibold text-lg flex items-center gap-2"><Percent className="w-5 h-5 text-[#1B5E3B]" /> Tarif Komisi</h3>
-          <p className="text-sm text-muted-foreground">Komisi dihitung sebagai persentase dari <b>laba kotor</b> semua penjualan online berstatus <span className="text-blue-700 font-semibold">Dikirim</span> dan <span className="text-green-700 font-semibold">Selesai</span>, lalu dibagi ke semua <b>kasir</b> sesuai jumlah hari <b>Hadir</b> di bulan tersebut (Izin, Sakit, dan Alpha tidak dihitung).</p>
+          <p className="text-sm text-muted-foreground">Komisi dihitung sebagai persentase dari <b>Diterima</b> (omzet − potongan platform) semua penjualan online berstatus <span className="text-blue-700 font-semibold">Dikirim</span> dan <span className="text-green-700 font-semibold">Selesai</span>, lalu dibagi ke semua <b>kasir</b> sesuai jumlah hari <b>Hadir</b> di bulan tersebut (Izin, Sakit, dan Alpha tidak dihitung).</p>
           <div>
             <label className="text-sm font-medium">Persentase komisi (%)</label>
             <div className="mt-1 flex gap-2">
@@ -58,7 +58,7 @@ export default function Komisi() {
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3" data-testid="commission-pool">
                 <PoolStat label="Pesanan" value={report.total.transaksi} testid="commission-pool-orders" />
                 <PoolStat label="Omzet" value={rupiah(report.total.omzet)} testid="commission-pool-omzet" />
-                <PoolStat label="Laba Kotor" value={rupiah(report.total.laba_kotor)} testid="commission-pool-laba" />
+                <PoolStat label="Diterima" value={rupiah(report.total.diterima)} testid="commission-pool-diterima" />
                 <PoolStat label={`Total Komisi (${report.rate}%)`} value={rupiah(report.total.komisi)} accent testid="commission-pool-total" />
               </div>
               {report.total_hadir === 0 && report.total.komisi > 0 && (
