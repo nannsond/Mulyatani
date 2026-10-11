@@ -2,7 +2,8 @@ import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { rupiah, MONTHS } from "@/lib/format";
 import { exportPDF, exportExcel } from "@/lib/exporter";
-import { Scale, Loader2, FileDown, FileSpreadsheet, ArrowUp, ArrowDown, Minus, Wallet } from "lucide-react";
+import { Scale, Loader2, FileDown, FileSpreadsheet, ArrowUp, ArrowDown, Minus, Wallet, Hourglass } from "lucide-react";
+import { CashDailyTable } from "@/components/CashDailyTable";
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 
 const now = new Date();
@@ -192,11 +193,22 @@ export default function LabaRugi() {
             <Line label="Pembelian Dibayar" value={cash.pembelian} negative testid="kas-pembelian" />
             <Line label="Pengeluaran" value={cash.pengeluaran} negative testid="kas-pengeluaran" />
             <Line label={cash.is_period ? "Arus Kas Bersih Periode" : "Kas Saat Ini"} value={cash.kas_saat_ini} bold accent testid="kas-total" />
+            <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-dashed border-amber-300 bg-amber-50/70 px-4 py-3" data-testid="kas-belum-cair">
+              <div className="flex items-center gap-3">
+                <Hourglass className="w-5 h-5 text-amber-600" />
+                <div>
+                  <p className="text-sm font-semibold text-amber-800">Online Belum Cair (Menunggu Marketplace)</p>
+                  <p className="text-xs text-amber-700" data-testid="kas-belum-cair-count">{cash.online_belum_cair_count || 0} pesanan Diproses/Dikirim · bruto {rupiah(cash.online_belum_cair_bruto || 0)} · belum masuk kas</p>
+                </div>
+              </div>
+              <span className="font-mono font-bold text-lg text-amber-800" data-testid="kas-belum-cair-amount">{rupiah(cash.online_belum_cair || 0)}</span>
+            </div>
             <p className="text-xs text-muted-foreground mt-3">{cash.is_period
               ? "Arus Kas = Omzet Diterima + Dana Pinjaman Masuk − Pembelian Dibayar − Pengeluaran pada periode ini (basis kas)."
               : "Kas = Saldo Awal + Omzet Diterima + Dana Pinjaman Masuk − Pembelian Dibayar − Pengeluaran. Online dihitung dari dana cair (nominal cair jika sudah dicatat, selain itu omzet − potongan platform). Hutang pembelian & piutang belum dihitung sampai benar-benar dibayar."}</p>
           </div>
         )}
+        <CashDailyTable period={mode === "bulanan" ? `${year}-${String(month).padStart(2, "0")}` : `${year}`} label={periode} />
         </>
       )}
     </div>

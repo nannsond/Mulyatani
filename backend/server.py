@@ -920,39 +920,61 @@ async def set_saldo_awal(data: SaldoAwal, admin: dict = Depends(require_admin)):
         {"$set": {"saldo_awal_kas": max(0.0, data.saldo_awal_kas)}}, upsert=True)
     return {"ok": True}
 
+CASH_KINDS = ["toko", "online", "pinjaman", "pembelian", "pengeluaran"]
+
+async def cash_events(period: Optional[str]) -> List[dict]:
+    rx = {"created_at": {"$regex": f"^{re.escape(period or '')}"}}
+    ev = []
+    for t in await db.transactions.find(rx).to_list(100000):
+        ev.append({"date": t["created_at"][:10], "kind": "toko", "amount": t["total"] * tx_fraction(t)})
+    for d in await db.ecommerce_sales.find({"status": "Selesai", **rx}).to_list(20000):
+        cair = d["cair"]["nominal"] if d.get("cair") else diterima_of(d)
+        ev.append({"date": d["created_at"][:10], "kind": "online", "amount": cair,
+                   "bruto": d.get("omzet", 0), "fee": d.get("total_fee", 0)})
+    lq = {"disbursed": True, "disbursed_date": {"$regex": f"^{re.escape(period or '')}"}}
+    for l in await db.loans.find(lq).to_list(10000):
+        ev.append({"date": l["disbursed_date"][:10], "kind": "pinjaman", "amount": l["principal"]})
+    for p in await db.purchases.find(rx).to_list(100000):
+        ev.append({"date": p["created_at"][:10], "kind": "pembelian", "amount": p.get("amount_paid", 0)})
+    for e in await db.expenses.find(rx).to_list(100000):
+        ev.append({"date": e["created_at"][:10], "kind": "pengeluaran", "amount": e.get("amount", 0)})
+    return ev
+
 @api_router.get("/reports/cash")
 async def report_cash(period: Optional[str] = None, user: dict = Depends(get_current_user)):
     s = await db.settings.find_one({"key": "store"}) or {}
-    if period:
-        rx = {"created_at": {"$regex": f"^{re.escape(period)}"}}
-        txs = await db.transactions.find(rx).to_list(100000)
-        purchases = await db.purchases.find(rx).to_list(100000)
-        exps = await db.expenses.find(rx).to_list(100000)
-        saldo = 0
-    else:
-        saldo = s.get("saldo_awal_kas", 0) or 0
-        txs = await db.transactions.find().to_list(100000)
-        purchases = await db.purchases.find().to_list(100000)
-        exps = await db.expenses.find().to_list(100000)
-    omzet_offline = sum(t["total"] * tx_fraction(t) for t in txs)
-    online_docs = await db.ecommerce_sales.find({"status": "Selesai", "created_at": {"$regex": f"^{re.escape(period or '')}"}}).to_list(20000)
-    omzet_online_bruto = sum(d.get("omzet", 0) for d in online_docs)
-    online_cair = sum(d["cair"]["nominal"] if d.get("cair") else diterima_of(d) for d in online_docs)
-    potongan_marketplace = omzet_online_bruto - online_cair
-    fee = sum(d.get("total_fee", 0) for d in online_docs)
-    pembelian = sum(p.get("amount_paid", 0) for p in purchases)
-    pengeluaran = sum(e.get("amount", 0) for e in exps)
-    omzet = omzet_offline + online_cair
-    lq = {"disbursed": True}
-    if period:
-        lq["disbursed_date"] = {"$regex": f"^{re.escape(period)}"}
-    pinjaman_masuk = sum(l["principal"] for l in await db.loans.find(lq).to_list(10000))
-    kas = saldo + omzet + pinjaman_masuk - pembelian - pengeluaran
-    return {"saldo_awal_kas": saldo, "omzet": omzet, "omzet_offline": omzet_offline,
-            "omzet_online_bruto": omzet_online_bruto, "potongan_marketplace": potongan_marketplace,
-            "omzet_online_cair": online_cair, "pinjaman_masuk": pinjaman_masuk, "pembelian": pembelian,
-            "pengeluaran": pengeluaran, "biaya_marketplace": fee, "kas_saat_ini": kas,
+    saldo = 0 if period else (s.get("saldo_awal_kas", 0) or 0)
+    ev = await cash_events(period)
+    tot = {k: sum(e["amount"] for e in ev if e["kind"] == k) for k in CASH_KINDS}
+    online_ev = [e for e in ev if e["kind"] == "online"]
+    bruto = sum(e["bruto"] for e in online_ev)
+    omzet = tot["toko"] + tot["online"]
+    kas = saldo + omzet + tot["pinjaman"] - tot["pembelian"] - tot["pengeluaran"]
+    pending = await db.ecommerce_sales.find({"status": {"$in": ["Diproses", "Dikirim"]},
+        "created_at": {"$regex": f"^{re.escape(period or '')}"}}).to_list(20000)
+    return {"saldo_awal_kas": saldo, "omzet": omzet, "omzet_offline": tot["toko"],
+            "omzet_online_bruto": bruto, "potongan_marketplace": bruto - tot["online"],
+            "omzet_online_cair": tot["online"], "pinjaman_masuk": tot["pinjaman"], "pembelian": tot["pembelian"],
+            "pengeluaran": tot["pengeluaran"], "biaya_marketplace": sum(e["fee"] for e in online_ev), "kas_saat_ini": kas,
+            "online_belum_cair": sum(diterima_of(d) for d in pending), "online_belum_cair_count": len(pending),
+            "online_belum_cair_bruto": sum(d.get("omzet", 0) for d in pending),
             "is_period": bool(period)}
+
+@api_router.get("/reports/cash/daily")
+async def report_cash_daily(period: str, user: dict = Depends(get_current_user)):
+    days = {}
+    for e in await cash_events(period):
+        d = days.setdefault(e["date"], {"date": e["date"], **{k: 0 for k in CASH_KINDS}})
+        d[e["kind"]] += e["amount"]
+    rows, run = [], 0
+    for d in sorted(days.values(), key=lambda x: x["date"]):
+        d["masuk"] = d["toko"] + d["online"] + d["pinjaman"]
+        d["keluar"] = d["pembelian"] + d["pengeluaran"]
+        d["bersih"] = d["masuk"] - d["keluar"]
+        run += d["bersih"]
+        d["saldo_berjalan"] = run
+        rows.append(d)
+    return {"period": period, "rows": rows}
 
 @api_router.post("/settings/logo")
 async def upload_logo(file: UploadFile = File(...), admin: dict = Depends(require_admin)):
