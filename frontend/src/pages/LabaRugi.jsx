@@ -42,14 +42,15 @@ export default function LabaRugi() {
   const labaKotor = s?.total_laba || 0;
   const hpp = omzet - labaKotor;
   const pengeluaran = s?.total_pengeluaran || 0;
-  const labaBersih = s?.laba_bersih ?? (labaKotor - pengeluaran);
+  const potongan = s?.potongan_platform || 0;
+  const labaBersih = s?.laba_bersih ?? (labaKotor - potongan - pengeluaran);
   const periode = mode === "bulanan" ? `${MONTHS[month - 1]} ${year}` : `Tahun ${year}`;
 
   const catMap = {};
   expenses.forEach((e) => { catMap[e.category] = (catMap[e.category] || 0) + e.amount; });
   const cats = Object.entries(catMap).map(([category, amount]) => ({ category, amount })).sort((a, b) => b.amount - a.amount);
 
-  const prevBersih = prev?.summary ? (prev.summary.laba_bersih ?? (prev.summary.total_laba - (prev.summary.total_pengeluaran || 0))) : null;
+  const prevBersih = prev?.summary ? (prev.summary.laba_bersih ?? (prev.summary.total_laba - (prev.summary.potongan_platform || 0) - (prev.summary.total_pengeluaran || 0))) : null;
   const pct = (cur, pr) => (pr === null || pr === 0) ? null : ((cur - pr) / Math.abs(pr)) * 100;
   const change = prevBersih !== null ? pct(labaBersih, prevBersih) : null;
 
@@ -57,6 +58,7 @@ export default function LabaRugi() {
     ["Pendapatan (Omzet)", omzet],
     ["Harga Pokok Penjualan (HPP)", -hpp],
     ["Laba Kotor", labaKotor],
+    ["Potongan Biaya Platform (Online)", -potongan],
     ["Pengeluaran Operasional", -pengeluaran],
     ["Laba Bersih", labaBersih],
   ];
@@ -110,6 +112,7 @@ export default function LabaRugi() {
             <Line label="Pendapatan (Omzet)" value={omzet} testid="lr-omzet" />
             <Line label="Harga Pokok Penjualan (HPP)" value={hpp} negative testid="lr-hpp" />
             <Line label="Laba Kotor" value={labaKotor} bold testid="lr-laba-kotor" />
+            <Line label="Potongan Biaya Platform (Online)" value={potongan} negative testid="lr-potongan-platform" />
             <Line label="Pengeluaran Operasional" value={pengeluaran} negative testid="lr-pengeluaran" />
             <Line label="Laba Bersih" value={labaBersih} bold accent testid="lr-laba-bersih" />
             {mode === "bulanan" && change !== null && (

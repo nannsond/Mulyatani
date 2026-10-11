@@ -200,6 +200,10 @@ def normalize_online(s: dict) -> dict:
             "total": s.get("omzet", 0), "payment_method": s.get("channel", "Online"),
             "created_at": s.get("created_at", ""), "total_fee": s.get("total_fee", 0), "_online": True}
 
+async def online_potongan(prefix: str) -> float:
+    docs = await db.ecommerce_sales.find({"status": "Selesai", "created_at": {"$regex": f"^{re.escape(prefix)}"}}, {"admin_fee": 1}).to_list(20000)
+    return sum(d.get("admin_fee", 0) for d in docs)
+
 async def fetch_online_selesai(prefix: str):
     rx = f"^{re.escape(prefix)}"
     docs = await db.ecommerce_sales.find({"status": "Selesai", "created_at": {"$regex": rx}}).to_list(20000)
@@ -777,7 +781,8 @@ async def report_monthly(year: int, month: int, user: dict = Depends(get_current
     peng = await db.expenses.find({"created_at": {"$regex": f"^{prefix}"}}).to_list(2000)
     s["total_pengeluaran"] = sum(e["amount"] for e in peng)
     s["biaya_marketplace"] = online_fee
-    s["laba_bersih"] = s["total_laba"] - s["total_pengeluaran"]
+    s["potongan_platform"] = await online_potongan(prefix)
+    s["laba_bersih"] = s["total_laba"] - s["potongan_platform"] - s["total_pengeluaran"]
     target = await db.targets.find_one({"year": year, "month": month})
     return {"year": year, "month": month, "summary": s,
             "target_omzet": target["target_omzet"] if target else 0,
@@ -804,19 +809,23 @@ async def report_yearly(year: int, user: dict = Depends(get_current_user)):
     s["total_pengeluaran"] = sum(e["amount"] for e in peng)
     online_fee_total = sum(s2.get("total_fee", 0) for s2 in online_docs)
     s["biaya_marketplace"] = online_fee_total
-    s["laba_bersih"] = s["total_laba"] - s["total_pengeluaran"]
+    s["potongan_platform"] = sum(s2.get("admin_fee", 0) for s2 in online_docs)
+    s["laba_bersih"] = s["total_laba"] - s["potongan_platform"] - s["total_pengeluaran"]
     peng_by_month = {}
     for e in peng:
         em = int(e["created_at"][5:7])
         peng_by_month[em] = peng_by_month.get(em, 0) + e["amount"]
     fee_by_month = {}
+    pot_by_month = {}
     for s2 in online_docs:
         fm = int(s2["created_at"][5:7])
         fee_by_month[fm] = fee_by_month.get(fm, 0) + s2.get("total_fee", 0)
+        pot_by_month[fm] = pot_by_month.get(fm, 0) + s2.get("admin_fee", 0)
     for mm in range(1, 13):
         monthly[mm]["pengeluaran"] = peng_by_month.get(mm, 0)
         monthly[mm]["biaya_marketplace"] = fee_by_month.get(mm, 0)
-        monthly[mm]["laba_bersih"] = monthly[mm]["laba"] - peng_by_month.get(mm, 0)
+        monthly[mm]["potongan_platform"] = pot_by_month.get(mm, 0)
+        monthly[mm]["laba_bersih"] = monthly[mm]["laba"] - pot_by_month.get(mm, 0) - peng_by_month.get(mm, 0)
     target = await db.targets.find_one({"year": year, "month": 0})
     return {"year": year, "summary": s,
             "target_omzet": target["target_omzet"] if target else 0,

@@ -1,0 +1,22 @@
+{
+  "summary": "Iteration 37 — Dana Cair tracking (admin set/clear per sale, bulanan daily report columns) + Daftar Harga category filter. Full backend + frontend testing passed.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_iter37_cair.py",
+    "/app/test_reports/pytest/iter37.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "DaftarHarga uses a native <select> (works, but inconsistent with shadcn Select used elsewhere) — console warning: <span> inside <option> hydration warning when a dynamic label is wrapped by the dev dynamic-tracking span. Not blocking.",
+    "server.py file is ~2159 lines; consider splitting ecommerce/reports routes into separate module (>700 lines threshold)."
+  ],
+  "updated_files": ["/app/backend/tests/test_iter37_cair.py"],
+  "success_rate": {"backend": "100% (7/7)", "frontend": "100% (category filter, admin cair set/save/reopen/clear, bulanan report columns, kasir read-only)"},
+  "test_credentials": "Admin nannsond@gmail.com / admin123; Kasir kasir@tokotani.com / kasir123",
+  "seed_data_creation": "pytest fixture creates and tears down a TEST_CAIR product + sale per module; existing ECOM-20261011-0001/0002 sales are left without cair after UI tests (clicked clear button during reopen flow test).",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Backend endpoints PUT/DELETE /api/ecommerce/sales/{id}/cair tested with admin+kasir; validation covered (bad date, negative nominal, unknown id). Reports bulanan daily[] now includes cair/selisih/belum_cair. Frontend: product-category-filter is a native <select> (use select_option(label='Pupuk (N)'), labels include counts). Admin PenjualanOnline table has selectors ecom-cair-open-{sid}, ecom-cair-date-{sid}, ecom-cair-nominal-{sid}, ecom-cair-save-{sid}, ecom-cair-{sid} (reopen), ecom-cair-clear-{sid}, ecom-cair-selisih-{sid}. Clear confirmation uses window.confirm (handle via page.on('dialog')). Laporan Online /laporan/online bulanan shows ecom-rep-daily, ecom-daily-cair-total, ecom-daily-selisih-total.",
+  "rca of the issue": "N/A — no bugs found."
+}
