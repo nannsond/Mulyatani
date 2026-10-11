@@ -570,9 +570,12 @@ async def list_customers(user: dict = Depends(get_current_user)):
     return [{"id": d.get("id"), "name": d.get("name", ""), "telepon": d.get("telepon", ""), "alamat": d.get("alamat", "")} for d in docs]
 
 @api_router.get("/deliveries")
-async def list_deliveries(status: Optional[str] = None, archived: bool = False, user: dict = Depends(get_current_user)):
+async def list_deliveries(status: Optional[str] = None, archived: bool = False, year: Optional[int] = None,
+                          month: Optional[int] = None, user: dict = Depends(get_current_user)):
     base = {"$or": [{"alamat": {"$nin": ["", None]}}, {"ongkir": {"$gt": 0}}]}
     conds: List[dict] = [base]
+    if year and month:
+        conds.append({"created_at": {"$regex": f"^{year:04d}-{month:02d}"}})
     if archived:
         conds.append({"arsip": True})
     else:

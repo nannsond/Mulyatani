@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
-import { rupiah, fmtDateTime } from "@/lib/format";
+import { rupiah, fmtDateTime, MONTHS } from "@/lib/format";
 import { MapPin, MessageCircle, Loader2, PackageCheck, Clock, Truck, Archive, ArchiveRestore } from "lucide-react";
 import { toast } from "sonner";
 
@@ -24,17 +24,18 @@ export default function Pengantaran() {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
 
+  const now = new Date();
+  const [month, setMonth] = useState(now.getMonth() + 1);
+  const [year, setYear] = useState(now.getFullYear());
+
   const archivedView = tab === "arsip";
   const load = () => {
     setLoading(true);
-    const url = tab === "arsip" ? "/deliveries?archived=true" : `/deliveries${tab ? `?status=${tab}` : ""}`;
-    api.get(url).then((r) => setRows(r.data)).catch(() => {}).finally(() => setLoading(false));
+    const params = { year, month, ...(tab === "arsip" ? { archived: true } : tab ? { status: tab } : {}) };
+    api.get("/deliveries", { params }).then((r) => setRows(r.data)).catch(() => {}).finally(() => setLoading(false));
   };
-  useEffect(() => {
-    setLoading(true);
-    const url = tab === "arsip" ? "/deliveries?archived=true" : `/deliveries${tab ? `?status=${tab}` : ""}`;
-    api.get(url).then((r) => setRows(r.data)).catch(() => {}).finally(() => setLoading(false));
-  }, [tab]);
+  useEffect(load, [tab, month, year]); // eslint-disable-line react-hooks/exhaustive-deps
+  const totalOngkir = rows.reduce((s, d) => s + (d.ongkir || 0), 0);
 
   const setStatus = async (id, status_antar) => {
     try {
@@ -60,10 +61,26 @@ export default function Pengantaran() {
 
   return (
     <div className="space-y-5">
-      <div>
-        <h1 className="font-heading text-2xl font-bold text-[#0F281E]">Daftar Pengantaran</h1>
-        <p className="text-sm text-muted-foreground">Pesanan yang perlu diantar ke alamat pembeli</p>
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h1 className="font-heading text-2xl font-bold text-[#0F281E]">Daftar Pengantaran</h1>
+          <p className="text-sm text-muted-foreground">Pesanan yang perlu diantar ke alamat pembeli</p>
+        </div>
+        <div className="flex gap-2">
+          <select value={month} onChange={(e) => setMonth(Number(e.target.value))} data-testid="delivery-month-select"
+            className="px-4 py-2.5 rounded-xl border border-input bg-card text-sm">
+            {MONTHS.map((m, i) => <option key={m} value={i + 1}>{m}</option>)}
+          </select>
+          <select value={year} onChange={(e) => setYear(Number(e.target.value))} data-testid="delivery-year-select"
+            className="px-4 py-2.5 rounded-xl border border-input bg-card text-sm">
+            {[0, 1, 2].map((d) => <option key={d} value={now.getFullYear() - d}>{now.getFullYear() - d}</option>)}
+          </select>
+        </div>
       </div>
+
+      <p className="text-sm text-muted-foreground" data-testid="delivery-month-summary">
+        {MONTHS[month - 1]} {year}: <span className="font-semibold text-[#0F281E]">{rows.length} pesanan</span> · Total ongkir <span className="font-mono font-semibold text-[#1B5E3B]">{rupiah(totalOngkir)}</span>
+      </p>
 
       <div className="flex gap-2 flex-wrap">
         {TABS.map((t) => (
@@ -79,7 +96,7 @@ export default function Pengantaran() {
       ) : rows.length === 0 ? (
         <div className="bg-card rounded-2xl border border-slate-200 p-12 text-center text-muted-foreground">
           <Truck className="w-10 h-10 mx-auto mb-3 opacity-40" />
-          Tidak ada pesanan untuk diantar.
+          Tidak ada pesanan untuk diantar di bulan ini.
         </div>
       ) : (
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
