@@ -3,6 +3,7 @@ import { api } from "@/lib/api";
 import { rupiah, fmtDate } from "@/lib/format";
 import { exportPDF, exportExcel } from "@/lib/exporter";
 import { CashDayDialog } from "@/components/CashDayDialog";
+import { CashFlowChart } from "@/components/CashFlowChart";
 import { CalendarDays, FileDown, FileSpreadsheet } from "lucide-react";
 
 const COLS = ["Tanggal", "Toko Fisik", "Online (Cair)", "Pinjaman", "Pembelian", "Pengeluaran", "Bersih", "Saldo Berjalan"];
@@ -35,6 +36,7 @@ export const CashDailyTable = ({ period, label }) => {
           <button onClick={() => exportExcel({ filename: `ArusKas_${period}`, sheetName: "Arus Kas", columns: COLS, rows: [...data, foot] })} data-testid="cash-daily-export-excel" className="flex items-center gap-2 px-3 py-2 rounded-xl border border-input text-sm hover:bg-secondary"><FileSpreadsheet className="w-4 h-4" /> Excel</button>
         </div>
       </div>
+      <CashFlowChart period={period} rows={rows} />
       <div className="overflow-x-auto max-h-[480px] overflow-y-auto rounded-xl border border-slate-100">
         <table className="w-full text-sm" data-testid="cash-daily-table">
           <thead className="sticky top-0 bg-secondary"><tr className="text-left">

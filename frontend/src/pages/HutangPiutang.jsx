@@ -23,7 +23,7 @@ export default function HutangPiutang() {
     if (!amt || amt <= 0) { toast.error("Masukkan jumlah"); return; }
     try {
       const url = pay.kind === "piutang" ? `/transactions/${pay.id}/pay` : `/purchases/${pay.id}/pay`;
-      await api.post(url, pay.kind === "piutang" ? { amount: amt, date: payDate } : { amount: amt });
+      await api.post(url, { amount: amt, date: payDate });
       toast.success("Pembayaran dicatat");
       setPay(null); setAmount(""); load();
     } catch (err) { toast.error(apiError(err.response?.data?.detail)); }
@@ -87,14 +87,12 @@ export default function HutangPiutang() {
             <p className="text-sm text-muted-foreground mb-2">Sisa: <span className="font-mono font-semibold text-[#0F281E]">{rupiah(pay.sisa)}</span></p>
             <input type="number" value={amount} onChange={(e) => setAmount(e.target.value)} data-testid="hp-pay-amount"
               className="w-full px-3 py-2.5 rounded-xl border border-input text-sm focus:outline-none focus:ring-2 focus:ring-[#1B5E3B]" placeholder="Jumlah bayar" />
-            {pay.kind === "piutang" && (
-              <div className="mt-3">
-                <label className="text-sm font-medium">Tanggal uang diterima</label>
+            <div className="mt-3">
+                <label className="text-sm font-medium">{pay.kind === "piutang" ? "Tanggal uang diterima" : "Tanggal uang dibayarkan"}</label>
                 <input type="date" value={payDate} max={todayStr()} onChange={(e) => setPayDate(e.target.value)} data-testid="hp-pay-date"
                   className="mt-1 w-full px-3 py-2.5 rounded-xl border border-input text-sm focus:outline-none focus:ring-2 focus:ring-[#1B5E3B]" />
-                <p className="text-xs text-muted-foreground mt-1">Masuk ke kas pada tanggal ini.</p>
-              </div>
-            )}
+                <p className="text-xs text-muted-foreground mt-1">{pay.kind === "piutang" ? "Masuk ke kas pada tanggal ini." : "Keluar dari kas pada tanggal ini."}</p>
+            </div>
             <button onClick={submitPay} data-testid="hp-pay-submit" className="mt-4 w-full bg-[#1B5E3B] text-white py-2.5 rounded-xl font-semibold hover:bg-[#143D2B]">Simpan</button>
           </div>
         </div>

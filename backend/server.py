@@ -923,13 +923,13 @@ async def set_saldo_awal(data: SaldoAwal, admin: dict = Depends(require_admin)):
 
 CASH_KINDS = ["toko", "online", "pinjaman", "pembelian", "pengeluaran"]
 
-def tx_cash_events(t: dict) -> List[dict]:
-    """Split a POS sale into cash-in events: initial payment on sale date, piutang payments on their own dates."""
+def paid_cash_events(t: dict, kind: str, title: str, desc: str, pay_label: str) -> List[dict]:
+    """Split a sale/purchase into cash events: initial payment on its date, later payments on their own dates."""
     total = t.get("total", 0) or 0
     paid = total if total <= 0 else max(0.0, min(t.get("amount_paid", total), total))
     pays = t.get("payments", [])
     initial = max(0.0, paid - sum(p.get("amount", 0) for p in pays))
-    base = {"kind": "toko", "title": t.get("invoice_no", "Transaksi"), "desc": t.get("customer_name") or t.get("payment_method", "")}
+    base = {"kind": kind, "title": title, "desc": desc}
     ev = []
     if initial or not pays:
         info = "" if initial >= total else f"Bayar awal dari total {rupiah_id(total)}"
@@ -939,8 +939,12 @@ def tx_cash_events(t: dict) -> List[dict]:
         amt = min(p.get("amount", 0), budget)
         budget -= amt
         if amt > 0:
-            ev.append({**base, "date": p["date"][:10], "amount": amt, "info": f"Pelunasan piutang (transaksi {t['created_at'][:10]})"})
+            ev.append({**base, "date": p["date"][:10], "amount": amt, "info": f"{pay_label} {t['created_at'][:10]})"})
     return ev
+
+def tx_cash_events(t: dict) -> List[dict]:
+    return paid_cash_events(t, "toko", t.get("invoice_no", "Transaksi"),
+                            t.get("customer_name") or t.get("payment_method", ""), "Pelunasan piutang (transaksi")
 
 def rupiah_id(n: float) -> str:
     return "Rp " + f"{n:,.0f}".replace(",", ".")
@@ -965,9 +969,9 @@ async def cash_events(period: Optional[str]) -> List[dict]:
     for l in await db.loans.find(lq).to_list(10000):
         ev.append({"date": l["disbursed_date"][:10], "kind": "pinjaman", "amount": l["principal"],
                    "title": f"Pinjaman {l['lender']}", "desc": l.get("note", ""), "info": ""})
-    for p in await db.purchases.find(rx).to_list(100000):
-        ev.append({"date": p["created_at"][:10], "kind": "pembelian", "amount": p.get("amount_paid", 0),
-                   "title": p.get("po_no", "Pembelian"), "desc": p.get("supplier", ""), "info": ""})
+    for p in await db.purchases.find(tq).to_list(100000):
+        ev.extend(e for e in paid_cash_events(p, "pembelian", p.get("po_no", "Pembelian"), p.get("supplier", ""),
+                                              "Bayar hutang supplier (pembelian") if e["date"].startswith(pre))
     for e in await db.expenses.find(rx).to_list(100000):
         ev.append({"date": e["created_at"][:10], "kind": "pengeluaran", "amount": e.get("amount", 0),
                    "title": e.get("category", "Pengeluaran"), "desc": e.get("note", ""), "info": ""})
@@ -1164,9 +1168,12 @@ async def pay_purchase(pid: str, data: PaymentInput, user: dict = Depends(get_cu
     p = await db.purchases.find_one({"_id": ObjectId(pid)})
     if not p:
         raise HTTPException(status_code=404, detail="Pembelian tidak ditemukan")
+    if data.amount <= 0:
+        raise HTTPException(status_code=400, detail="Jumlah harus lebih dari 0")
     paid = min(p.get("amount_paid", 0) + data.amount, p["total"])
     status = "lunas" if paid >= p["total"] else ("sebagian" if paid > 0 else "belum")
-    payments = p.get("payments", []) + [{"amount": data.amount, "date": now_iso(), "by": user["name"]}]
+    pdate = f"{data.date[:10]}T{now_iso()[11:]}" if data.date else now_iso()
+    payments = p.get("payments", []) + [{"amount": paid - p.get("amount_paid", 0), "date": pdate, "by": user["name"]}]
     await db.purchases.update_one({"_id": ObjectId(pid)}, {"$set": {"amount_paid": paid, "status": status, "payments": payments}})
     return {"ok": True, "amount_paid": paid, "status": status}
 
