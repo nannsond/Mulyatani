@@ -1,0 +1,173 @@
+{
+  "project_title": "Toko Tani Makmur - Sistem Laporan Penjualan & Stok Pertanian",
+  "app_type": "dashboard / saas_app",
+  "language": "Bahasa Indonesia",
+  "currency": "Rupiah (Rp)",
+  "tech_stack": {
+    "framework": "React.js (Vite, JS files)",
+    "styling": "Tailwind CSS v4 + Lucide React + Recharts + Sonner",
+    "components": "Shadcn UI (JS custom wrapped primitives)"
+  },
+  "brand_identity": {
+    "name": "Toko Tani Makmur (AgriStore POS & Reporting)",
+    "tagline": "Sistem Informasi Penjualan, Stok Opname & Laporan Pertanian Modern",
+    "emotional_archetype": "Organic & Earthy + High-Precision Tactical Pro",
+    "vibe": "Terpercaya, Rapi, Tangguh, dan Presisi. Mengombinasikan kehangatan nada bumi (Forest Green, Sage, Terracotta) dengan ketajaman angka keuangan bertipografi mono."
+  },
+  "colors": {
+    "palette_name": "Earthy Agriculture Pro",
+    "primary": {
+      "forest_dark": "#143D2B",
+      "forest_main": "#1B5E3B",
+      "forest_light": "#2D8A56",
+      "sage_soft": "#E8F0EC"
+    },
+    "accent": {
+      "terracotta": "#C85A32",
+      "terracotta_hover": "#B04B26",
+      "sunburst_amber": "#D97706"
+    },
+    "neutrals": {
+      "bg_app": "#F6F7F5",
+      "bg_card": "#FFFFFF",
+      "sidebar_bg": "#0E241B",
+      "sidebar_border": "#1A3A2D",
+      "text_heading": "#0F281E",
+      "text_body": "#334E42",
+      "text_muted": "#64748B",
+      "border_subtle": "#E2E8F0"
+    },
+    "status": {
+      "success": "#16A34A",
+      "warning": "#EAB308",
+      "danger": "#DC2626",
+      "info": "#0284C7"
+    },
+    "rules": {
+      "transparency_ban": "DILARANG menggunakan background 'transparent' murni pada header, dropdown, modal, atau popover. Selalu gunakan bg-white/95 dengan backdrop-blur-md atau bg-[#0E241B] padat.",
+      "contrast_check": "Angka Rupiah (Rp) dan nilai kuantitas stok harus selalu berkontras tinggi (Slate-900 / Forest Dark pada background terang)."
+    }
+  },
+  "typography": {
+    "heading_font": "Plus Jakarta Sans, sans-serif",
+    "body_font": "Inter, sans-serif",
+    "mono_font": "JetBrains Mono, monospace (Khusus Angka Rupiah & Kode Barcode/SKU)",
+    "hierarchy": {
+      "h1_hero": "text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-tight text-[#0F281E]",
+      "h2_section": "text-2xl sm:text-3xl font-bold tracking-tight text-[#0F281E]",
+      "h3_card": "text-lg sm:text-xl font-semibold text-[#0F281E]",
+      "body_regular": "text-sm sm:text-base text-[#334E42] leading-relaxed",
+      "currency_large": "font-mono font-bold text-2xl sm:text-3xl text-[#1B5E3B]",
+      "badge_text": "text-xs font-semibold tracking-wider uppercase"
+    }
+  },
+  "image_urls": {
+    "hero_and_login_bg": {
+      "url": "https://images.unsplash.com/photo-1691229219606-f9aa47d9cdef?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTY2Njd8MHwxfHNlYXJjaHw0fHxhZ3JpY3VsdHVyYWwlMjBzdG9yZSUyMHNlZWRzJTIwZmVydGlsaXplciUyMGZhcm1pbmclMjB0b29scyUyMGluZG9uZXNpYXxlbnwwfHx8fDE3OTE0NjgxNDJ8MA&ixlib=rb-4.1.0&q=85",
+      "description": "Petani & Kasir Toko Pertanian Indonesia - Digunakan untuk banner login & header dashboard"
+    },
+    "farmer_field": {
+      "url": "https://images.unsplash.com/photo-1512631118612-7bf02594062b?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTY2Njd8MHwxfHNlYXJjaHwxfHxhZ3JpY3VsdHVyYWwlMjBzdG9yZSUyMHNlZWRzJTIwZmVydGlsaXplciUyMGZhcm1pbmclMjB0b29scyUyMGluZG9uZXNpYXxlbnwwfHx8fDE3OTE0NjgxNDJ8MA&ixlib=rb-4.1.0&q=85",
+      "description": "Petani memegang alat pertanian - Avatar / Ilustrasi Toko Pertanian"
+    },
+    "rice_field_work": {
+      "url": "https://images.unsplash.com/photo-1700906310080-65a7d9718929?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTY2Njd8MHwxfHNlYXJjaHwyfHxhZ3JpY3VsdHVyYWwlMjBzdG9yZSUyMHNlZWRzJTIwZmVydGlsaXplciUyMGZhcm1pbmclMjB0b29scyUyMGluZG9uZXNpYXxlbnwwfHx8fDE3OTE0NjgxNDJ8MA&ixlib=rb-4.1.0&q=85",
+      "description": "Sawah Pertanian Indonesia - Latar Belakang Modal / Cetak Laporan"
+    }
+  },
+  "key_features_and_modules": [
+    {
+      "module": "Authentication (Login)",
+      "route": "/login",
+      "description": "Form Login JWT sederhana untuk Admin & Kasir dengan preset toggle akun demo (Admin Store, Kasir Kasir 1)."
+    },
+    {
+      "module": "Dashboard Overview",
+      "route": "/",
+      "description": "Ringkasan total omzet hari ini, transaksi hari ini, stok rendah alert, grafik penjualan harian/bulanan, dan aktivitas transaksi terbaru."
+    },
+    {
+      "module": "Input Transaksi Penjualan (POS Kasir)",
+      "route": "/pos",
+      "description": "Interface kasir cepat: Cari produk (Pupuk, Benih, Pestisida, Alat Tani), atur jumlah, kalkulasi otomatis Rp, bayar tunai/non-tunai, cetak struk nota PDF/modal."
+    },
+    {
+      "module": "Laporan Harian",
+      "route": "/laporan/harian",
+      "description": "Breakdown transaksi per hari, filter picker tanggal, detail kasir, metode pembayaran, total omzet, ekspor PDF & Excel."
+    },
+    {
+      "module": "Laporan Bulanan",
+      "route": "/laporan/bulanan",
+      "description": "Agregasi penjualan per bulan, perbandingan target, analisis kategori produk paling laris, margin keuntungan kasar, ekspor PDF & Excel."
+    },
+    {
+      "module": "Laporan Tahunan",
+      "route": "/laporan/tahunan",
+      "description": "Grafik tren musiman (Musim Tanam vs Musim Panen), perbandingan omzet antar tahun, statistik produk utama, ekspor PDF & Excel."
+    },
+    {
+      "module": "Stok Opname",
+      "route": "/stok-opname",
+      "description": "Pemeriksaan stok fisik vs stok sistem, pencatatan selisih (variansi), alasan penyesuaian (rusak/kadaluarsa/hilang/bonus supplier), dan penyesuaian otomatis stok sistem."
+    },
+    {
+      "module": "Daftar Harga & Katalog Produk",
+      "route": "/daftar-harga",
+      "description": "Manajemen produk pertanian (Pupuk NPK, Urea, Benih Padi Hibrida, Pestisida, Sprayer, dll), Atur Harga Beli, Harga Jual, Stok Minimal, Kategori, Tambah/Edit/Hapus."
+    }
+  ],
+  "layout_architecture": {
+    "sidebar": {
+      "type": "Fixed Left Sidebar (#0E241B)",
+      "header": "Logo Toko Tani Makmur + Status Role (Admin/Kasir)",
+      "links": [
+        {"label": "Dashboard", "icon": "LayoutDashboard", "path": "/"},
+        {"label": "Kasir Penjualan", "icon": "ShoppingCart", "path": "/pos"},
+        {"label": "Daftar Harga & Produk", "icon": "Tag", "path": "/daftar-harga"},
+        {"label": "Stok Opname", "icon": "Boxes", "path": "/stok-opname"},
+        {"label": "Laporan Harian", "icon": "Calendar", "path": "/laporan/harian"},
+        {"label": "Laporan Bulanan", "icon": "BarChart3", "path": "/laporan/bulanan"},
+        {"label": "Laporan Tahunan", "icon": "TrendingUp", "path": "/laporan/tahunan"}
+      ],
+      "footer": "Profile user aktif, Role Badge, Button Logout (JWT Clear)"
+    },
+    "header_navbar": {
+      "type": "Sticky Top Bar (bg-white/95 border-b border-slate-200 z-30)",
+      "components": [
+        "Breadcrumbs lokasi halaman",
+        "Quick Action (+ Transaksi Baru)",
+        "Search Global Produk/Transaksi",
+        "Notification Bell (Alert Stok Kritis)",
+        "User Role Toggle Switcher / Quick Demo Swapper"
+      ]
+    }
+  },
+  "testing_and_data_testid_rules": {
+    "requirement": "Semua elemen interaktif (tombol, input, menu, link, modal, tab, filter, ekspor) WAJIB memiliki attribute data-testid berkebab-case.",
+    "examples": [
+      "data-testid=\"login-email-input\"",
+      "data-testid=\"login-password-input\"",
+      "data-testid=\"login-submit-button\"",
+      "data-testid=\"pos-search-product-input\"",
+      "data-testid=\"pos-add-to-cart-button\"",
+      "data-testid=\"pos-checkout-button\"",
+      "data-testid=\"pos-print-receipt-button\"",
+      "data-testid=\"stok-opname-physical-input\"",
+      "data-testid=\"stok-opname-save-button\"",
+      "data-testid=\"export-pdf-button\"",
+      "data-testid=\"export-excel-button\"",
+      "data-testid=\"product-add-modal-trigger\"",
+      "data-testid=\"filter-date-picker\""
+    ]
+  },
+  "instructions_to_main_agent": [
+    "Gunakan struktur React (.js) dengan komponen Shadcn UI yang dimodifikasi menggunakan Tailwind CSS v4.",
+    "Pastikan seluruh mata uang diformat menggunakan format Rupiah Indonesia yang presisi (contoh: Rp 125.000). Gunakan font mono 'JetBrains Mono' untuk teks nominal uang agar terlihat rapi dan selaras secara vertikal.",
+    "Sediakan fitur Ekspor PDF (menggunakan jsPDF / html2canvas atau cetak browser terstruktur) dan Ekspor Excel (.csv / xlsx download) pada setiap modul laporan (Harian, Bulanan, Tahunan, Stok Opname, dan Daftar Harga).",
+    "Integrasikan penanganan Stok Opname yang menghitung variansi stok secara real-time: Selisih = Stok Fisik - Stok Sistem. Tampilkan badge status (Sesuai [Hijau], Kurang [Merah], Lebih [Biru]).",
+    "Gunakan Sonner (`import { toast } from 'sonner'`) untuk pemberitahuan aksi seperti 'Transaksi Berhasil Disimpan', 'Stok Opname Disesuaikan', dan 'Sesi Login Berakhir'.",
+    "Gunakan Recharts untuk visualisasi chart grafik penjualan yang responsif dengan warna Forest Green (`#1B5E3B`) dan Terracotta Accent (`#C85A32`).",
+    "Pastikan ketersediaan data mock yang kaya dan realistis (Produk Pertanian khas Indonesia: NPK Phonska, Urea Pupuk Indonesia, Benih Padi Ciherang, Gramoxone, Roundup, Curacron, Tangki Sprayer Elektrik) lengkap dengan riwayat transaksi harian, bulanan, dan tahunan."
+  ]
+}
