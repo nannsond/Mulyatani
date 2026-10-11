@@ -764,7 +764,13 @@ async def report_daily(date: str, user: dict = Depends(get_current_user)):
     cost = await product_cost_map()
     s = summarize(all_txs); s["total_laba"] = compute_profit(all_txs, cost)
     s["biaya_marketplace"] = online_fee
-    return {"date": date, "summary": s, "transactions": txs,
+    peng = await db.expenses.find({"created_at": {"$regex": f"^{re.escape(date)}"}}).sort("created_at", 1).to_list(1000)
+    s["total_pengeluaran"] = sum(e["amount"] for e in peng)
+    s["potongan_platform"] = await online_potongan(date)
+    s["laba_bersih"] = s["total_laba"] - s["potongan_platform"] - s["total_pengeluaran"]
+    expenses = [{"id": str(e["_id"]), "category": e.get("category", ""), "note": e.get("note", ""),
+                 "amount": e["amount"], "created_at": e["created_at"]} for e in peng]
+    return {"date": date, "summary": s, "transactions": txs, "expenses": expenses,
             "top_products": await top_products(all_txs), "categories": await category_breakdown(all_txs)}
 
 @api_router.get("/reports/monthly")
