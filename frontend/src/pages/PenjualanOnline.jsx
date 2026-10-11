@@ -6,7 +6,7 @@ import { Search, Plus, Minus, Trash2, ShoppingBag, Loader2, CheckCircle2, FileSp
 import { toast } from "sonner";
 import { useAuth } from "@/context/AuthContext";
 import { calcFees } from "@/lib/fees";
-import { OngkirCell, estimateFor } from "@/components/OngkirCell";
+import { OngkirCell } from "@/components/OngkirCell";
 import { OngkirEstimateBox } from "@/components/OngkirEstimateBox";
 
 const STATUSES = ["Diproses", "Dikirim", "Selesai", "Dikembalikan"];
@@ -38,8 +38,6 @@ export default function PenjualanOnline() {
   const [recent, setRecent] = useState([]);
   const [filterMonth, setFilterMonth] = useState(todayStr().slice(0, 7));
   const [filterChannel, setFilterChannel] = useState("");
-  const [shipping, setShipping] = useState({ platform_tables: {} });
-  const [ship, setShip] = useState({});
 
   const colorOf = (n) => channels.find((c) => c.name === n)?.color || CHANNEL_COLORS[n] || "#64748b";
   const activeChannels = channels.filter((c) => c.active);
@@ -49,7 +47,6 @@ export default function PenjualanOnline() {
   const loadRecent = () => api.get(`/ecommerce/sales?month=${filterMonth}${filterChannel ? `&channel=${encodeURIComponent(filterChannel)}` : ""}`).then((r) => setRecent(r.data));
   useEffect(() => {
     loadProducts(); loadBundles();
-    api.get("/shipping/rates").then((r) => setShipping(r.data));
     api.get("/channels").then((r) => { setChannels(r.data); const act = r.data.filter((c) => c.active); if (act.length) setChannel(act[0].name); });
   }, []);
   useEffect(() => { loadRecent(); }, [filterMonth, filterChannel]);
@@ -86,9 +83,7 @@ export default function PenjualanOnline() {
   const isAutoFee = adminFee === "";
   const effAdmin = isAutoFee ? autoFee.total : Number(adminFee) || 0;
   const beratTotal = Math.round(cart.reduce((s, i) => s + i.qty * (i.berat || 0), 0) * 1000) / 1000;
-  const est = estimateFor(shipping, channel, ship, beratTotal, cart.length > 0);
-  const estOngkir = est.fee;
-  const effOngkir = ongkir === "" ? estOngkir : Number(ongkir) || 0;
+  const effOngkir = Number(ongkir) || 0;
   const totalFee = effAdmin + effOngkir + (Number(biayaLain) || 0);
   const estNet = omzet - totalFee;
 
@@ -103,7 +98,6 @@ export default function PenjualanOnline() {
         admin_fee: effAdmin,
         fee_breakdown: isAutoFee ? autoFee.items : [{ label: "Biaya admin (manual)", amount: effAdmin }],
         ongkir: effOngkir,
-        daerah: est.label || "",
         berat_total: beratTotal,
         biaya_lain: Number(biayaLain) || 0,
         customer_name: customerName,
@@ -111,7 +105,7 @@ export default function PenjualanOnline() {
         date,
       });
       toast.success(`Penjualan ${channel} ${data.ecom_no} tersimpan (status: Diproses)`);
-      setCart([]); setAdminFee(""); setOngkir(""); setShip({}); setBiayaLain(""); setCustomerName(""); setOrderNo("");
+      setCart([]); setAdminFee(""); setOngkir(""); setBiayaLain(""); setCustomerName(""); setOrderNo("");
       loadProducts(); loadBundles(); loadRecent();
     } catch (err) {
       toast.error(apiError(err.response?.data?.detail));
@@ -225,10 +219,10 @@ export default function PenjualanOnline() {
             </div>
             <div className="grid grid-cols-3 gap-2">
               <input type="number" value={adminFee} onChange={(e) => setAdminFee(e.target.value)} data-testid="ecom-admin-fee" placeholder={`Potongan: ${autoFee.total}`} title="Kosongkan untuk potongan otomatis" className="px-2 py-2 rounded-lg border border-input text-xs" />
-              <input type="number" value={ongkir} onChange={(e) => setOngkir(e.target.value)} data-testid="ecom-ongkir" placeholder={`Ongkir: ${estOngkir}`} title="Kosongkan untuk estimasi otomatis" className="px-2 py-2 rounded-lg border border-input text-xs" />
+              <input type="number" value={ongkir} onChange={(e) => setOngkir(e.target.value)} data-testid="ecom-ongkir" placeholder="Ongkir" className="px-2 py-2 rounded-lg border border-input text-xs" />
               <input type="number" value={biayaLain} onChange={(e) => setBiayaLain(e.target.value)} data-testid="ecom-biaya-lain" placeholder="Biaya lain" className="px-2 py-2 rounded-lg border border-input text-xs" />
             </div>
-            <OngkirEstimateBox value={ship} onChange={setShip} est={est} berat={beratTotal} effOngkir={effOngkir} manual={ongkir !== ""} channel={channel} />
+            <OngkirEstimateBox berat={beratTotal} effOngkir={effOngkir} />
             <input value={customerName} onChange={(e) => setCustomerName(e.target.value)} data-testid="ecom-customer" placeholder="Nama pembeli (opsional)" className="w-full px-3 py-2 rounded-lg border border-input text-sm" />
             <div className="flex gap-2">
               <input value={orderNo} onChange={(e) => setOrderNo(e.target.value)} data-testid="ecom-order-no" placeholder="No. pesanan (opsional)" className="w-1/2 px-3 py-2 rounded-lg border border-input text-sm" />

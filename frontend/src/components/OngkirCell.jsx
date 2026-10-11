@@ -4,22 +4,6 @@ import { rupiah } from "@/lib/format";
 import { Check, X } from "lucide-react";
 import { toast } from "sonner";
 
-const tierIndex = (berat) => (berat <= 1 ? 0 : Math.min(5, Math.ceil(berat - 1e-9) - 1));
-export const routeLabel = (r) => `${r.zona_a} ↔ ${r.zona_b}`;
-
-export function estimateFor(shipping, channel, sel, berat, hasItems) {
-  const table = shipping.platform_tables?.[channel];
-  if (table) {
-    const svc = table.services.find((x) => x.name === sel.layanan);
-    const route = svc?.routes.find((r) => routeLabel(r) === sel.rute);
-    if (!route || !hasItems) return { fee: 0, label: "", table };
-    const tier = tierIndex(berat);
-    const fee = route.fees[tier];
-    return { fee: fee || 0, na: fee == null, tier: table.tiers[tier], label: `${svc.name} · ${sel.rute}`, table };
-  }
-  return { fee: 0, label: "" };
-}
-
 export function OngkirCell({ sale, isAdmin, onSaved }) {
   const [editing, setEditing] = useState(false);
   const [val, setVal] = useState("");

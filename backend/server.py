@@ -1311,11 +1311,6 @@ async def finalize_ecom_ongkir(sid: str, data: EcomOngkirInput, admin: dict = De
     await db.ecommerce_sales.update_one({"_id": doc["_id"]}, {"$set": upd})
     return {"ok": True, **upd}
 
-@api_router.get("/shipping/rates")
-async def get_shipping_rates(user: dict = Depends(get_current_user)):
-    pl = await db.settings.find_one({"key": "platform_logistics"}) or {}
-    return {"platform_tables": pl.get("tables", {})}
-
 class EcomBulkRow(BaseModel):
     channel: str
     sku: str
@@ -1990,9 +1985,6 @@ async def seed():
         await db.settings.update_one({"key": "channels"}, {"$set": {"list": [dict(c) for c in DEFAULT_CHANNELS]}}, upsert=True)
     await db.ecommerce_sales.update_many({"status": {"$exists": False}}, {"$set": {"status": "Selesai"}})
 
-    if not await db.settings.find_one({"key": "platform_logistics"}):
-        with open(ROOT_DIR / "logistics_tiktok.json", encoding="utf-8") as f:
-            await db.settings.insert_one({"key": "platform_logistics", "tables": {"TikTok Shop": json.load(f)}})
 
     if not await db.settings.find_one({"key": "migr_ongkir_fees"}):
         ch = await db.settings.find_one({"key": "channels"})
