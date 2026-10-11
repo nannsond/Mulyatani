@@ -38,7 +38,7 @@ export default function PenjualanOnline() {
   const [recent, setRecent] = useState([]);
   const [filterMonth, setFilterMonth] = useState(todayStr().slice(0, 7));
   const [filterChannel, setFilterChannel] = useState("");
-  const [shipping, setShipping] = useState({ rates: [], min_kg: 1, platform_tables: {} });
+  const [shipping, setShipping] = useState({ platform_tables: {} });
   const [ship, setShip] = useState({});
 
   const colorOf = (n) => channels.find((c) => c.name === n)?.color || CHANNEL_COLORS[n] || "#64748b";
@@ -228,7 +228,7 @@ export default function PenjualanOnline() {
               <input type="number" value={ongkir} onChange={(e) => setOngkir(e.target.value)} data-testid="ecom-ongkir" placeholder={`Ongkir: ${estOngkir}`} title="Kosongkan untuk estimasi otomatis" className="px-2 py-2 rounded-lg border border-input text-xs" />
               <input type="number" value={biayaLain} onChange={(e) => setBiayaLain(e.target.value)} data-testid="ecom-biaya-lain" placeholder="Biaya lain" className="px-2 py-2 rounded-lg border border-input text-xs" />
             </div>
-            <OngkirEstimateBox shipping={shipping} value={ship} onChange={setShip} est={est} berat={beratTotal} effOngkir={effOngkir} manual={ongkir !== ""} channel={channel} />
+            <OngkirEstimateBox value={ship} onChange={setShip} est={est} berat={beratTotal} effOngkir={effOngkir} manual={ongkir !== ""} channel={channel} />
             <input value={customerName} onChange={(e) => setCustomerName(e.target.value)} data-testid="ecom-customer" placeholder="Nama pembeli (opsional)" className="w-full px-3 py-2 rounded-lg border border-input text-sm" />
             <div className="flex gap-2">
               <input value={orderNo} onChange={(e) => setOrderNo(e.target.value)} data-testid="ecom-order-no" placeholder="No. pesanan (opsional)" className="w-1/2 px-3 py-2 rounded-lg border border-input text-sm" />

@@ -1311,32 +1311,10 @@ async def finalize_ecom_ongkir(sid: str, data: EcomOngkirInput, admin: dict = De
     await db.ecommerce_sales.update_one({"_id": doc["_id"]}, {"$set": upd})
     return {"ok": True, **upd}
 
-class ShippingRate(BaseModel):
-    daerah: str
-    tarif_per_kg: float
-
-class ShippingRatesInput(BaseModel):
-    rates: List[ShippingRate] = []
-    min_kg: float = 1
-
 @api_router.get("/shipping/rates")
 async def get_shipping_rates(user: dict = Depends(get_current_user)):
-    s = await db.settings.find_one({"key": "shipping_rates"}) or {}
     pl = await db.settings.find_one({"key": "platform_logistics"}) or {}
-    return {"rates": s.get("rates", []), "min_kg": s.get("min_kg", 1), "platform_tables": pl.get("tables", {})}
-
-@api_router.post("/shipping/rates")
-async def set_shipping_rates(data: ShippingRatesInput, admin: dict = Depends(require_admin)):
-    rates, seen = [], set()
-    for r in data.rates:
-        name = r.daerah.strip()
-        if not name or name.lower() in seen:
-            continue
-        seen.add(name.lower())
-        rates.append({"daerah": name, "tarif_per_kg": max(0.0, r.tarif_per_kg)})
-    min_kg = max(0.0, data.min_kg)
-    await db.settings.update_one({"key": "shipping_rates"}, {"$set": {"rates": rates, "min_kg": min_kg}}, upsert=True)
-    return {"rates": rates, "min_kg": min_kg}
+    return {"platform_tables": pl.get("tables", {})}
 
 class EcomBulkRow(BaseModel):
     channel: str

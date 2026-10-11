@@ -258,3 +258,4 @@ Aplikasi laporan penjualan sederhana untuk bisnis toko pertanian: laporan harian
 ## Update
 - Fitur Harga Saran dihapus seluruhnya (Daftar Harga, Paket Bundling, Penjualan Online, Dashboard, Pengaturan; endpoint /api/pricing/settings dihapus)
 - Harga Online dihapus; hanya harga per platform (harga_channel). Tab "Harga Platform". Migrasi otomatis isi harga_channel kosong dari harga_online lama.
+- Tarif Ongkir per Daerah dihapus dari Pengaturan (card + POST /api/shipping/rates). Estimasi ongkir hanya dari tabel logistik platform (TikTok Shop); channel lain isi ongkir manual.

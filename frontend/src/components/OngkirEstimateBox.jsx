@@ -24,22 +24,14 @@ function PlatformPicker({ table, value, onChange }) {
   );
 }
 
-export function OngkirEstimateBox({ shipping, value, onChange, est, berat, effOngkir, manual, channel }) {
+export function OngkirEstimateBox({ value, onChange, est, berat, effOngkir, manual, channel }) {
   return (
     <div className="rounded-lg border border-dashed border-amber-300 bg-amber-50/60 p-2.5 text-xs space-y-1.5" data-testid="ecom-ongkir-estimate">
-      {est.table ? (
+      {est.table && (
         <>
           <p className="font-semibold text-[#0F281E]">Biaya Layanan Logistik {channel}</p>
           <PlatformPicker table={est.table} value={value} onChange={onChange} />
         </>
-      ) : (
-        <div className="flex items-center gap-2">
-          <span className="font-semibold text-[#0F281E] whitespace-nowrap">Daerah tujuan</span>
-          <select value={value.daerah || ""} onChange={(e) => onChange({ ...value, daerah: e.target.value })} data-testid="ecom-daerah-select" className={sel}>
-            <option value="">-- Pilih daerah --</option>
-            {shipping.rates.map((r) => <option key={r.daerah} value={r.daerah}>{`${r.daerah} (${rupiah(r.tarif_per_kg)}/kg)`}</option>)}
-          </select>
-        </div>
       )}
       <div className="flex justify-between text-muted-foreground"><span>Berat total{est.tier ? ` · tier ${est.tier}` : ""}</span><span className="font-mono" data-testid="ecom-berat-total">{berat} kg</span></div>
       <div className="flex justify-between text-muted-foreground">
@@ -47,7 +39,6 @@ export function OngkirEstimateBox({ shipping, value, onChange, est, berat, effOn
         <span className="font-mono" data-testid="ecom-ongkir-est">-{rupiah(effOngkir)}</span>
       </div>
       {est.na && <p className="text-red-600" data-testid="ecom-ongkir-na">Layanan tidak tersedia untuk rute & berat ini.</p>}
-      {!est.table && shipping.rates.length === 0 && <p className="text-amber-700">Atur tarif ongkir per daerah di Pengaturan.</p>}
       <p className="text-amber-700">Ongkir final ditentukan platform saat dana cair, perbarui di tabel di bawah.</p>
     </div>
   );
