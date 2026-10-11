@@ -923,21 +923,32 @@ async def set_saldo_awal(data: SaldoAwal, admin: dict = Depends(require_admin)):
 CASH_KINDS = ["toko", "online", "pinjaman", "pembelian", "pengeluaran"]
 
 async def cash_events(period: Optional[str]) -> List[dict]:
-    rx = {"created_at": {"$regex": f"^{re.escape(period or '')}"}}
+    pre = period or ""
+    rx = {"created_at": {"$regex": f"^{re.escape(pre)}"}}
     ev = []
     for t in await db.transactions.find(rx).to_list(100000):
-        ev.append({"date": t["created_at"][:10], "kind": "toko", "amount": t["total"] * tx_fraction(t)})
-    for d in await db.ecommerce_sales.find({"status": "Selesai", **rx}).to_list(20000):
-        cair = d["cair"]["nominal"] if d.get("cair") else diterima_of(d)
-        ev.append({"date": d["created_at"][:10], "kind": "online", "amount": cair,
-                   "bruto": d.get("omzet", 0), "fee": d.get("total_fee", 0)})
-    lq = {"disbursed": True, "disbursed_date": {"$regex": f"^{re.escape(period or '')}"}}
+        ev.append({"date": t["created_at"][:10], "kind": "toko", "amount": t["total"] * tx_fraction(t),
+                   "title": t.get("invoice_no", "Transaksi"), "desc": t.get("customer_name") or t.get("payment_method", ""),
+                   "info": "" if t.get("status", "lunas") == "lunas" else f"Dibayar sebagian dari {t['total']:,.0f}".replace(",", ".")})
+    for d in await db.ecommerce_sales.find({"status": "Selesai"}).to_list(50000):
+        cair = d.get("cair")
+        date = cair["tanggal"] if cair else d["created_at"][:10]
+        if not date.startswith(pre):
+            continue
+        ev.append({"date": date, "kind": "online", "amount": cair["nominal"] if cair else diterima_of(d),
+                   "bruto": d.get("omzet", 0), "fee": d.get("total_fee", 0),
+                   "title": f"{d.get('channel', 'Online')} {d.get('order_no') or ''}".strip(), "desc": d.get("customer_name", ""),
+                   "info": "Cair tercatat" if cair else "Estimasi (belum dicatat cair)"})
+    lq = {"disbursed": True, "disbursed_date": {"$regex": f"^{re.escape(pre)}"}}
     for l in await db.loans.find(lq).to_list(10000):
-        ev.append({"date": l["disbursed_date"][:10], "kind": "pinjaman", "amount": l["principal"]})
+        ev.append({"date": l["disbursed_date"][:10], "kind": "pinjaman", "amount": l["principal"],
+                   "title": f"Pinjaman {l['lender']}", "desc": l.get("note", ""), "info": ""})
     for p in await db.purchases.find(rx).to_list(100000):
-        ev.append({"date": p["created_at"][:10], "kind": "pembelian", "amount": p.get("amount_paid", 0)})
+        ev.append({"date": p["created_at"][:10], "kind": "pembelian", "amount": p.get("amount_paid", 0),
+                   "title": p.get("po_no", "Pembelian"), "desc": p.get("supplier", ""), "info": ""})
     for e in await db.expenses.find(rx).to_list(100000):
-        ev.append({"date": e["created_at"][:10], "kind": "pengeluaran", "amount": e.get("amount", 0)})
+        ev.append({"date": e["created_at"][:10], "kind": "pengeluaran", "amount": e.get("amount", 0),
+                   "title": e.get("category", "Pengeluaran"), "desc": e.get("note", ""), "info": ""})
     return ev
 
 @api_router.get("/reports/cash")
@@ -975,6 +986,14 @@ async def report_cash_daily(period: str, user: dict = Depends(get_current_user))
         d["saldo_berjalan"] = run
         rows.append(d)
     return {"period": period, "rows": rows}
+
+@api_router.get("/reports/cash/day")
+async def report_cash_day(date: str, user: dict = Depends(get_current_user)):
+    ev = [e for e in await cash_events(date[:10]) if e["amount"]]
+    for e in ev:
+        e.pop("bruto", None); e.pop("fee", None)
+    order = {k: i for i, k in enumerate(CASH_KINDS)}
+    return {"date": date[:10], "items": sorted(ev, key=lambda e: order[e["kind"]])}
 
 @api_router.post("/settings/logo")
 async def upload_logo(file: UploadFile = File(...), admin: dict = Depends(require_admin)):

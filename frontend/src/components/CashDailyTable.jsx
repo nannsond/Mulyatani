@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { rupiah, fmtDate } from "@/lib/format";
 import { exportPDF, exportExcel } from "@/lib/exporter";
+import { CashDayDialog } from "@/components/CashDayDialog";
 import { CalendarDays, FileDown, FileSpreadsheet } from "lucide-react";
 
 const COLS = ["Tanggal", "Toko Fisik", "Online (Cair)", "Pinjaman", "Pembelian", "Pengeluaran", "Bersih", "Saldo Berjalan"];
@@ -15,6 +16,7 @@ const Cell = ({ k, v }) => {
 
 export const CashDailyTable = ({ period, label }) => {
   const [rows, setRows] = useState([]);
+  const [day, setDay] = useState(null);
   useEffect(() => { api.get(`/reports/cash/daily?period=${period}`).then((r) => setRows(r.data.rows)); }, [period]);
 
   const total = KEYS.reduce((o, k) => ({ ...o, [k]: k === "saldo_berjalan" ? (rows.at(-1)?.saldo_berjalan || 0) : rows.reduce((s, r) => s + r[k], 0) }), {});
@@ -41,7 +43,7 @@ export const CashDailyTable = ({ period, label }) => {
           <tbody>
             {rows.length === 0 && <tr><td colSpan={8} className="px-3 py-8 text-center text-muted-foreground">Belum ada arus kas pada periode ini.</td></tr>}
             {rows.map((r) => (
-              <tr key={r.date} className="border-t border-slate-100 hover:bg-secondary/40" data-testid={`cash-daily-row-${r.date}`}>
+              <tr key={r.date} onClick={() => setDay(r.date)} className="border-t border-slate-100 hover:bg-secondary/60 cursor-pointer transition-colors" data-testid={`cash-daily-row-${r.date}`}>
                 <td className="px-3 py-2 whitespace-nowrap">{fmtDate(r.date)}</td>
                 {KEYS.map((k) => <Cell key={k} k={k} v={r[k]} />)}
               </tr>
@@ -56,7 +58,8 @@ export const CashDailyTable = ({ period, label }) => {
           )}
         </table>
       </div>
-      <p className="text-xs text-muted-foreground mt-3">Saldo berjalan dihitung dari awal periode (tanpa saldo awal kas). Total kolom sama dengan kotak Kas mode "Periode Ini".</p>
+      <p className="text-xs text-muted-foreground mt-3">Saldo berjalan dihitung dari awal periode (tanpa saldo awal kas). Total kolom sama dengan kotak Kas mode "Periode Ini". Klik baris untuk melihat rincian transaksi.</p>
+      <CashDayDialog date={day} onClose={() => setDay(null)} />
     </div>
   );
 };

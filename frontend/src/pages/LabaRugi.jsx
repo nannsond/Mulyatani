@@ -205,7 +205,7 @@ export default function LabaRugi() {
             </div>
             <p className="text-xs text-muted-foreground mt-3">{cash.is_period
               ? "Arus Kas = Omzet Diterima + Dana Pinjaman Masuk − Pembelian Dibayar − Pengeluaran pada periode ini (basis kas)."
-              : "Kas = Saldo Awal + Omzet Diterima + Dana Pinjaman Masuk − Pembelian Dibayar − Pengeluaran. Online dihitung dari dana cair (nominal cair jika sudah dicatat, selain itu omzet − potongan platform). Hutang pembelian & piutang belum dihitung sampai benar-benar dibayar."}</p>
+              : "Kas = Saldo Awal + Omzet Diterima + Dana Pinjaman Masuk − Pembelian Dibayar − Pengeluaran. Online dihitung dari dana cair pada tanggal cair (nominal cair jika sudah dicatat, selain itu estimasi omzet − potongan platform pada tanggal pesanan). Hutang pembelian & piutang belum dihitung sampai benar-benar dibayar."}</p>
           </div>
         )}
         <CashDailyTable period={mode === "bulanan" ? `${year}-${String(month).padStart(2, "0")}` : `${year}`} label={periode} />
