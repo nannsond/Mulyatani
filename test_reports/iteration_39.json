@@ -1,0 +1,19 @@
+{
+  "summary": "Tested Dana Masuk Kas (loan disbursement) feature end-to-end. Backend 7/7 pytest pass: GET /api/reports/cash returns pinjaman_masuk; creating loan with disbursed=true increases pinjaman_masuk and kas_saat_ini by principal; disbursed=false does NOT affect kas (disbursed_date null); PATCH /api/loans/{id}/disbursement toggles both ways and updates kas accordingly; kasir receives 403 on PATCH; period query filters by disbursed_date (2026-01 includes, 2025-12 excludes); PATCH nonexistent returns 404. Frontend verified: LoanForm shows 'Dana pinjaman sudah cair & masuk kas toko' checkbox default-checked with date input, unchecking hides date input; creating disbursed loan shows 'Masuk kas 15 Jan 2026' label on toggle button; creating undisbursed loan shows 'Catat Dana Masuk Kas' label; clicking toggle (confirm dialog accepted) flips state and updates Laba Rugi; Laba Rugi /laporan/laba-rugi 'Dana Pinjaman Masuk (Modal)' line (data-testid=kas-pinjaman-masuk) shows Rp 2.000.000 with one disbursed loan and Rp 3.500.000 after toggling undisbursed loan on, confirming kas-total integration.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": ["/app/backend/tests/test_iter39_disbursement.py", "/app/test_reports/pytest/iter39.xml"],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "server.py line 946: period filter uses re.escape on period string — safe. Correctly uses disbursed_date (not start_date) for period scoping as per spec.",
+    "server.py line 1202/1217: disbursed_date defaults to start_date[:10] when disbursed=true but client omits date — sensible fallback.",
+    "LoanForm.jsx: form reset after successful save re-sets disbursed=true; user must manually uncheck for subsequent undisbursed loans — acceptable UX."
+  ],
+  "updated_files": ["/app/backend/tests/test_iter39_disbursement.py"],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "test_credentials": "admin nannsond@gmail.com/admin123, kasir kasir@tokotani.com/kasir123",
+  "seed_data_creation": "Created transient loans TEST_ITER39_Disbursed, TEST_ITER39_NotDisbursed (backend) and TEST_UI39_Disb, TEST_UI39_NotDisb (UI) — all cleaned up at end of each test run via DELETE /api/loans/{id} and UI delete buttons. DB confirmed empty post-cleanup.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Dana Masuk Kas feature fully working. loan-save-button testid (not loan-save-btn). After LoanForm submit, form resets to defaults (disbursed=true checked, start_date=today) — must uncheck checkbox before filling next undisbursed loan. window.confirm dialogs for toggle/delete — accept via page.on('dialog', accept)."
+}
