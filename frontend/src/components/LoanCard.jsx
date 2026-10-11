@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { api, apiError } from "@/lib/api";
-import { rupiah, fmtDate } from "@/lib/format";
-import { Trash2, Wallet, ChevronDown } from "lucide-react";
+import { rupiah, fmtDate, todayStr } from "@/lib/format";
+import { Trash2, Wallet, ChevronDown, ArrowDownToLine } from "lucide-react";
 import { toast } from "sonner";
 import { LoanPayDialog } from "@/components/LoanPayDialog";
 
@@ -19,6 +19,14 @@ export const LoanCard = ({ loan: l, onChange }) => {
     if (!window.confirm("Hapus pinjaman ini? Semua cicilan di Pengeluaran ikut terhapus.")) return;
     try { await api.delete(`/loans/${l.id}`); toast.success("Pinjaman dihapus"); onChange(); }
     catch (err) { toast.error(apiError(err.response?.data?.detail)); }
+  };
+  const toggleDisburse = async () => {
+    const msg = l.disbursed ? "Batalkan pencatatan dana masuk kas?" : "Catat dana pinjaman masuk kas hari ini?";
+    if (!window.confirm(msg)) return;
+    try {
+      await api.patch(`/loans/${l.id}/disbursement`, { disbursed: !l.disbursed, disbursed_date: l.disbursed ? null : todayStr() });
+      toast.success(l.disbursed ? "Dana masuk dibatalkan" : "Dana masuk kas dicatat"); onChange();
+    } catch (err) { toast.error(apiError(err.response?.data?.detail)); }
   };
   const delPay = async (pid) => {
     if (!window.confirm("Hapus pembayaran ini?")) return;
@@ -51,6 +59,10 @@ export const LoanCard = ({ loan: l, onChange }) => {
       <div className="flex flex-wrap gap-2 mt-4">
         {!lunas && <button onClick={() => setPayOpen(true)} data-testid={`loan-pay-button-${l.id}`} className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[#1B5E3B] text-white text-sm font-semibold hover:bg-[#143D2B]"><Wallet className="w-4 h-4" /> Bayar Cicilan</button>}
         <button onClick={() => setShowHist(!showHist)} data-testid={`loan-history-toggle-${l.id}`} className="flex items-center gap-1 px-4 py-2 rounded-xl border border-input text-sm hover:bg-secondary">Riwayat <ChevronDown className={`w-4 h-4 transition-transform ${showHist ? "rotate-180" : ""}`} /></button>
+        <button onClick={toggleDisburse} data-testid={`loan-disburse-toggle-${l.id}`} title={l.disbursed ? "Klik untuk membatalkan" : "Klik untuk mencatat dana masuk kas"}
+          className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm border ${l.disbursed ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-dashed border-input text-muted-foreground hover:bg-secondary"}`}>
+          <ArrowDownToLine className="w-4 h-4" /> {l.disbursed ? `Masuk kas ${fmtDate(l.disbursed_date)}` : "Catat Dana Masuk Kas"}
+        </button>
         <button onClick={delLoan} data-testid={`loan-delete-${l.id}`} className="ml-auto flex items-center gap-1 px-3 py-2 rounded-xl text-destructive text-sm hover:bg-red-50"><Trash2 className="w-4 h-4" /> Hapus</button>
       </div>
       {showHist && (

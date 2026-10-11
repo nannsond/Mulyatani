@@ -941,8 +941,12 @@ async def report_cash(period: Optional[str] = None, user: dict = Depends(get_cur
     pembelian = sum(p.get("amount_paid", 0) for p in purchases)
     pengeluaran = sum(e.get("amount", 0) for e in exps)
     omzet = omzet_offline + omzet_online
-    kas = saldo + omzet - pembelian - pengeluaran
-    return {"saldo_awal_kas": saldo, "omzet": omzet, "pembelian": pembelian,
+    lq = {"disbursed": True}
+    if period:
+        lq["disbursed_date"] = {"$regex": f"^{re.escape(period)}"}
+    pinjaman_masuk = sum(l["principal"] for l in await db.loans.find(lq).to_list(10000))
+    kas = saldo + omzet + pinjaman_masuk - pembelian - pengeluaran
+    return {"saldo_awal_kas": saldo, "omzet": omzet, "pinjaman_masuk": pinjaman_masuk, "pembelian": pembelian,
             "pengeluaran": pengeluaran, "biaya_marketplace": fee, "kas_saat_ini": kas,
             "is_period": bool(period)}
 
@@ -1164,6 +1168,12 @@ class LoanInput(BaseModel):
     tenor: int = Field(gt=0)
     start_date: str
     note: str = ""
+    disbursed: bool = True
+    disbursed_date: Optional[str] = None
+
+class LoanDisburseInput(BaseModel):
+    disbursed: bool
+    disbursed_date: Optional[str] = None
 
 class LoanPaymentInput(BaseModel):
     amount: float = Field(gt=0)
@@ -1189,6 +1199,7 @@ def loan_out(doc: dict) -> dict:
 @api_router.post("/loans")
 async def create_loan(data: LoanInput, admin: dict = Depends(require_admin)):
     doc = {**data.model_dump(), "payments": [], "user_name": admin["name"], "created_at": now_iso()}
+    doc["disbursed_date"] = (data.disbursed_date or data.start_date)[:10] if data.disbursed else None
     res = await db.loans.insert_one(doc)
     doc["_id"] = res.inserted_id
     return loan_out(doc)
@@ -1197,6 +1208,15 @@ async def create_loan(data: LoanInput, admin: dict = Depends(require_admin)):
 async def list_loans(admin: dict = Depends(require_admin)):
     docs = await db.loans.find().sort("start_date", -1).to_list(1000)
     return [loan_out(d) for d in docs]
+
+@api_router.patch("/loans/{lid}/disbursement")
+async def set_loan_disbursement(lid: str, data: LoanDisburseInput, admin: dict = Depends(require_admin)):
+    doc = await db.loans.find_one({"_id": ObjectId(lid)})
+    if not doc:
+        raise HTTPException(status_code=404, detail="Pinjaman tidak ditemukan")
+    dd = (data.disbursed_date or doc["start_date"])[:10] if data.disbursed else None
+    await db.loans.update_one({"_id": doc["_id"]}, {"$set": {"disbursed": data.disbursed, "disbursed_date": dd}})
+    return loan_out(await db.loans.find_one({"_id": doc["_id"]}))
 
 @api_router.delete("/loans/{lid}")
 async def delete_loan(lid: str, admin: dict = Depends(require_admin)):

@@ -185,12 +185,13 @@ export default function LabaRugi() {
             </div>
             {!cash.is_period && <Line label="Saldo Awal Kas" value={cash.saldo_awal_kas} testid="kas-saldo-awal" />}
             <Line label="Omzet Diterima (Kas)" value={cash.omzet} testid="kas-omzet" />
+            <Line label="Dana Pinjaman Masuk (Modal)" value={cash.pinjaman_masuk || 0} testid="kas-pinjaman-masuk" />
             <Line label="Pembelian Dibayar" value={cash.pembelian} negative testid="kas-pembelian" />
             <Line label="Pengeluaran" value={cash.pengeluaran} negative testid="kas-pengeluaran" />
             <Line label={cash.is_period ? "Arus Kas Bersih Periode" : "Kas Saat Ini"} value={cash.kas_saat_ini} bold accent testid="kas-total" />
             <p className="text-xs text-muted-foreground mt-3">{cash.is_period
-              ? "Arus Kas = Omzet Diterima − Pembelian Dibayar − Pengeluaran pada periode ini (basis kas)."
-              : "Kas = Saldo Awal + Omzet Diterima − Pembelian Dibayar − Pengeluaran. Hutang pembelian & piutang belum dihitung sampai benar-benar dibayar."}</p>
+              ? "Arus Kas = Omzet Diterima + Dana Pinjaman Masuk − Pembelian Dibayar − Pengeluaran pada periode ini (basis kas)."
+              : "Kas = Saldo Awal + Omzet Diterima + Dana Pinjaman Masuk − Pembelian Dibayar − Pengeluaran. Hutang pembelian & piutang belum dihitung sampai benar-benar dibayar."}</p>
           </div>
         )}
         </>

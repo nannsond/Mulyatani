@@ -4,7 +4,7 @@ import { rupiah, todayStr } from "@/lib/format";
 import { Landmark, Plus } from "lucide-react";
 import { toast } from "sonner";
 
-const EMPTY = { lender: "", principal: "", interest_rate: "", tenor: "12", start_date: todayStr(), note: "" };
+const EMPTY = { lender: "", principal: "", interest_rate: "", tenor: "12", start_date: todayStr(), note: "", disbursed: true, disbursed_date: todayStr() };
 const inputCls = "mt-1 w-full px-3 py-2.5 rounded-xl border border-input text-sm focus:outline-none focus:ring-2 focus:ring-[#1B5E3B]";
 
 const Field = ({ label, children }) => (
@@ -23,7 +23,7 @@ export const LoanForm = ({ onSaved }) => {
     e.preventDefault();
     if (!f.lender.trim() || p <= 0 || t <= 0) { toast.error("Lengkapi pemberi pinjaman, jumlah pokok, dan tenor"); return; }
     try {
-      await api.post("/loans", { lender: f.lender.trim(), principal: p, interest_rate: r, tenor: t, start_date: f.start_date, note: f.note });
+      await api.post("/loans", { lender: f.lender.trim(), principal: p, interest_rate: r, tenor: t, start_date: f.start_date, note: f.note, disbursed: f.disbursed, disbursed_date: f.disbursed_date });
       toast.success("Pinjaman dicatat");
       setF(EMPTY); onSaved();
     } catch (err) { toast.error(apiError(err.response?.data?.detail)); }
@@ -40,6 +40,13 @@ export const LoanForm = ({ onSaved }) => {
       </div>
       <Field label="Tanggal Mulai"><input type="date" value={f.start_date} onChange={set("start_date")} data-testid="loan-start-input" className={inputCls} /></Field>
       <Field label="Catatan"><input value={f.note} onChange={set("note")} data-testid="loan-note-input" className={inputCls} placeholder="Opsional" /></Field>
+      <div className="rounded-xl border border-emerald-200 bg-emerald-50/60 p-3 space-y-2">
+        <label className="flex items-center gap-2 text-sm font-medium cursor-pointer">
+          <input type="checkbox" checked={f.disbursed} onChange={(e) => setF({ ...f, disbursed: e.target.checked })} data-testid="loan-disbursed-checkbox" className="w-4 h-4 accent-[#1B5E3B]" />
+          Dana pinjaman sudah cair & masuk kas toko
+        </label>
+        {f.disbursed && <Field label="Tanggal Dana Masuk"><input type="date" value={f.disbursed_date} onChange={set("disbursed_date")} data-testid="loan-disbursed-date-input" className={inputCls} /></Field>}
+      </div>
       <div className="rounded-xl bg-secondary/60 p-3 text-sm space-y-1" data-testid="loan-preview">
         <div className="flex justify-between"><span className="text-muted-foreground">Total bunga (flat)</span><span className="font-mono">{rupiah(bunga)}</span></div>
         <div className="flex justify-between"><span className="text-muted-foreground">Total kewajiban</span><span className="font-mono">{rupiah(p + bunga)}</span></div>
