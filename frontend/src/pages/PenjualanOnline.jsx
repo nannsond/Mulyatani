@@ -52,7 +52,7 @@ export default function PenjualanOnline() {
 
   const sellable = [
     ...products,
-    ...bundles.map((b) => ({ id: b.id, name: b.name, category: "Paket", berat: b.berat, harga_channel: b.harga_channel, hpp: b.hpp, stok: b.stok, stok_minimal: 0, is_bundle: true, hemat: b.hemat })),
+    ...bundles.map((b) => ({ id: b.id, name: b.name, category: "Paket", harga_channel: b.harga_channel, hpp: b.hpp, stok: b.stok, stok_minimal: 0, is_bundle: true, hemat: b.hemat })),
   ];
   const priceFor = (p) => p.harga_channel?.[channel] || 0;
   useEffect(() => {
@@ -69,7 +69,7 @@ export default function PenjualanOnline() {
         if (ex.qty >= p.stok) { toast.error("Melebihi stok"); return c; }
         return c.map((i) => i.product_id === p.id ? { ...i, qty: i.qty + 1 } : i);
       }
-      return [...c, { product_id: p.id, name: p.name, harga: priceFor(p), qty: 1, stok: p.stok, berat: Number(p.berat) || 0, is_bundle: !!p.is_bundle }];
+      return [...c, { product_id: p.id, name: p.name, harga: priceFor(p), qty: 1, stok: p.stok, is_bundle: !!p.is_bundle }];
     });
   };
   const setQty = (id, delta) => setCart((c) =>

@@ -249,7 +249,6 @@ class Product(BaseModel):
     harga_channel: Dict[str, float] = {}
     stok: int = 0
     stok_minimal: int = 5
-    berat: float = 0
 
 class ProductInput(BaseModel):
     sku: str
@@ -262,7 +261,6 @@ class ProductInput(BaseModel):
     harga_channel: Dict[str, float] = {}
     stok: int = 0
     stok_minimal: int = 5
-    berat: float = 0
 
 class CartItem(BaseModel):
     product_id: str
@@ -384,14 +382,12 @@ async def _bundle_view(b: dict, pmap: dict) -> dict:
     comps = []
     stok = None
     hpp = 0.0
-    berat = 0.0
     satuan_total = 0.0
     for c in b.get("components", []):
         p = pmap.get(c["product_id"])
         q = max(1, c.get("qty", 1))
         pstok = p.get("stok", 0) if p else 0
         hpp += q * (p.get("harga_beli", 0) if p else 0)
-        berat += q * ((p or {}).get("berat", 0) or 0)
         satuan_total += q * (p.get("harga_jual", 0) if p else 0)
         avail = pstok // q
         stok = avail if stok is None else min(stok, avail)
@@ -401,7 +397,7 @@ async def _bundle_view(b: dict, pmap: dict) -> dict:
     return {"id": str(b["_id"]), "name": b["name"], "category": b.get("category", "Paket"),
             "harga_jual": b.get("harga_jual", 0), "harga_reseller": b.get("harga_reseller", 0),
             "harga_channel": b.get("harga_channel", {}), "components": comps,
-            "stok": max(0, stok or 0), "hpp": hpp, "berat": berat, "harga_satuan_total": satuan_total,
+            "stok": max(0, stok or 0), "hpp": hpp, "harga_satuan_total": satuan_total,
             "hemat": max(0, satuan_total - b.get("harga_jual", 0)), "is_bundle": True}
 
 @api_router.get("/bundles")
