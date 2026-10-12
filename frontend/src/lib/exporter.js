@@ -386,23 +386,21 @@ export async function readBundleExcel(file) {
   return [...map.values()].map((b) => ({ ...b, category: b.category || "Paket" }));
 }
 
-export function printShelfLabels({ items, info }) {
+export function printShelfLabels({ items }) {
   const doc = new jsPDF();
-  const W = 63, H = 34, cols = 3, perPage = 24, x0 = 10.5, y0 = 12.5;
+  // 4 cm x 2 cm labels: 5 x 14 = 70 per A4 page
+  const W = 40, H = 20, cols = 5, perPage = 70, x0 = 5, y0 = 8.5;
   items.forEach((p, i) => {
     if (i > 0 && i % perPage === 0) doc.addPage();
     const k = i % perPage, x = x0 + (k % cols) * W, y = y0 + Math.floor(k / cols) * H;
-    doc.setLineDashPattern([1, 1], 0); doc.setDrawColor(170, 170, 170); doc.rect(x, y, W, H);
-    doc.setFillColor(27, 94, 59); doc.rect(x, y, W, 5, "F");
-    doc.setFont("helvetica", "bold"); doc.setFontSize(6.5); doc.setTextColor(255, 255, 255);
-    doc.text((info?.store_name || "Toko Tani").toUpperCase(), x + 3, y + 3.5, { maxWidth: W - 6 });
-    doc.setFontSize(9.5); doc.setTextColor(20, 20, 20);
-    doc.text(doc.splitTextToSize(p.name, W - 6).slice(0, 2), x + 3, y + 10);
-    doc.setFontSize(17); doc.setTextColor(27, 94, 59);
-    doc.text(rp(p.harga_jual), x + 3, y + 25);
-    doc.setFont("helvetica", "normal"); doc.setFontSize(7); doc.setTextColor(110, 110, 110);
-    doc.text(`per ${p.unit || "pcs"}`, x + 3, y + 30.5);
-    doc.text(p.sku || "", x + W - 3, y + 30.5, { align: "right" });
+    doc.setLineDashPattern([0.8, 0.8], 0); doc.setDrawColor(170, 170, 170); doc.rect(x, y, W, H);
+    doc.setFont("helvetica", "bold"); doc.setFontSize(6.5); doc.setTextColor(20, 20, 20);
+    doc.text(doc.splitTextToSize(p.name, W - 3).slice(0, 2), x + 1.5, y + 3.3, { lineHeightFactor: 1.1 });
+    doc.setFontSize(12); doc.setTextColor(27, 94, 59);
+    doc.text(rp(p.harga_jual), x + 1.5, y + 14);
+    doc.setFont("helvetica", "normal"); doc.setFontSize(5); doc.setTextColor(110, 110, 110);
+    doc.text(`per ${p.unit || "pcs"}`, x + 1.5, y + 18.3);
+    doc.text(p.sku || "", x + W - 1.5, y + 18.3, { align: "right" });
   });
   doc.save("Label_Harga_Rak.pdf");
 }
