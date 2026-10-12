@@ -386,21 +386,27 @@ export async function readBundleExcel(file) {
   return [...map.values()].map((b) => ({ ...b, category: b.category || "Paket" }));
 }
 
-export function printShelfLabels({ items }) {
+export function printShelfLabels({ items, w = 40, h = 20 }) {
   const doc = new jsPDF();
-  // 4 cm x 2 cm labels: 5 x 14 = 70 per A4 page
-  const W = 40, H = 20, cols = 5, perPage = 70, x0 = 5, y0 = 8.5;
+  const cols = Math.max(1, Math.floor(200 / w)), rows = Math.max(1, Math.floor(287 / h)), perPage = cols * rows;
+  const x0 = (210 - cols * w) / 2, y0 = (297 - rows * h) / 2;
+  const s = Math.min(h / 20, w / 40), pad = Math.max(1, 1.5 * s), PT = 0.3528;
+  const nameFs = Math.max(4.5, 6.5 * s), smallFs = Math.max(3.8, 5 * s), lines = h >= 18 ? 2 : 1;
   items.forEach((p, i) => {
     if (i > 0 && i % perPage === 0) doc.addPage();
-    const k = i % perPage, x = x0 + (k % cols) * W, y = y0 + Math.floor(k / cols) * H;
-    doc.setLineDashPattern([0.8, 0.8], 0); doc.setDrawColor(170, 170, 170); doc.rect(x, y, W, H);
-    doc.setFont("helvetica", "bold"); doc.setFontSize(6.5); doc.setTextColor(20, 20, 20);
-    doc.text(doc.splitTextToSize(p.name, W - 3).slice(0, 2), x + 1.5, y + 3.3, { lineHeightFactor: 1.1 });
-    doc.setFontSize(12); doc.setTextColor(27, 94, 59);
-    doc.text(rp(p.harga_jual), x + 1.5, y + 14);
-    doc.setFont("helvetica", "normal"); doc.setFontSize(5); doc.setTextColor(110, 110, 110);
-    doc.text(`per ${p.unit || "pcs"}`, x + 1.5, y + 18.3);
-    doc.text(p.sku || "", x + W - 1.5, y + 18.3, { align: "right" });
+    const k = i % perPage, x = x0 + (k % cols) * w, y = y0 + Math.floor(k / cols) * h;
+    doc.setLineDashPattern([0.8, 0.8], 0); doc.setDrawColor(170, 170, 170); doc.rect(x, y, w, h);
+    doc.setFont("helvetica", "bold"); doc.setFontSize(nameFs); doc.setTextColor(20, 20, 20);
+    doc.text(doc.splitTextToSize(p.name, w - 2 * pad).slice(0, lines), x + pad, y + pad + nameFs * PT * 0.8, { lineHeightFactor: 1.1 });
+    let fs = 12 * s;
+    doc.setFontSize(fs);
+    while (fs > 5 && doc.getTextWidth(rp(p.harga_jual)) > w - 2 * pad) { fs -= 0.5; doc.setFontSize(fs); }
+    doc.setTextColor(27, 94, 59);
+    doc.text(rp(p.harga_jual), x + pad, y + h * 0.7);
+    doc.setFont("helvetica", "normal"); doc.setFontSize(smallFs); doc.setTextColor(110, 110, 110);
+    const by = y + h - pad * 0.8;
+    doc.text(`per ${p.unit || "pcs"}`, x + pad, by);
+    doc.text(p.sku || "", x + w - pad, by, { align: "right" });
   });
   doc.save("Label_Harga_Rak.pdf");
 }

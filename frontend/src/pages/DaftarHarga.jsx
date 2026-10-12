@@ -8,6 +8,7 @@ import BundlingPanel from "@/components/BundlingPanel";
 import PriceCell from "@/components/PriceCell";
 import ExcelImport from "@/components/ExcelImport";
 import LabelSelectBar, { isPriceNew } from "@/components/LabelSelectBar";
+import { loadLabelSize } from "@/components/LabelSizePicker";
 import { exportPDF, exportExcel, printPriceList, printShelfLabels, exportProductTemplate, readProductExcel } from "@/lib/exporter";
 import { toast } from "sonner";
 import { calcFees } from "@/lib/fees";
@@ -31,6 +32,7 @@ export default function DaftarHarga() {
   const [view, setView] = useState("satuan");
   const [channels, setChannels] = useState([]);
   const [selected, setSelected] = useState(new Set());
+  const [labelSize, setLabelSize] = useState(loadLabelSize);
   const toggleSelect = (id) => setSelected((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
 
   const load = () => api.get("/products").then((r) => setProducts(r.data));
@@ -124,7 +126,7 @@ export default function DaftarHarga() {
             className="flex items-center gap-2 px-3 py-2.5 rounded-xl border border-input text-sm hover:bg-secondary"><Printer className="w-4 h-4" /> Cetak</button>
           <button onClick={() => {
               const items = selected.size ? sorted.filter((p) => selected.has(p.id)) : sorted;
-              items.length ? printShelfLabels({ items }) : toast.error("Belum ada produk untuk dicetak");
+              items.length ? printShelfLabels({ items, w: labelSize.w, h: labelSize.h }) : toast.error("Belum ada produk untuk dicetak");
             }} data-testid="print-shelf-labels-button"
             title="Cetak label rak untuk produk yang dicentang, atau semua yang tampil bila tidak ada yang dicentang"
             className="flex items-center gap-2 px-3 py-2.5 rounded-xl border border-input text-sm hover:bg-secondary"><Tag className="w-4 h-4" /> Label Rak{selected.size > 0 && ` (${selected.size})`}</button>
@@ -141,7 +143,7 @@ export default function DaftarHarga() {
         </div>
       </div>
 
-      <LabelSelectBar visible={sorted} selected={selected} setSelected={setSelected} />
+      <LabelSelectBar visible={sorted} selected={selected} setSelected={setSelected} size={labelSize} setSize={setLabelSize} />
 
       <div className="bg-card rounded-2xl border border-slate-200 overflow-x-auto">
         <table className="w-full text-sm">
