@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
-import { rupiah, fmtDateTime, MONTHS } from "@/lib/format";
-import { MapPin, MessageCircle, Loader2, PackageCheck, Clock, Truck, Archive, ArchiveRestore } from "lucide-react";
+import { rupiah, fmtDateTime, fmtDate, todayStr, MONTHS } from "@/lib/format";
+import { MapPin, MessageCircle, Loader2, PackageCheck, Clock, Truck, Archive, ArchiveRestore, CalendarClock } from "lucide-react";
 import { toast } from "sonner";
 
 const TABS = [
@@ -19,6 +19,21 @@ const STATUS_STYLE = {
 };
 const STATUS_LABEL = { belum: "Belum Diantar", diantar: "Sedang Diantar", selesai: "Selesai" };
 
+function DeliveryBadges({ d, today }) {
+  if (d.status_antar === "selesai") return null;
+  const tags = [];
+  if (d.dari_bulan_lalu) tags.push(["Dari bulan lalu", "bg-purple-100 text-purple-700", "lalu"]);
+  if (d.jadwal_antar && d.jadwal_antar < today) tags.push(["Terlambat", "bg-red-100 text-red-700", "telat"]);
+  else if (d.jadwal_antar === today) tags.push(["Antar hari ini", "bg-emerald-100 text-emerald-700", "hari-ini"]);
+  else if (d.jadwal_antar > today) tags.push(["Terjadwal", "bg-sky-100 text-sky-700", "nanti"]);
+  if (!tags.length) return null;
+  return (
+    <div className="flex gap-1.5 flex-wrap">
+      {tags.map(([label, cls, key]) => <span key={key} data-testid={`delivery-badge-${key}-${d.id}`} className={`px-2 py-0.5 rounded-md text-[11px] font-semibold ${cls}`}>{label}</span>)}
+    </div>
+  );
+}
+
 export default function Pengantaran() {
   const [tab, setTab] = useState("");
   const [rows, setRows] = useState([]);
@@ -35,7 +50,7 @@ export default function Pengantaran() {
     api.get("/deliveries", { params }).then((r) => setRows(r.data)).catch(() => {}).finally(() => setLoading(false));
   };
   useEffect(load, [tab, month, year]); // eslint-disable-line react-hooks/exhaustive-deps
-  const totalOngkir = rows.reduce((s, d) => s + (d.ongkir || 0), 0);
+  const totalOngkir = rows.filter((d) => !d.dari_bulan_lalu).reduce((s, d) => s + (d.ongkir || 0), 0);
 
   const setStatus = async (id, status_antar) => {
     try {
@@ -56,6 +71,24 @@ export default function Pengantaran() {
       toast.error("Gagal memperbarui arsip");
     }
   };
+
+  const setJadwal = async (id, jadwal_antar) => {
+    try {
+      await api.put(`/deliveries/${id}/schedule`, { jadwal_antar });
+      toast.success(jadwal_antar ? `Dijadwalkan ${fmtDate(jadwal_antar)}` : "Jadwal dihapus");
+      load();
+    } catch (e) {
+      toast.error("Gagal menyimpan jadwal");
+    }
+  };
+
+  const today = todayStr();
+  const planDate = (d) => d.jadwal_antar || d.created_at.slice(0, 10);
+  const sorted = [...rows].sort((a, b) => {
+    const da = a.status_antar === "selesai", db = b.status_antar === "selesai";
+    if (da !== db) return da ? 1 : -1;
+    return da ? b.created_at.localeCompare(a.created_at) : planDate(a).localeCompare(planDate(b));
+  });
 
   const waLink = (p) => `https://wa.me/${(p || "").replace(/\D/g, "").replace(/^0/, "62")}`;
 
@@ -80,6 +113,7 @@ export default function Pengantaran() {
 
       <p className="text-sm text-muted-foreground" data-testid="delivery-month-summary">
         {MONTHS[month - 1]} {year}: <span className="font-semibold text-[#0F281E]">{rows.length} pesanan</span> · Total ongkir <span className="font-mono font-semibold text-[#1B5E3B]">{rupiah(totalOngkir)}</span>
+        {rows.some((d) => d.dari_bulan_lalu) && <span className="text-purple-700"> · termasuk pesanan bulan lalu yang belum selesai</span>}
       </p>
 
       <div className="flex gap-2 flex-wrap">
@@ -100,7 +134,7 @@ export default function Pengantaran() {
         </div>
       ) : (
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {rows.map((d) => (
+          {sorted.map((d) => (
             <div key={d.id} className="bg-card rounded-2xl border border-slate-200 p-5 space-y-3" data-testid={`delivery-card-${d.id}`}>
               <div className="flex items-start justify-between gap-2">
                 <div>
@@ -109,7 +143,17 @@ export default function Pengantaran() {
                 </div>
                 <span className={`px-2.5 py-1 rounded-lg text-xs font-semibold ${STATUS_STYLE[d.status_antar] || STATUS_STYLE.belum}`}>{STATUS_LABEL[d.status_antar] || "Belum Diantar"}</span>
               </div>
-              <p className="text-xs text-muted-foreground">{fmtDateTime(d.created_at)}</p>
+              <p className="text-xs text-muted-foreground">Order: {fmtDateTime(d.created_at)}</p>
+              <DeliveryBadges d={d} today={today} />
+              {!archivedView && d.status_antar !== "selesai" ? (
+                <label className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <CalendarClock className="w-4 h-4 text-[#1B5E3B]" /> Jadwal antar
+                  <input type="date" value={d.jadwal_antar || ""} onChange={(e) => setJadwal(d.id, e.target.value)} data-testid={`delivery-jadwal-${d.id}`}
+                    className="flex-1 px-2 py-1.5 rounded-lg border border-input text-xs text-foreground" />
+                </label>
+              ) : d.jadwal_antar ? (
+                <p className="text-xs text-muted-foreground flex items-center gap-1.5"><CalendarClock className="w-4 h-4" /> Jadwal antar: {fmtDate(d.jadwal_antar)}</p>
+              ) : null}
               {d.alamat && <div className="flex gap-2 text-sm"><MapPin className="w-4 h-4 text-[#1B5E3B] shrink-0 mt-0.5" /><span>{d.alamat}</span></div>}
               {d.telepon && (
                 <a href={waLink(d.telepon)} target="_blank" rel="noopener noreferrer" data-testid={`delivery-wa-${d.id}`}

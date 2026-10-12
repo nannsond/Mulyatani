@@ -283,6 +283,7 @@ class TransactionInput(BaseModel):
     telepon: str = ""
     ongkir: float = 0
     amount_paid: Optional[float] = None
+    jadwal_antar: Optional[str] = None
 
 class PaymentInput(BaseModel):
     amount: float
@@ -556,6 +557,7 @@ async def create_transaction(data: TransactionInput, user: dict = Depends(get_cu
            "discount": discount, "discount_reason": data.discount_reason, "ongkir": ongkir, "total": total,
            "payment_method": data.payment_method, "customer_name": data.customer_name, "alamat": data.alamat, "telepon": data.telepon,
            "status_antar": ("belum" if needs_delivery else ""),
+           "jadwal_antar": ((data.jadwal_antar or "")[:10] if needs_delivery else ""),
            "amount_paid": amount_paid, "status": status, "payments": [],
            "cashier_id": user["id"], "cashier_name": user["name"], "created_at": now_iso()}
     res = await db.transactions.insert_one(doc)
@@ -574,8 +576,13 @@ async def list_deliveries(status: Optional[str] = None, archived: bool = False, 
                           month: Optional[int] = None, user: dict = Depends(get_current_user)):
     base = {"$or": [{"alamat": {"$nin": ["", None]}}, {"ongkir": {"$gt": 0}}]}
     conds: List[dict] = [base]
-    if year and month:
-        conds.append({"created_at": {"$regex": f"^{year:04d}-{month:02d}"}})
+    prefix = f"{year:04d}-{month:02d}" if year and month else None
+    if prefix:
+        rx = {"$regex": f"^{prefix}"}
+        or_conds: List[dict] = [{"created_at": rx}, {"jadwal_antar": rx}]
+        if not archived:
+            or_conds.append({"status_antar": {"$ne": "selesai"}, "created_at": {"$lt": prefix}})
+        conds.append({"$or": or_conds})
     if archived:
         conds.append({"arsip": True})
     else:
@@ -588,7 +595,20 @@ async def list_deliveries(status: Optional[str] = None, archived: bool = False, 
         d["id"] = str(d["_id"]); d.pop("_id", None)
         if not d.get("status_antar"):
             d["status_antar"] = "belum"
+        d["dari_bulan_lalu"] = bool(prefix) and d["created_at"][:7] < prefix
     return docs
+
+@api_router.put("/deliveries/{tid}/schedule")
+async def schedule_delivery(tid: str, body: Dict[str, Any], user: dict = Depends(get_current_user)):
+    jadwal = str(body.get("jadwal_antar") or "")[:10]
+    if jadwal and not re.fullmatch(r"\d{4}-\d{2}-\d{2}", jadwal):
+        raise HTTPException(status_code=400, detail="Format tanggal tidak valid")
+    if not ObjectId.is_valid(tid):
+        raise HTTPException(status_code=404, detail="Transaksi tidak ditemukan")
+    r = await db.transactions.update_one({"_id": ObjectId(tid)}, {"$set": {"jadwal_antar": jadwal}})
+    if r.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Transaksi tidak ditemukan")
+    return {"ok": True, "jadwal_antar": jadwal}
 
 @api_router.put("/deliveries/{tid}/archive")
 async def archive_delivery(tid: str, body: Dict[str, Any], user: dict = Depends(get_current_user)):
@@ -672,7 +692,9 @@ async def update_transaction(tid: str, data: TransactionInput, admin: dict = Dep
     status = "lunas" if amount_paid >= total else ("sebagian" if amount_paid > 0 else "belum")
     needs_delivery = bool((data.alamat or "").strip()) or ongkir > 0
     status_antar = old.get("status_antar") or ("belum" if needs_delivery else "")
+    extra = {} if data.jadwal_antar is None else {"jadwal_antar": data.jadwal_antar[:10]}
     await db.transactions.update_one({"_id": ObjectId(tid)}, {"$set": {
+        **extra,
         "items": items, "subtotal": subtotal, "discount": discount, "discount_reason": data.discount_reason,
         "ongkir": ongkir, "total": total, "payment_method": data.payment_method, "customer_name": data.customer_name, "alamat": data.alamat, "telepon": data.telepon,
         "status_antar": status_antar,
