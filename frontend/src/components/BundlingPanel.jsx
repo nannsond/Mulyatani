@@ -2,7 +2,8 @@ import { useEffect, useState } from "react";
 import { api, apiError } from "@/lib/api";
 import { rupiah } from "@/lib/format";
 import { calcFees } from "@/lib/fees";
-import { exportPDF, exportExcel } from "@/lib/exporter";
+import { exportPDF, exportExcel, exportBundleTemplate, readBundleExcel } from "@/lib/exporter";
+import ExcelImport from "@/components/ExcelImport";
 import { toast } from "sonner";
 import { Plus, Pencil, Trash2, Boxes, AlertTriangle, PackageMinus, Loader2, Search, FileDown, FileSpreadsheet } from "lucide-react";
 import BundleModal from "@/components/BundleModal";
@@ -92,6 +93,8 @@ export default function BundlingPanel({ isAdmin, onChanged, channels = [] }) {
             className="flex items-center gap-2 px-3 py-2.5 rounded-xl border border-input text-sm hover:bg-secondary"><FileDown className="w-4 h-4" /> PDF</button>
           <button onClick={() => exportExcel({ filename: exportTitle.replace(/\s+/g, "_"), sheetName: "Paket", columns: cols, rows })} data-testid="bundle-export-excel"
             className="flex items-center gap-2 px-3 py-2.5 rounded-xl border border-input text-sm hover:bg-secondary"><FileSpreadsheet className="w-4 h-4" /> Excel</button>
+          {isAdmin && <ExcelImport title="paket" endpoint="/bundles/bulk" testid="bundle" onDone={() => { load(); onChanged?.(); }}
+            parse={async (f) => ({ bundles: await readBundleExcel(f) })} onTemplate={() => exportBundleTemplate(channels.map((c) => c.name))} />}
           {isAdmin && (
             <button onClick={() => setModal({ ...EMPTY })} data-testid="bundle-add-trigger"
               className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#1B5E3B] text-white text-sm font-semibold hover:bg-[#143D2B]"><Plus className="w-4 h-4" /> Tambah</button>

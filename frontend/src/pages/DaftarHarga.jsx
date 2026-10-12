@@ -3,11 +3,11 @@ import { api, apiError } from "@/lib/api";
 import { rupiah } from "@/lib/format";
 import { useAuth } from "@/context/AuthContext";
 import { useSettings } from "@/context/SettingsContext";
-import { Plus, Pencil, Trash2, FileDown, FileSpreadsheet, X, Search, Printer, AlertTriangle, Package, Boxes } from "lucide-react";
+import { Plus, Pencil, Trash2, FileDown, FileSpreadsheet, X, Search, Printer, AlertTriangle, Package, Boxes, Tag } from "lucide-react";
 import BundlingPanel from "@/components/BundlingPanel";
 import PriceCell from "@/components/PriceCell";
-import ProductImport from "@/components/ProductImport";
-import { exportPDF, exportExcel, printPriceList } from "@/lib/exporter";
+import ExcelImport from "@/components/ExcelImport";
+import { exportPDF, exportExcel, printPriceList, printShelfLabels, exportProductTemplate, readProductExcel } from "@/lib/exporter";
 import { toast } from "sonner";
 import { calcFees } from "@/lib/fees";
 
@@ -119,11 +119,15 @@ export default function DaftarHarga() {
         <div className="flex gap-2">
           <button onClick={() => printPriceList({ products: sorted, channels, logoUrl, info: storeInfo })} data-testid="print-pricelist-button"
             className="flex items-center gap-2 px-3 py-2.5 rounded-xl border border-input text-sm hover:bg-secondary"><Printer className="w-4 h-4" /> Cetak</button>
+          <button onClick={() => sorted.length ? printShelfLabels({ items: sorted, info: storeInfo }) : toast.error("Belum ada produk untuk dicetak")} data-testid="print-shelf-labels-button"
+            title="Cetak label harga rak untuk produk yang sedang tampil (ikut filter & pencarian)"
+            className="flex items-center gap-2 px-3 py-2.5 rounded-xl border border-input text-sm hover:bg-secondary"><Tag className="w-4 h-4" /> Label Rak</button>
           <button onClick={() => exportPDF({ title: exportTitle, columns: cols, rows })} data-testid="export-pdf-button"
             className="flex items-center gap-2 px-3 py-2.5 rounded-xl border border-input text-sm hover:bg-secondary"><FileDown className="w-4 h-4" /> PDF</button>
           <button onClick={() => exportExcel({ filename: exportTitle.replace(/\s+/g, "_"), sheetName: "Produk", columns: cols, rows })} data-testid="export-excel-button"
             className="flex items-center gap-2 px-3 py-2.5 rounded-xl border border-input text-sm hover:bg-secondary"><FileSpreadsheet className="w-4 h-4" /> Excel</button>
-          {isAdmin && <ProductImport channels={channels} onDone={load} />}
+          {isAdmin && <ExcelImport title="produk" endpoint="/products/bulk" testid="product" onDone={load}
+            parse={async (f) => ({ rows: await readProductExcel(f) })} onTemplate={() => exportProductTemplate(channels.map((c) => c.name))} />}
           {isAdmin && (
             <button onClick={() => setModal({ ...EMPTY })} data-testid="product-add-modal-trigger"
               className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#1B5E3B] text-white text-sm font-semibold hover:bg-[#143D2B]"><Plus className="w-4 h-4" /> Tambah</button>

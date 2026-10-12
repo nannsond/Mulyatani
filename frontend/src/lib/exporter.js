@@ -290,8 +290,9 @@ export async function readProductExcel(file) {
   const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, blankrows: false });
   const header = (rows[0] || []).map((h) => String(h ?? "").trim());
   const num = (v) => Number(String(v ?? "").replace(/[^\d.-]/g, "")) || 0;
-  return rows.slice(1).filter((r) => r && String(r[0] ?? "").trim()).map((r) => ({
-    sku: String(r[0]).trim(),
+  return rows.slice(1).map((r, i) => [r, i + 2]).filter(([r]) => r && (String(r[0] ?? "").trim() || String(r[1] ?? "").trim())).map(([r, row]) => ({
+    row,
+    sku: String(r[0] ?? "").trim(),
     name: String(r[1] ?? "").trim(),
     category: String(r[2] ?? "").trim() || "Lainnya",
     unit: String(r[3] ?? "").trim() || "pcs",
@@ -338,4 +339,70 @@ export async function printInstallmentReceipt(tx, idx, logoUrl, info = {}) {
   doc.setFontSize(8);
   doc.text(sisa > 0 ? "Terima kasih atas pembayarannya." : "Terima kasih, tagihan telah LUNAS.", 40, y, { align: "center" });
   doc.save(`Cicilan_${tx.invoice_no}_ke-${idx + 1}.pdf`);
+}
+
+const BUNDLE_COLS = ["Nama Paket", "Kategori", "Harga Normal", "Harga Reseller", "SKU Komponen", "Qty"];
+
+export function exportBundleTemplate(channels = []) {
+  const cols = [...BUNDLE_COLS, ...channels.map((c) => `Harga ${c}`)];
+  const ex = [
+    ["Paket Tanam Cabai", "Paket", 60000, 55000, "BNH-001", 1, ...channels.map(() => 65000)],
+    ["Paket Tanam Cabai", "", "", "", "PPK-002", 2, ...channels.map(() => "")],
+  ];
+  const ws = XLSX.utils.aoa_to_sheet([cols, ...ex]);
+  ws["!cols"] = cols.map(() => ({ wch: 18 }));
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Paket");
+  XLSX.writeFile(wb, "Template_Paket_Bundling.xlsx");
+}
+
+export async function readBundleExcel(file) {
+  const wb = XLSX.read(await file.arrayBuffer(), { type: "array" });
+  const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, blankrows: false });
+  const header = (rows[0] || []).map((h) => String(h ?? "").trim());
+  const num = (v) => Number(String(v ?? "").replace(/[^\d.-]/g, "")) || 0;
+  const map = new Map();
+  let last = null;
+  rows.slice(1).forEach((r, i) => {
+    if (!r) return;
+    const name = String(r[0] ?? "").trim();
+    const sku = String(r[4] ?? "").trim();
+    if (!name && !sku) return;
+    const key = name ? name.toLowerCase() : last;
+    if (!key) return;
+    last = key;
+    if (!map.has(key)) map.set(key, { name, category: "", harga_jual: 0, harga_reseller: 0, harga_channel: {}, components: [], rows: [] });
+    const b = map.get(key);
+    b.rows.push(i + 2);
+    if (!b.category && String(r[1] ?? "").trim()) b.category = String(r[1]).trim();
+    if (!b.harga_jual) b.harga_jual = num(r[2]);
+    if (!b.harga_reseller) b.harga_reseller = num(r[3]);
+    header.slice(6).forEach((h, j) => {
+      const ch = h.replace(/^Harga\s+/i, ""); const v = num(r[6 + j]);
+      if (ch && v > 0 && !b.harga_channel[ch]) b.harga_channel[ch] = v;
+    });
+    if (sku) b.components.push({ sku, qty: r[5] === undefined || r[5] === "" ? 1 : num(r[5]) });
+  });
+  return [...map.values()].map((b) => ({ ...b, category: b.category || "Paket" }));
+}
+
+export function printShelfLabels({ items, info }) {
+  const doc = new jsPDF();
+  const W = 63, H = 34, cols = 3, perPage = 24, x0 = 10.5, y0 = 12.5;
+  items.forEach((p, i) => {
+    if (i > 0 && i % perPage === 0) doc.addPage();
+    const k = i % perPage, x = x0 + (k % cols) * W, y = y0 + Math.floor(k / cols) * H;
+    doc.setLineDashPattern([1, 1], 0); doc.setDrawColor(170, 170, 170); doc.rect(x, y, W, H);
+    doc.setFillColor(27, 94, 59); doc.rect(x, y, W, 5, "F");
+    doc.setFont("helvetica", "bold"); doc.setFontSize(6.5); doc.setTextColor(255, 255, 255);
+    doc.text((info?.store_name || "Toko Tani").toUpperCase(), x + 3, y + 3.5, { maxWidth: W - 6 });
+    doc.setFontSize(9.5); doc.setTextColor(20, 20, 20);
+    doc.text(doc.splitTextToSize(p.name, W - 6).slice(0, 2), x + 3, y + 10);
+    doc.setFontSize(17); doc.setTextColor(27, 94, 59);
+    doc.text(rp(p.harga_jual), x + 3, y + 25);
+    doc.setFont("helvetica", "normal"); doc.setFontSize(7); doc.setTextColor(110, 110, 110);
+    doc.text(`per ${p.unit || "pcs"}`, x + 3, y + 30.5);
+    doc.text(p.sku || "", x + W - 3, y + 30.5, { align: "right" });
+  });
+  doc.save("Label_Harga_Rak.pdf");
 }

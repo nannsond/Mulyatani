@@ -354,29 +354,54 @@ async def create_product(data: ProductInput, admin: dict = Depends(require_admin
     doc["_id"] = res.inserted_id
     return Product(**doc).model_dump()
 
+class ProductBulkRow(ProductInput):
+    row: int = 0
+
 class ProductBulkInput(BaseModel):
-    rows: List[ProductInput]
+    rows: List[ProductBulkRow]
+    dry_run: bool = False
+
+def _preview_item(row, code, name, errs, warns, exists):
+    status = "error" if errs else ("update" if exists else "baru")
+    return {"row": row, "code": code, "name": name, "status": status,
+            "message": "; ".join(errs or warns)}
 
 @api_router.post("/products/bulk")
 async def bulk_products(data: ProductBulkInput, admin: dict = Depends(require_admin)):
+    channels = {c["name"] for c in await get_channels_cfg()}
+    existing = {p["sku"]: p for p in await db.products.find().to_list(10000)}
+    seen, preview = set(), []
     created = updated = 0
-    errors = []
     for idx, r in enumerate(data.rows, start=2):
-        if not r.sku.strip() or not r.name.strip():
-            errors.append(f"Baris {idx}: SKU dan Nama wajib diisi"); continue
-        doc = r.model_dump()
-        doc["sku"] = r.sku.strip()
-        doc["category"] = r.category.strip() or "Lainnya"
-        existing = await db.products.find_one({"sku": doc["sku"]})
-        if existing:
+        row = r.row or idx
+        sku, name = r.sku.strip(), r.name.strip()
+        errs, warns = [], []
+        if not sku: errs.append("SKU kosong")
+        if not name: errs.append("Nama Produk kosong")
+        if sku and sku in seen: errs.append("SKU ganda di file")
+        if min(r.harga_beli, r.harga_jual, r.harga_reseller, r.stok, r.stok_minimal) < 0: errs.append("Ada angka negatif")
+        unknown = [k for k in r.harga_channel if k not in channels]
+        if unknown: errs.append("Channel tidak dikenal: " + ", ".join(unknown))
+        if r.harga_jual <= 0: warns.append("Harga Normal 0")
+        elif r.harga_jual < r.harga_beli: warns.append("Harga Normal di bawah Harga Beli")
+        seen.add(sku)
+        old = existing.get(sku)
+        if old and not errs: warns.insert(0, "SKU sudah ada, data diperbarui (stok tidak diubah)")
+        preview.append(_preview_item(row, sku, name, errs, warns, old))
+        if errs or data.dry_run:
+            continue
+        doc = r.model_dump(exclude={"row"})
+        doc.update(sku=sku, name=name, category=r.category.strip() or "Lainnya")
+        if old:
             doc.pop("stok")
-            doc["harga_channel"] = {**existing.get("harga_channel", {}), **doc["harga_channel"]}
-            await db.products.update_one({"_id": existing["_id"]}, {"$set": doc})
+            doc["harga_channel"] = {**old.get("harga_channel", {}), **doc["harga_channel"]}
+            await db.products.update_one({"_id": old["_id"]}, {"$set": doc})
             updated += 1
         else:
             await db.products.insert_one(doc)
             created += 1
-    return {"created": created, "updated": updated, "errors": errors}
+    errors = [f"Baris {p['row']}: {p['message']}" for p in preview if p["status"] == "error"]
+    return {"created": created, "updated": updated, "errors": errors, "preview": preview}
 
 @api_router.put("/products/{pid}")
 async def update_product(pid: str, data: ProductInput, admin: dict = Depends(require_admin)):
@@ -490,6 +515,67 @@ async def update_bundle(bid: str, data: BundleInput, admin: dict = Depends(requi
     if r.matched_count == 0:
         raise HTTPException(status_code=404, detail="Paket tidak ditemukan")
     return {"ok": True}
+
+class BundleBulkComp(BaseModel):
+    sku: str
+    qty: float = 1
+
+class BundleBulkRow(BaseModel):
+    rows: List[int] = []
+    name: str
+    category: str = "Paket"
+    harga_jual: float = 0
+    harga_reseller: float = 0
+    harga_channel: Dict[str, float] = {}
+    components: List[BundleBulkComp] = []
+
+class BundleBulkInput(BaseModel):
+    bundles: List[BundleBulkRow]
+    dry_run: bool = False
+
+@api_router.post("/bundles/bulk")
+async def bulk_bundles(data: BundleBulkInput, admin: dict = Depends(require_admin)):
+    channels = {c["name"] for c in await get_channels_cfg()}
+    prods = {p["sku"]: p for p in await db.products.find().to_list(10000)}
+    existing = {b["name"].strip().lower(): b for b in await db.bundles.find().to_list(5000)}
+    preview = []
+    created = updated = 0
+    for b in data.bundles:
+        name = b.name.strip()
+        rowlabel = "-".join(str(x) for x in ([b.rows[0], b.rows[-1]] if len(b.rows) > 1 else b.rows))
+        errs, warns, comps, skus = [], [], [], set()
+        if not name: errs.append("Nama Paket kosong")
+        if not b.components: errs.append("Belum ada komponen (SKU Komponen)")
+        for c in b.components:
+            sku = c.sku.strip()
+            p = prods.get(sku)
+            if not p: errs.append(f"SKU '{sku}' tidak ada di Produk Satuan"); continue
+            if c.qty <= 0 or c.qty != int(c.qty): errs.append(f"Qty {sku} harus bilangan bulat > 0"); continue
+            if sku in skus: errs.append(f"SKU '{sku}' ganda dalam paket"); continue
+            skus.add(sku)
+            comps.append({"product_id": str(p["_id"]), "name": p["name"], "qty": int(c.qty)})
+        unknown = [k for k in b.harga_channel if k not in channels]
+        if unknown: errs.append("Channel tidak dikenal: " + ", ".join(unknown))
+        if min(b.harga_jual, b.harga_reseller) < 0: errs.append("Ada angka negatif")
+        if b.harga_jual <= 0: warns.append("Harga Normal 0")
+        old = existing.get(name.lower())
+        if old and not errs: warns.insert(0, "Paket sudah ada, data diperbarui")
+        preview.append(_preview_item(rowlabel, f"{len(b.components)} komponen", name, errs, warns, old))
+        if errs or data.dry_run:
+            continue
+        doc = {"name": name, "category": b.category.strip() or "Paket", "harga_jual": b.harga_jual,
+               "harga_reseller": b.harga_reseller,
+               "harga_channel": {k: v for k, v in b.harga_channel.items() if v > 0}, "components": comps}
+        if old:
+            await db.bundles.update_one({"_id": old["_id"]}, {"$set": doc})
+            updated += 1
+        else:
+            doc["created_at"] = now_iso()
+            await db.bundles.insert_one(doc)
+            existing[name.lower()] = doc
+            created += 1
+    errors = [f"Baris {p['row']}: {p['message']}" for p in preview if p["status"] == "error"]
+    return {"created": created, "updated": updated, "errors": errors, "preview": preview}
 
 @api_router.delete("/bundles/{bid}")
 async def delete_bundle(bid: str, admin: dict = Depends(require_admin)):
