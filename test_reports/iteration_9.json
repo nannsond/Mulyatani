@@ -1,0 +1,37 @@
+{
+  "summary": "Frontend-only test of store-logo embedding on Label Rak PDFs. Used Playwright to log in as admin, downloaded shelf-label PDFs for sizes 5×3 cm and 4×2 cm in both no-logo and with-logo states (uploaded /app/frontend/public/mulyatani-logo.png via POST /api/settings/logo). Verified PDFs with pymupdf: logo is embedded only when store has a logo AND label height >= 30mm (5×3), and absent on smaller sizes (4×2) exactly as implemented in exporter.js printShelfLabels. Image-count and file-size results match expected behavior. Bundle flow uses the same printShelfLabels function with same logoUrl prop — no bundles exist in DB to exercise it directly (count=0), but code path is identical and verified via source review. No-logo state restored by $unset of logo_path/content_type on settings doc (settings doc preserved). User's real product 'ZA' not modified; no new TEST_ data created.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "pdf_verification_results": {
+    "no_logo_5x3": {"pages": 1, "images_per_page": [0], "size_bytes": 3597},
+    "no_logo_4x2": {"pages": 1, "images_per_page": [0], "size_bytes": 3589},
+    "with_logo_5x3": {"pages": 1, "images_per_page": [1], "size_bytes": 753880},
+    "with_logo_4x2": {"pages": 1, "images_per_page": [0], "size_bytes": 3589},
+    "checks": {
+      "no_logo_any_size_downloads_without_error": "PASS",
+      "with_logo_5x3_has_embedded_image": "PASS",
+      "with_logo_4x2_has_no_image_due_to_h_lt_30": "PASS",
+      "no_crash_when_no_logo": "PASS",
+      "logo_failure_safe": "Code wraps loadImageData in try/catch and falls back to no-logo PDF (verified by source review in exporter.js L392-394)"
+    }
+  },
+  "test_report_links": ["/app/test_reports/pdf_logo_test.py", "/app/test_reports/downloads/"],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "exporter.js printShelfLabels: logo is placed top-right using addImage; aspect-ratio handled via logo.r. Height gating (h>=30) is reasonable, documented in review request.",
+    "DaftarHarga.jsx/BundlingPanel.jsx correctly pass logoUrl derived from settings.has_logo with cache-busting query (logo_updated).",
+    "The in-flight PDF generation is now async; both call sites fire without await — acceptable since save() is terminal, but errors (e.g., canvas tainting) would be unhandled Promise rejections. Consider .catch(toast) at call sites.",
+    "No image used for display is broken; using existing /app/frontend/public/mulyatani-logo.png as logo asset is relevant to the Mulyatani agriculture store app."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A (not tested per request)", "frontend": "100%"},
+  "test_credentials": "Admin nannsond@gmail.com / admin123 (from /app/memory/test_credentials.md)",
+  "seed_data_creation": "None. Uploaded store logo temporarily and restored via mongosh $unset {logo_path, content_type} as instructed. settings doc preserved. User's product 'ZA' untouched.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "To re-exercise logo-on-PDF behavior: (1) POST /api/settings/logo with admin bearer token and any PNG under 2MB; (2) in UI /daftar-harga select products, choose label size 5×3; (3) click [data-testid=print-shelf-labels-button]; (4) analyze PDF with pymupdf — expect images_per_page>0 only when size>=5×3. Always restore via mongosh $unset logo_path/content_type on settings doc. Bundles collection is empty — create a TEST_ bundle if bundle label testing is needed."
+}
