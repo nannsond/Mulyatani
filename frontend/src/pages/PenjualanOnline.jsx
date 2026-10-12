@@ -39,6 +39,7 @@ export default function PenjualanOnline() {
   const [recent, setRecent] = useState([]);
   const [filterMonth, setFilterMonth] = useState(todayStr().slice(0, 7));
   const [filterChannel, setFilterChannel] = useState("");
+  const [filterCair, setFilterCair] = useState("");
 
   const colorOf = (n) => channels.find((c) => c.name === n)?.color || CHANNEL_COLORS[n] || "#64748b";
   const activeChannels = channels.filter((c) => c.active);
@@ -146,6 +147,10 @@ export default function PenjualanOnline() {
     } catch (err) { toast.error("Gagal membaca file Excel"); }
     finally { setImporting(false); if (fileRef.current) fileRef.current.value = ""; }
   };
+
+  const isBelumCair = (x) => !x.cair && x.status !== "Dikembalikan";
+  const belumCair = recent.filter(isBelumCair);
+  const shownSales = filterCair === "belum" ? belumCair : filterCair === "sudah" ? recent.filter((x) => x.cair) : recent;
 
   return (
     <div className="space-y-6">
@@ -257,9 +262,19 @@ export default function PenjualanOnline() {
               <option value="">Semua channel</option>
               {channels.map((c) => <option key={c.name} value={c.name}>{c.name}</option>)}
             </select>
+            <select value={filterCair} onChange={(e) => setFilterCair(e.target.value)} data-testid="ecom-filter-cair" className="px-3 py-2 rounded-xl border border-input text-sm bg-card">
+              <option value="">Semua dana</option>
+              <option value="belum">Belum cair</option>
+              <option value="sudah">Sudah cair</option>
+            </select>
             <input type="month" value={filterMonth} onChange={(e) => setFilterMonth(e.target.value)} data-testid="ecom-filter-month" className="px-3 py-2 rounded-xl border border-input text-sm" />
           </div>
         </div>
+        <button type="button" onClick={() => setFilterCair(filterCair === "belum" ? "" : "belum")} data-testid="ecom-belum-cair-summary"
+          className={`mb-3 inline-flex items-center gap-2 text-xs font-semibold px-3 py-1.5 rounded-lg border transition-colors ${filterCair === "belum" ? "bg-amber-500 border-amber-500 text-white" : "bg-amber-50 border-amber-200 text-amber-800 hover:bg-amber-100"}`}>
+          {belumCair.length} pesanan belum cair · estimasi {rupiah(belumCair.reduce((t, x) => t + (x.omzet || 0) - (x.admin_fee || 0), 0))}
+          <span className="font-normal">{filterCair === "belum" ? "(klik untuk tampilkan semua)" : "(klik untuk lihat)"}</span>
+        </button>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead><tr className="border-b border-slate-200 bg-secondary/50 text-left">
@@ -268,8 +283,8 @@ export default function PenjualanOnline() {
               <th className="px-3 py-2.5 font-semibold text-right">Laba Bersih</th><th className="px-3 py-2.5 font-semibold text-center">Status</th>{isAdmin && <th className="px-3 py-2.5 font-semibold text-center">Aksi</th>}
             </tr></thead>
             <tbody>
-              {recent.length === 0 && <tr><td colSpan={isAdmin ? 11 : 10} className="px-3 py-8 text-center text-muted-foreground">Belum ada penjualan online.</td></tr>}
-              {recent.map((s) => (
+              {shownSales.length === 0 && <tr><td colSpan={isAdmin ? 11 : 10} className="px-3 py-8 text-center text-muted-foreground">{filterCair ? "Tidak ada penjualan sesuai filter dana." : "Belum ada penjualan online."}</td></tr>}
+              {shownSales.map((s) => (
                 <tr key={s.id} className="border-b border-slate-100" data-testid={`ecom-row-${s.id}`}>
                   <td className="px-3 py-2.5 font-mono text-xs">{s.ecom_no}</td>
                   <td className="px-3 py-2.5"><span className="text-xs px-2 py-1 rounded-lg text-white font-semibold" style={{ backgroundColor: colorOf(s.channel) }}>{s.channel}</span></td>
