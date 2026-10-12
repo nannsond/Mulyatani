@@ -95,7 +95,7 @@ export default function DaftarHarga() {
         </button>
       </div>
 
-      {view === "bundling" ? <BundlingPanel isAdmin={isAdmin} onChanged={load} channels={channels} /> : (
+      {view === "bundling" ? <BundlingPanel isAdmin={isAdmin} onChanged={load} channels={channels} labelSize={labelSize} setLabelSize={setLabelSize} /> : (
       <>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="relative flex-1 min-w-[200px] max-w-sm">

@@ -1,0 +1,34 @@
+{
+  "summary": "Frontend-only test for Bundling tab shelf-label printing. Logged in as admin, created TEST_ product + TEST_ bundle via API, opened Daftar Harga -> Paket Bundling and verified all new testids and flows. Regression on Produk Satuan tab also verified. Cleaned up TEST_ data.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [
+      {
+        "flow": "LabelSize live sync between Produk Satuan and Paket Bundling tabs",
+        "issue": "labelSize is persisted in localStorage correctly, but each panel reads it only via useState(loadLabelSize) at mount. In Daftar Harga both panels appear to remain mounted after first visit, so changing size in Bundling tab does NOT update the Produk Satuan tab live (and vice-versa) within the same session. Spec says it should be 'shared with Produk Satuan tab'. Verified: set 3x2 on Produk, switch to Bundle (shows 3x2), change Bundle to 5x3 -> localStorage=5x3 but switching back to Produk still shows 3x2 until page reload.",
+        "affected_selectors": ["label-size-select"]
+      }
+    ],
+    "design_issues": [
+      {"screen": "Daftar Harga (console)", "issues": ["React hydration warning: <span> cannot be a child of <option> (unrelated to this task, from DaftarHarga.jsx line 115 category <option> content)"]}
+    ]
+  },
+  "test_report_links": [],
+  "action_items": [
+    "Make labelSize truly shared between Produk Satuan and Paket Bundling tabs. Simplest fix: lift labelSize state into the parent (DaftarHarga.jsx) and pass size/setSize into both panels, OR listen to the 'storage' event / use a small store/context so the mounted sibling panel updates when the other writes to localStorage.",
+    "(Optional) Fix the <span> inside <option> React warning in DaftarHarga.jsx around line 115 (category options) to avoid hydration noise."
+  ],
+  "critical_code_review_comments": [
+    "BundlingPanel.printLabels uses `sku: 'PAKET'` as a filler on the shelf-label when there is no 'hemat' – fine functionally, but SKU column really represents 'secondary line'; consider renaming the exporter param or using an explicit sublabel field for clarity.",
+    "Both ProductsPanel and BundlingPanel independently call useState(loadLabelSize); duplication + no live sync. Lift state up."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "n/a", "frontend": "95%"},
+  "test_credentials": "Admin nannsond@gmail.com / admin123 (from /app/memory/test_credentials.md)",
+  "seed_data_creation": "Created TEST_LabelBundle_Prod product and TEST_LabelBundle_Pkg bundle via API for testing, deleted both at the end.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "All testids from the spec are present and working: bundle-label-select-bar, bundle-label-selected-count, label-size-select (shared id across both tabs), bundle-label-select-clear, bundle-label-select-all, bundle-label-select-{id}, bundle-print-labels-button. Download produced 'Label_Harga_Rak.pdf'. Empty-list toast 'Belum ada paket untuk dicetak' confirmed. Produk Satuan regression (label-select-bar, label-select-recent, label-select-clear, print-shelf-labels-button) is intact. Only functional gap is live sync of labelSize between the two panels while both are mounted in the same session.",
+  "rca of the issue": "ProductsPanel and BundlingPanel each call useState(loadLabelSize) independently. In the Daftar Harga page the two panels appear to remain mounted after the first tab visit (tab switcher only toggles visibility), so a write to localStorage from one panel never re-initialises the other panel's state. On a page reload both panels pick up the latest value – that's why persistence looks correct but intra-session sharing is broken."
+}

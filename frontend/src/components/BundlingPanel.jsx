@@ -4,7 +4,6 @@ import { rupiah } from "@/lib/format";
 import { calcFees } from "@/lib/fees";
 import { exportPDF, exportExcel, exportBundleTemplate, readBundleExcel, printShelfLabels } from "@/lib/exporter";
 import LabelSelectBar from "@/components/LabelSelectBar";
-import { loadLabelSize } from "@/components/LabelSizePicker";
 import ExcelImport from "@/components/ExcelImport";
 import { toast } from "sonner";
 import { Plus, Pencil, Trash2, Boxes, AlertTriangle, PackageMinus, Loader2, Search, FileDown, FileSpreadsheet, Tag } from "lucide-react";
@@ -14,7 +13,7 @@ import PriceCell from "@/components/PriceCell";
 const EMPTY = { name: "", category: "Paket", harga_jual: 0, harga_reseller: 0, harga_channel: {}, components: [] };
 const slug = (s) => s.replace(/\s+/g, "-").toLowerCase();
 
-export default function BundlingPanel({ isAdmin, onChanged, channels = [] }) {
+export default function BundlingPanel({ isAdmin, onChanged, channels = [], labelSize, setLabelSize }) {
   const [bundles, setBundles] = useState([]);
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -22,7 +21,6 @@ export default function BundlingPanel({ isAdmin, onChanged, channels = [] }) {
   const [search, setSearch] = useState("");
   const [sortBy, setSortBy] = useState("name");
   const [selected, setSelected] = useState(new Set());
-  const [labelSize, setLabelSize] = useState(loadLabelSize);
   const toggleSelect = (id) => setSelected((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
 
   const load = () => Promise.all([api.get("/bundles"), api.get("/products")]).then(([b, p]) => { setBundles(b.data); setProducts(p.data); setLoading(false); });
