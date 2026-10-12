@@ -1,0 +1,32 @@
+{
+  "summary": "End-to-end validation of iteration 57: Impor Produk & Paket Bundling dengan Pratinjau + Label Rak. All 7 backend pytest cases passed (preview errors/warnings, dry_run saves nothing, commit saves only valid rows, update preserves stok, bulk bundles errors on bad SKU/qty/dup/empty name/no components/unknown channel, create+update case-insensitive, kasir 403 on both). Frontend: Daftar Harga -> Produk Satuan uploaded /app/frontend/public/Contoh_Produk.xlsx -> preview '5 baru, 0 diperbarui, 0 bermasalah', confirm saved all 5 and toast '5 produk baru, 0 diperbarui' shown. Bad-rows file (empty SKU + duplicate SKU) -> red Gagal rows with messages 'SKU kosong' and 'SKU ganda di file', confirm label 'Simpan 2 data valid'; Cancel saved nothing (row count unchanged). Label Rak button downloaded Label_Harga_Rak.pdf for the visible products. Paket Bundling tab: uploaded /app/frontend/public/Contoh_Paket_Bundling.xlsx -> preview '2 baru, 0 diperbarui, 0 bermasalah' with 2 components each; confirm created 2 bundles (Paket Pupuk Hemat 1x PPK-001 + 3x PPK-002 Rp 330.000; Paket Tanam Cabai 1x BNH-001 + 2x PPK-002 Rp 60.000) with Shopee channel prices applied. Kasir: 0 import/template buttons found on both Produk Satuan and Paket Bundling tabs - correctly hidden. All data cleaned up afterwards; final products=0, bundles=0.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "DaftarHarga", "issues": ["Pre-existing hydration warning: <span> rendered inside <option> at DaftarHarga.jsx line 110 (devtools injects x-source span). Non-blocking, carried from previous iteration."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter57_bulk_preview.py",
+    "/app/test_reports/pytest/iter57.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "bulk_products: duplicate-SKU-in-file detection added (seen set) - good; negative numbers, unknown channel, warnings for Harga Normal <= 0 / < Harga Beli all behave as spec.",
+    "bulk_products on update correctly pops stok and merges harga_channel so existing channel prices are preserved.",
+    "bulk_bundles correctly validates integer qty > 0, duplicate SKU within bundle, missing components list, empty name, unknown channel, and does case-insensitive upsert by name.",
+    "ImportPreviewDialog uses semantic data-testids (import-preview-dialog, -summary, -row-N, -cancel, -confirm) and disables confirm when there are 0 valid rows - solid UX.",
+    "readBundleExcel correctly groups rows with the same Nama Paket and continues previous bundle when Nama Paket is empty on subsequent rows (verified with Contoh file).",
+    "printShelfLabels generates compact 63x34mm labels with store name, product name, price and SKU - 3 cols x 8 rows per page. Toast error when sorted.length==0 - good."
+  ],
+  "updated_files": ["/app/backend/tests/test_iter57_bulk_preview.py"],
+  "success_rate": {"backend": "100% (7/7 pytest)", "frontend": "100% (admin preview+confirm+cancel+shelf+bundle import all pass; kasir correctly hidden)"},
+  "test_credentials": "Admin nannsond@gmail.com/admin123, Kasir kasir@tokotani.com/kasir123",
+  "seed_data_creation": "Backend tests created TEST_* products/bundles (auto-cleaned via module fixture). UI test imported Contoh_Produk.xlsx + Contoh_Paket_Bundling.xlsx then DELETE API cleaned everything. Final products=0, bundles=0 as user requested.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Preview flow: POST /api/products/bulk and /api/bundles/bulk accept dry_run=true to return preview list [{row,code,name,status,message}] without persisting. Frontend ExcelImport reads file, posts dry_run first, opens ImportPreviewDialog with testids: import-preview-dialog, import-preview-summary, import-preview-row-N, import-preview-cancel, import-preview-confirm. Shelf labels via print-shelf-labels-button on Produk Satuan tab (always visible, admin and kasir alike - but kasir still cannot import). Bundle testids: bundle-template-button, bundle-import-button, bundle-import-input.",
+  "rca of the issue": "N/A"
+}
