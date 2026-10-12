@@ -8,6 +8,7 @@ import { useAuth } from "@/context/AuthContext";
 import { calcFees } from "@/lib/fees";
 import { OngkirCell } from "@/components/OngkirCell";
 import EcomEditDialog from "@/components/EcomEditDialog";
+import { CairReminder } from "@/components/CairReminder";
 import { CairCell } from "@/components/CairCell";
 
 const STATUSES = ["Diproses", "Dikirim", "Selesai", "Dikembalikan"];
@@ -149,6 +150,7 @@ export default function PenjualanOnline() {
 
   return (
     <div className="space-y-6">
+      {isAdmin && <CairReminder overdueOnly onChanged={loadRecent} key={recent.map((r) => `${r.status}${r.cair ? 1 : 0}`).join()} />}
       <div className="grid lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-4">
           <div className="flex flex-wrap items-center gap-2" data-testid="ecom-channel-selector">

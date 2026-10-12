@@ -1011,9 +1011,15 @@ async def cash_events(period: Optional[str]) -> List[dict]:
 @api_router.get("/ecommerce/belum-cair")
 async def list_belum_cair(admin: dict = Depends(require_admin)):
     docs = await db.ecommerce_sales.find({"status": "Selesai", "cair": {"$exists": False}}).sort("created_at", 1).to_list(5000)
+    now = datetime.now(timezone.utc)
     out = []
     for d in docs:
         d["id"] = str(d.pop("_id"))
+        ref = d.get("selesai_at") or d["created_at"]
+        try:
+            d["umur_hari"] = (now - datetime.fromisoformat(ref)).days
+        except (ValueError, TypeError):
+            d["umur_hari"] = 0
         out.append(d)
     return out
 
@@ -1601,6 +1607,8 @@ async def update_ecom_status(sid: str, data: EcomStatusInput, user: dict = Depen
     if not doc:
         raise HTTPException(status_code=404, detail="Penjualan tidak ditemukan")
     update = {"status": data.status}
+    if data.status == "Selesai" and doc.get("status") != "Selesai":
+        update["selesai_at"] = now_iso()
     if data.status == "Dikembalikan" and data.restore_stock and not doc.get("stock_restored"):
         await _restore_sale_items(doc.get("items", []))
         update["stock_restored"] = True

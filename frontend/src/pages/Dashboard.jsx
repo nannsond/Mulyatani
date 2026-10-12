@@ -4,6 +4,7 @@ import { rupiah, fmtDateTime } from "@/lib/format";
 import { TrendingUp, ShoppingCart, Package, AlertTriangle, Loader2, Warehouse } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { Link } from "react-router-dom";
+import { CairReminder } from "@/components/CairReminder";
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 
 function Stat({ label, value, icon: Icon, accent, testid }) {
@@ -41,6 +42,7 @@ export default function Dashboard() {
         <Stat label="Total Produk" value={data.total_produk} icon={Package} accent="bg-[#D97706]" testid="stat-total-produk" />
         <Stat label="Stok Menipis" value={data.low_stock.length} icon={AlertTriangle} accent="bg-destructive" testid="stat-low-stock" />
       </div>
+      {isAdmin && <CairReminder overdueOnly />}
       {isAdmin && aset && (
         <Link to="/stok-opname" data-testid="stat-inventory-value" className="flex items-center justify-between gap-4 flex-wrap bg-[#0E241B] text-white rounded-2xl p-5 hover:bg-[#143D2B] transition-colors">
           <div className="flex items-center gap-3">
