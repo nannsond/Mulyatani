@@ -39,9 +39,9 @@ function DeleteRowButton({ h, onDeleted }) {
 export function OpnameHistory({ history, isAdmin, onDeleted }) {
   const colSpan = isAdmin ? 7 : 6;
   return (
-    <div className="overflow-x-auto">
+    <div className="overflow-auto max-h-[560px]" data-testid="opname-history-scroll">
       <table className="w-full text-sm">
-        <thead>
+        <thead className="sticky top-0 z-10 bg-[#EEF3EF]">
           <tr className="border-b border-slate-200 bg-secondary/50 text-left">
             <th className="px-3 py-2.5 font-semibold">Tanggal</th>
             <th className="px-3 py-2.5 font-semibold">Produk</th>
