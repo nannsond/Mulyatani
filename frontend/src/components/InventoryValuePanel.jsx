@@ -85,7 +85,7 @@ export const InventoryValuePanel = ({ refreshKey }) => {
             <th className="py-2 pr-3">Produk</th><th className="py-2 pl-3 text-right">Stok</th>
           </tr></thead>
           <tbody>
-            {items.length === 0 && <tr><td colSpan={2} className="py-6 text-center text-muted-foreground">Belum ada produk</td></tr>}
+            {items.length === 0 && <tr><td colSpan={2} className="py-6 text-center text-muted-foreground">{q.trim() || cat !== "all" ? "Produk tidak ditemukan" : "Belum ada produk"}</td></tr>}
             {shown.map((i) => (
               <tr key={i.id} className="border-b border-slate-100" data-testid={`inventory-row-${i.id}`}>
                 <td className="py-2 pr-3"><p className="font-medium">{i.name}</p><p className="text-xs text-muted-foreground">{i.category}</p></td>
