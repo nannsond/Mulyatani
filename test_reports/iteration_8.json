@@ -1,0 +1,38 @@
+{
+  "summary": "Frontend-only verification of 'Isi Paket di Label' feature on Daftar Harga -> Paket Bundling. All three requirements verified end-to-end: hint text behaves correctly, 5x3 PDF contains 'Isi: 1x <component>' and 4x2 PDF does NOT, and labelSize is now live-shared between Produk Satuan and Paket Bundling tabs (iteration_7 regression fixed).",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Daftar Harga (console)", "issues": ["Pre-existing React hydration warning: <span> cannot be child of <option> on DaftarHarga.jsx line 115 category options (unrelated to this task, carried over from iteration_7)."]}
+    ]
+  },
+  "test_results_detail": {
+    "hint_default_4x2": "'Pilih ukuran 5 x 3 cm (tinggi >= 3 cm) agar isi paket ikut tercetak' PASS",
+    "hint_5x3": "'Isi paket ikut tercetak di label' PASS",
+    "hint_custom_h4": "'Isi paket ikut tercetak di label' PASS (custom height >= 3 cm triggers 'contents' branch)",
+    "pdf_5x3_contents": "PDF text: 'TEST_Label_Pkg | Isi: 1x TEST_Label_Prod | Rp 5.000 | per paket PAKET' - contains 'Isi:' PASS",
+    "pdf_4x2_no_contents": "PDF text: 'TEST_Label_Pkg | Rp 5.000 | per paket PAKET' - does NOT contain 'Isi:' PASS",
+    "pdf_filename": "Label_Harga_Rak.pdf PASS",
+    "no_js_errors_during_print": "No console errors during print PASS",
+    "label_size_shared_bundle_to_satuan": "Set 4x2 on Bundling -> switching to Produk Satuan shows 4x2 PASS (fixed since iteration_7)",
+    "label_size_shared_satuan_to_bundle": "Set 3x2 on Produk Satuan -> switching to Bundling shows 3x2 PASS",
+    "regression_produk_satuan_label_pdf": "print-shelf-labels-button on Produk Satuan still downloads Label_Harga_Rak.pdf PASS"
+  },
+  "test_report_links": [],
+  "action_items": [
+    "(Pre-existing, optional) Fix <span> inside <option> React hydration warning in DaftarHarga.jsx around line 115."
+  ],
+  "critical_code_review_comments": [
+    "labelSize state is now correctly lifted into DaftarHarga.jsx and passed to BundlingPanel; ProductsPanel is inlined so both share it. Clean fix.",
+    "LabelSelectBar hint prop is optional and only rendered when provided - good composition. Produk Satuan does not pass hint which is intentional since contents are not drawn for products anyway."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "n/a", "frontend": "100%"},
+  "test_credentials": "Admin nannsond@gmail.com / admin123 (from /app/memory/test_credentials.md)",
+  "seed_data_creation": "Created TEST_Label_Prod (sku TEST_LBL_SKU2) and TEST_Label_Pkg bundle via API, deleted both at end. Existing 'ZA' product untouched.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Shelf-label feature with 'Isi: ...' content on tall labels is working. Exporter in printShelfLabels draws contents only when h >= 30 (mm). BundlingPanel passes `contents: 'Isi: ' + components...` and hint toggles based on labelSize.h >= 30. labelSize state is lifted in DaftarHarga.jsx and now shared live between the Produk Satuan and Paket Bundling tabs."
+}
