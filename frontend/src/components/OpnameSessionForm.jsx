@@ -47,7 +47,7 @@ function SessionRow({ row, product, onChange, onRemove }) {
   );
 }
 
-export function OpnameSessionForm({ products, onSaved }) {
+export function OpnameSessionForm({ products, onSaved, catRequest }) {
   const [rows, setRows] = useState([]);
   const [note, setNote] = useState("");
   const [saving, setSaving] = useState(false);
@@ -78,15 +78,25 @@ export function OpnameSessionForm({ products, onSaved }) {
     if (rows.some((r) => r.product_id === p.id)) { toast.info("Produk sudah ada di sesi"); return; }
     setRows([...rows, { product_id: p.id, stok_fisik: "", alasan: "Penyesuaian" }]);
   };
-  const addCategory = () => {
-    if (!cat) { toast.error("Pilih kategori dulu"); return; }
-    const have = new Set(rows.map((r) => r.product_id));
-    const fresh = products.filter((p) => (p.category || "Lainnya") === cat && !have.has(p.id))
-      .sort((a, b) => a.name.localeCompare(b.name, "id"));
-    if (fresh.length === 0) { toast.info("Semua produk kategori ini sudah ada di sesi"); return; }
-    setRows([...rows, ...fresh.map((p) => ({ product_id: p.id, stok_fisik: "", alasan: "Penyesuaian" }))]);
-    toast.success(`${fresh.length} produk ${cat} ditambahkan`);
+  const addCategoryName = (c) => {
+    if (!c) { toast.error("Pilih kategori dulu"); return; }
+    setRows((cur) => {
+      const have = new Set(cur.map((r) => r.product_id));
+      const fresh = products.filter((p) => (p.category || "Lainnya") === c && !have.has(p.id))
+        .sort((a, b) => a.name.localeCompare(b.name, "id"));
+      if (fresh.length === 0) { toast.info(`Semua produk ${c} sudah ada di sesi`); return cur; }
+      toast.success(`${fresh.length} produk ${c} ditambahkan`);
+      return [...cur, ...fresh.map((p) => ({ product_id: p.id, stok_fisik: "", alasan: "Penyesuaian" }))];
+    });
   };
+  const addCategory = () => addCategoryName(cat);
+  const formRef = useRef(null);
+  useEffect(() => {
+    if (!catRequest) return;
+    setCat(catRequest.cat);
+    addCategoryName(catRequest.cat);
+    formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [catRequest]); // eslint-disable-line react-hooks/exhaustive-deps
   const update = (i, row) => setRows(rows.map((r, j) => (j === i ? row : r)));
 
   const allRows = rows;
@@ -108,7 +118,7 @@ export function OpnameSessionForm({ products, onSaved }) {
   };
 
   return (
-    <form onSubmit={submit} className="bg-card rounded-2xl border border-slate-200 p-6 h-fit space-y-4" data-testid="opname-session-form">
+    <form ref={formRef} onSubmit={submit} className="bg-card rounded-2xl border border-slate-200 p-6 h-fit space-y-4" data-testid="opname-session-form">
       <h3 className="font-heading font-semibold text-lg text-[#0F281E] flex items-center gap-2">
         <ClipboardCheck className="w-5 h-5" /> Input Opname
         {rows.length > 0 && <span className="ml-auto text-xs font-medium px-2 py-1 rounded-lg bg-secondary" data-testid="opname-session-count">{rows.filter((r) => r.stok_fisik !== "").length}/{rows.length} dihitung</span>}
