@@ -277,18 +277,14 @@ export default function PenjualanOnline() {
                   <td className="px-3 py-2.5 text-right font-mono">{rupiah(s.omzet)}</td>
                   <td className="px-3 py-2.5 text-right font-mono font-semibold text-[#2563EB]" data-testid={`ecom-diterima-${s.id}`} title={`Potongan ${rupiah(s.admin_fee || 0)}`}>{rupiah((s.omzet || 0) - (s.admin_fee || 0))}</td>
                   <td className="px-3 py-2.5 text-right text-xs"><CairCell sale={s} isAdmin={isAdmin} onSaved={loadRecent} /></td>
-                  <td className="px-3 py-2.5 text-right text-xs"><OngkirCell sale={s} isAdmin={isAdmin} onSaved={loadRecent} /></td>
+                  <td className="px-3 py-2.5 text-right text-xs"><OngkirCell sale={s} onSaved={loadRecent} /></td>
                   <td className="px-3 py-2.5 text-right font-mono text-destructive">{rupiah(s.total_fee)}</td>
                   <td className="px-3 py-2.5 text-right font-mono font-semibold text-[#1B5E3B]">{rupiah(s.laba_bersih)}</td>
                   <td className="px-3 py-2.5 text-center">
-                    {isAdmin ? (
-                      <select value={s.status || "Diproses"} onChange={(e) => changeStatus(s, e.target.value)} data-testid={`ecom-status-${s.id}`}
-                        className={`text-xs px-2 py-1 rounded-lg font-semibold border-0 cursor-pointer ${STATUS_STYLE[s.status] || STATUS_STYLE.Diproses}`}>
-                        {STATUSES.map((st) => <option key={st} value={st}>{st}</option>)}
-                      </select>
-                    ) : (
-                      <span className={`text-xs px-2 py-1 rounded-lg font-semibold ${STATUS_STYLE[s.status] || STATUS_STYLE.Diproses}`}>{s.status || "Diproses"}</span>
-                    )}
+                    <select value={s.status || "Diproses"} onChange={(e) => changeStatus(s, e.target.value)} data-testid={`ecom-status-${s.id}`}
+                      className={`text-xs px-2 py-1 rounded-lg font-semibold border-0 cursor-pointer ${STATUS_STYLE[s.status] || STATUS_STYLE.Diproses}`}>
+                      {STATUSES.map((st) => <option key={st} value={st}>{st}</option>)}
+                    </select>
                   </td>
                   {isAdmin && <td className="px-3 py-2.5 text-center"><div className="flex items-center justify-center gap-2">
                     <button onClick={() => setEditSale(s)} data-testid={`ecom-edit-${s.id}`} title="Edit" className="text-[#1B5E3B] hover:text-[#143D2B]"><Pencil className="w-4 h-4" /></button>

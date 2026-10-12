@@ -1594,7 +1594,7 @@ class EcomStatusInput(BaseModel):
     restore_stock: bool = False
 
 @api_router.put("/ecommerce/sales/{sid}/status")
-async def update_ecom_status(sid: str, data: EcomStatusInput, admin: dict = Depends(require_admin)):
+async def update_ecom_status(sid: str, data: EcomStatusInput, user: dict = Depends(get_current_user)):
     if data.status not in ONLINE_STATUSES:
         raise HTTPException(status_code=400, detail="Status tidak valid")
     doc = await db.ecommerce_sales.find_one({"_id": ObjectId(sid)})
@@ -1692,7 +1692,7 @@ class EcomOngkirInput(BaseModel):
     ongkir: float
 
 @api_router.put("/ecommerce/sales/{sid}/ongkir")
-async def finalize_ecom_ongkir(sid: str, data: EcomOngkirInput, admin: dict = Depends(require_admin)):
+async def finalize_ecom_ongkir(sid: str, data: EcomOngkirInput, user: dict = Depends(get_current_user)):
     if data.ongkir < 0:
         raise HTTPException(status_code=400, detail="Ongkir tidak boleh negatif")
     doc = await db.ecommerce_sales.find_one({"_id": ObjectId(sid)})
