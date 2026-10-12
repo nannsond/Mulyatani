@@ -81,7 +81,7 @@ export default function BundlingPanel({ isAdmin, onChanged, channels = [], label
     const list = selected.size ? sorted.filter((b) => selected.has(b.id)) : sorted;
     if (!list.length) { toast.error("Belum ada paket untuk dicetak"); return; }
     printShelfLabels({ w: labelSize.w, h: labelSize.h, logoUrl, items: list.map((b) => ({
-      name: b.name, harga_jual: b.harga_jual, unit: "paket",
+      name: b.name, harga_jual: b.harga_jual, unit: "paket", category: b.category || "Paket",
       contents: "Isi: " + b.components.map((c) => `${c.qty}× ${c.name}`).join(", "), sku: b.hemat > 0 ? `Hemat ${rupiah(b.hemat)}` : "PAKET" })) });
   };
 

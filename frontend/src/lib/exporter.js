@@ -386,6 +386,13 @@ export async function readBundleExcel(file) {
   return [...map.values()].map((b) => ({ ...b, category: b.category || "Paket" }));
 }
 
+export const CATEGORY_COLORS = {
+  Pupuk: [27, 94, 59], Benih: [217, 119, 6], Pestisida: [200, 40, 40], "Alat Tani": [37, 99, 235],
+  Paket: [124, 58, 237], Lainnya: [100, 116, 139],
+};
+const EXTRA_COLORS = [[13, 148, 136], [219, 39, 119], [101, 163, 13], [180, 83, 9], [79, 70, 229], [8, 145, 178]];
+export const categoryColor = (c) => CATEGORY_COLORS[c] || EXTRA_COLORS[[...(c || "")].reduce((a, ch) => a + ch.charCodeAt(0), 0) % EXTRA_COLORS.length];
+
 export async function printShelfLabels({ items, w = 40, h = 20, logoUrl }) {
   const doc = new jsPDF();
   let logo = null;
@@ -402,7 +409,11 @@ export async function printShelfLabels({ items, w = 40, h = 20, logoUrl }) {
     const k = i % perPage, x = x0 + (k % cols) * w, y = y0 + Math.floor(k / cols) * h;
     const withContents = showContents && p.contents;
     doc.setLineDashPattern([0.8, 0.8], 0); doc.setDrawColor(170, 170, 170); doc.rect(x, y, w, h);
-    let tw = w - 2 * pad;
+    const sw = Math.max(1.2, 1.5 * s);
+    doc.setFillColor(...categoryColor(p.category)); doc.rect(x, y, sw, h, "F");
+    const lx = x + sw + pad * 0.8;
+    const fullW = w - pad - (lx - x);
+    let tw = fullW;
     if (logo) {
       const L = h * 0.28, lw = logo.r >= 1 ? L : L * logo.r, lh = logo.r >= 1 ? L / logo.r : L;
       doc.addImage(logo.data, "PNG", x + w - pad - lw, y + pad, lw, lh);
@@ -413,10 +424,10 @@ export async function printShelfLabels({ items, w = 40, h = 20, logoUrl }) {
     const allName = doc.splitTextToSize(p.name, tw), nMax = withContents ? 1 : lines;
     const nameLines = allName.slice(0, nMax);
     if (allName.length > nMax) nameLines[nMax - 1] = nameLines[nMax - 1].replace(/.{0,2}$/, "") + "…";
-    doc.text(nameLines, x + pad, nameY, { lineHeightFactor: 1.1 });
+    doc.text(nameLines, lx, nameY, { lineHeightFactor: 1.1 });
     let fs = 12 * s;
     doc.setFontSize(fs);
-    while (fs > 5 && doc.getTextWidth(rp(p.harga_jual)) > w - 2 * pad) { fs -= 0.5; doc.setFontSize(fs); }
+    while (fs > 5 && doc.getTextWidth(rp(p.harga_jual)) > fullW) { fs -= 0.5; doc.setFontSize(fs); }
     const priceY = y + h * (withContents ? 0.8 : 0.7);
     if (withContents) {
       doc.setFont("helvetica", "normal"); doc.setFontSize(cFs); doc.setTextColor(70, 70, 70);
@@ -424,14 +435,14 @@ export async function printShelfLabels({ items, w = 40, h = 20, logoUrl }) {
       const max = Math.max(1, Math.floor((priceY - fs * PT * 0.75 - 1 - top) / cLineH) + 1);
       let cl = doc.splitTextToSize(p.contents, tw);
       if (cl.length > max) { cl = cl.slice(0, max); cl[max - 1] = cl[max - 1].replace(/.{0,2}$/, "") + "…"; }
-      doc.text(cl, x + pad, top, { lineHeightFactor: 1.15 });
+      doc.text(cl, lx, top, { lineHeightFactor: 1.15 });
       doc.setFont("helvetica", "bold"); doc.setFontSize(fs);
     }
     doc.setTextColor(27, 94, 59);
-    doc.text(rp(p.harga_jual), x + pad, priceY);
+    doc.text(rp(p.harga_jual), lx, priceY);
     doc.setFont("helvetica", "normal"); doc.setFontSize(smallFs); doc.setTextColor(110, 110, 110);
     const by = y + h - pad * 0.8;
-    doc.text(`per ${p.unit || "pcs"}`, x + pad, by);
+    doc.text(`per ${p.unit || "pcs"}`, lx, by);
     doc.text(p.sku || "", x + w - pad, by, { align: "right" });
   });
   doc.save("Label_Harga_Rak.pdf");
