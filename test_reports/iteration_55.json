@@ -1,0 +1,20 @@
+{
+  "summary": "Iter55 — Pengingat Dana Cair (overdue >7 hari). Backend 4/4 pytest pass: PUT /ecommerce/sales/{id}/status to Selesai sets selesai_at only on first transition (idempotent on repeat); GET /ecommerce/belum-cair admin-only (kasir 403), returns umur_hari computed from selesai_at (fallback created_at), excludes _id; recording cair removes row. Frontend: as admin, Dashboard shows red cair-overdue-banner with text '1 pesanan Selesai lebih dari 7 hari belum dicatat cair', cair-overdue-open opens cair-reminder-dialog with cair-reminder-only-late checked by default, cair-reminder-row-* visible with red bg-red-100 age badge; unchecking shows all belum-cair rows. Penjualan Online page shows same overdue banner at top. Laba Rugi page shows regular cair-reminder with cair-reminder-overdue-count ('1 sudah lebih dari 7 hari') and dialog checkbox UNchecked by default. Kasir sees no banner on both Dashboard and Penjualan Online.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": ["/app/backend/tests/test_iter55_belum_cair_overdue.py", "/app/test_reports/pytest/iter55.xml"],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "list_belum_cair uses require_admin — correct. umur_hari parsing is wrapped in try/except — safe.",
+    "update_ecom_status only sets selesai_at when transitioning INTO Selesai from non-Selesai — correct per spec. Does not clear selesai_at when leaving Selesai; if admin reverts Selesai -> Diproses -> Selesai, selesai_at is updated to new time (good).",
+    "DialogContent missing aria-describedby warning (console) — minor a11y, pre-existing."
+  ],
+  "updated_files": ["/app/backend/tests/test_iter55_belum_cair_overdue.py"],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "test_credentials": "Admin nannsond@gmail.com/admin123, Kasir kasir@tokotani.com/kasir123",
+  "seed_data_creation": "Created one TEST_overdue_UI Shopee sale, set Selesai, mutated selesai_at to 10 days ago in Mongo, verified UI, then DELETE via admin (stock restored). No junk left.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "All Pengingat Dana Cair flows (backend + UI banner + dialog + role gating) work end-to-end. Pre-existing minor: DialogContent aria-describedby console warnings; delete_ecom_sale may double-restore stock after Dikembalikan+delete (noted iter54).",
+  "rca of the issue": "N/A — no bugs found."
+}
