@@ -354,6 +354,30 @@ async def create_product(data: ProductInput, admin: dict = Depends(require_admin
     doc["_id"] = res.inserted_id
     return Product(**doc).model_dump()
 
+class ProductBulkInput(BaseModel):
+    rows: List[ProductInput]
+
+@api_router.post("/products/bulk")
+async def bulk_products(data: ProductBulkInput, admin: dict = Depends(require_admin)):
+    created = updated = 0
+    errors = []
+    for idx, r in enumerate(data.rows, start=2):
+        if not r.sku.strip() or not r.name.strip():
+            errors.append(f"Baris {idx}: SKU dan Nama wajib diisi"); continue
+        doc = r.model_dump()
+        doc["sku"] = r.sku.strip()
+        doc["category"] = r.category.strip() or "Lainnya"
+        existing = await db.products.find_one({"sku": doc["sku"]})
+        if existing:
+            doc.pop("stok")
+            doc["harga_channel"] = {**existing.get("harga_channel", {}), **doc["harga_channel"]}
+            await db.products.update_one({"_id": existing["_id"]}, {"$set": doc})
+            updated += 1
+        else:
+            await db.products.insert_one(doc)
+            created += 1
+    return {"created": created, "updated": updated, "errors": errors}
+
 @api_router.put("/products/{pid}")
 async def update_product(pid: str, data: ProductInput, admin: dict = Depends(require_admin)):
     await db.products.update_one({"_id": ObjectId(pid)}, {"$set": data.model_dump()})

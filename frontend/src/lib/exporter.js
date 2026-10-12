@@ -273,6 +273,37 @@ export async function readEcomExcel(file) {
   return out;
 }
 
+const PRODUCT_COLS = ["SKU", "Nama Produk", "Kategori", "Satuan", "Harga Beli", "Harga Normal", "Harga Reseller", "Stok", "Stok Minimal"];
+
+export function exportProductTemplate(channels = []) {
+  const cols = [...PRODUCT_COLS, ...channels.map((c) => `Harga ${c}`)];
+  const example = ["PPK-001", "Pupuk Urea 50kg", "Pupuk", "zak", 280000, 310000, 300000, 20, 5, ...channels.map(() => 0)];
+  const ws = XLSX.utils.aoa_to_sheet([cols, example]);
+  ws["!cols"] = cols.map(() => ({ wch: 18 }));
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Produk");
+  XLSX.writeFile(wb, "Template_Produk.xlsx");
+}
+
+export async function readProductExcel(file) {
+  const wb = XLSX.read(await file.arrayBuffer(), { type: "array" });
+  const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, blankrows: false });
+  const header = (rows[0] || []).map((h) => String(h ?? "").trim());
+  const num = (v) => Number(String(v ?? "").replace(/[^\d.-]/g, "")) || 0;
+  return rows.slice(1).filter((r) => r && String(r[0] ?? "").trim()).map((r) => ({
+    sku: String(r[0]).trim(),
+    name: String(r[1] ?? "").trim(),
+    category: String(r[2] ?? "").trim() || "Lainnya",
+    unit: String(r[3] ?? "").trim() || "pcs",
+    harga_beli: num(r[4]),
+    harga_jual: num(r[5]),
+    harga_reseller: num(r[6]),
+    stok: Math.round(num(r[7])),
+    stok_minimal: r[8] === undefined || r[8] === "" ? 5 : Math.round(num(r[8])),
+    harga_channel: Object.fromEntries(header.slice(9).map((h, i) => [h.replace(/^Harga\s+/i, ""), num(r[9 + i])]).filter(([k, v]) => k && v > 0)),
+  }));
+}
+
 export async function printInstallmentReceipt(tx, idx, logoUrl, info = {}) {
   const pays = tx.payments || [];
   const pay = pays[idx];

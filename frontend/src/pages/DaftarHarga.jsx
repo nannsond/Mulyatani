@@ -6,6 +6,7 @@ import { useSettings } from "@/context/SettingsContext";
 import { Plus, Pencil, Trash2, FileDown, FileSpreadsheet, X, Search, Printer, AlertTriangle, Package, Boxes } from "lucide-react";
 import BundlingPanel from "@/components/BundlingPanel";
 import PriceCell from "@/components/PriceCell";
+import ProductImport from "@/components/ProductImport";
 import { exportPDF, exportExcel, printPriceList } from "@/lib/exporter";
 import { toast } from "sonner";
 import { calcFees } from "@/lib/fees";
@@ -122,6 +123,7 @@ export default function DaftarHarga() {
             className="flex items-center gap-2 px-3 py-2.5 rounded-xl border border-input text-sm hover:bg-secondary"><FileDown className="w-4 h-4" /> PDF</button>
           <button onClick={() => exportExcel({ filename: exportTitle.replace(/\s+/g, "_"), sheetName: "Produk", columns: cols, rows })} data-testid="export-excel-button"
             className="flex items-center gap-2 px-3 py-2.5 rounded-xl border border-input text-sm hover:bg-secondary"><FileSpreadsheet className="w-4 h-4" /> Excel</button>
+          {isAdmin && <ProductImport channels={channels} onDone={load} />}
           {isAdmin && (
             <button onClick={() => setModal({ ...EMPTY })} data-testid="product-add-modal-trigger"
               className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#1B5E3B] text-white text-sm font-semibold hover:bg-[#143D2B]"><Plus className="w-4 h-4" /> Tambah</button>
