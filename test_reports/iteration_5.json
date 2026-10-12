@@ -1,0 +1,32 @@
+{
+  "summary": "Iteration 58 (Pilih Produk Label) tested end-to-end. Backend: 10/10 pytest cases pass validating harga_jual_updated semantics - set by PATCH /api/products/{id}/price (field=harga_jual) when value changes, by PUT /api/products/{id} when harga_jual differs from stored value, and by POST /api/products/bulk when updating an existing SKU with a different harga_jual; NOT set on initial POST /api/products create, NOT set on bulk create (new SKU), NOT set when the price is unchanged, NOT set when a non-price field (harga_beli) is updated via PATCH. Kasir still gets 403 on PATCH price. Frontend (admin on /daftar-harga Produk Satuan): label-select-bar renders with correct empty-state copy, label-select-recent initially '(0)', label-select-all toggles all visible rows, label-selected-count updates to 'N produk dipilih untuk Label Rak', print-shelf-labels-button shows ' Label Rak (N)' when N>0, label-select-clear resets. After creating TEST_UI_1 and PATCHing harga_jual: price-new-badge-{id} 'Harga baru' appears on that row, label-select-recent updates to 'Harga berubah 7 hari (1)', clicking it selects ONLY the TEST product (ZA checkbox stays unchecked), and 'Label Rak (1)' downloads Label_Harga_Rak.pdf. User's real product ZA (sku '1', id 6acce5c6e0f442bbbd42f5e3) was not modified or deleted; TEST_UI_1 was deleted via API; no transactions were created.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "DaftarHarga", "issues": ["Carried-over hydration warning: <span> inside <option> at DaftarHarga.jsx line 113 (dev x-source instrumentation). Non-blocking, same as iter_4."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter58_label_select.py",
+    "/app/test_reports/pytest/iter58.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "update_product_price correctly guards against updating timestamp when value is unchanged by comparing to old harga_jual first - no accidental churn.",
+    "update_product (PUT) uses a projection {harga_jual:1} for the comparison - efficient and race-safe enough for single-admin usage.",
+    "bulk_products uses the preloaded 'existing' dict and compares harga_jual before adding timestamp; stok is correctly preserved on update (doc.pop('stok')).",
+    "LabelSelectBar.isPriceNew helper handles null/undefined harga_jual_updated cleanly (truthy check before Date math). 7-day window is correct (days * DAY ms).",
+    "print-shelf-labels-button falls back to all visible products when selected set is empty - matches spec and the bar's copy.",
+    "label-select-all checks sorted.length>0 before 'every', avoiding being 'checked' on an empty filtered table."
+  ],
+  "updated_files": ["/app/backend/tests/test_iter58_label_select.py", "/app/test_reports/iteration_5.json"],
+  "success_rate": {"backend": "100% (10/10)", "frontend": "100% (bar, select-all, select-recent, clear, badge, shelf label PDF with selection)"},
+  "test_credentials": "Admin nannsond@gmail.com/admin123, Kasir kasir@tokotani.com/kasir123",
+  "seed_data_creation": "Backend tests created and auto-cleaned TEST_SKU_A..J (10 products). UI test created TEST_UI_1 via API, then DELETE after assertions. User's ZA product untouched; no transactions created.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "harga_jual_updated is a top-level product field (ISO string or null). isPriceNew(p, days=7) in /app/frontend/src/components/LabelSelectBar.jsx is the shared helper used by DaftarHarga.jsx for both the row badge (price-new-badge-{id}) and the 'Harga berubah 7 hari (N)' selector (label-select-recent). The selection Set state lives in DaftarHarga; Label Rak button prints only selected items when size>0, else all visible sorted items. Testids: label-select-bar, label-selected-count, label-select-recent, label-select-clear, label-select-all, label-select-{id}, price-new-badge-{id}, print-shelf-labels-button, product-row-{id}.",
+  "rca of the issue": "N/A"
+}
