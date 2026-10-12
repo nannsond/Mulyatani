@@ -1,0 +1,41 @@
+{
+  "summary": "Frontend-only test of per-category color stripe on Label Rak PDFs (Produk Satuan + Paket Bundling) and legend swatches. Created TEST_ products (Benih, Pestisida, Alat Tani) + TEST_ bundle via API, logged in as admin, downloaded shelf-label PDFs at sizes 4×2, 3×1,5, 5×3 for both tabs. Rendered each PDF with pymupdf @200dpi and sampled pixel color inside the left stripe for every label. All 15 samples match the expected RGB within ±2/channel (anti-alias tolerance): Pupuk (27,94,59), Benih (217,119,6), Pestisida (200,40,40), Alat Tani (37,99,235), Paket (124,58,237). Legend badges show correct inline background colors on both tabs (label-category-legend and bundle-label-category-legend). Label selection, size picker, and PDF download work with no JS runtime errors. All TEST_ data cleaned up; user's product 'ZA' intact; no transactions created.",
+  "pdf_pixel_verification": {
+    "sampling": "DPI=200, point at (x0+col*w + stripe_width/2, y0+row*h + h/2) using CATEGORY layout from exporter.printShelfLabels",
+    "satuan_order_A_to_Z": ["TEST_Alat (Alat Tani)", "TEST_Benih (Benih)", "TEST_Pestisida (Pestisida)", "ZA (Pupuk)"],
+    "satuan_4x2":  {"Alat Tani":[38,99,234],"Benih":[216,119,5],"Pestisida":[198,40,40],"Pupuk":[28,94,58],"all_ok":true},
+    "satuan_3x1.5":{"Alat Tani":[38,99,234],"Benih":[216,119,5],"Pestisida":[198,40,40],"Pupuk":[28,94,58],"all_ok":true},
+    "satuan_5x3":  {"Alat Tani":[38,99,234],"Benih":[216,119,5],"Pestisida":[198,40,40],"Pupuk":[28,94,58],"all_ok":true},
+    "bundle_4x2":  {"Paket":[124,58,237],"all_ok":true},
+    "bundle_3x1.5":{"Paket":[124,58,237],"all_ok":true},
+    "bundle_5x3":  {"Paket":[124,58,237],"all_ok":true}
+  },
+  "legend_verification": {
+    "label-category-legend (Produk)": "Alat Tani/Benih/Pestisida/Pupuk with swatch styles rgb(37,99,235)/rgb(217,119,6)/rgb(200,40,40)/rgb(27,94,59)",
+    "bundle-label-category-legend (Bundling)": "Paket with swatch style rgb(124,58,237)"
+  },
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/test_reports/verify_category_colors.py",
+    "/app/test_reports/downloads/iter10/"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "exporter.js printShelfLabels: stripe width sw = max(1.2, 1.5*s) mm scales nicely across sizes; color sampled at stripe centerline matches CATEGORY_COLORS exactly (within +/-2 due to PDF rendering AA). Good.",
+    "categoryColor fallback for custom categories uses deterministic char-sum % EXTRA_COLORS[6] — stable across renders. OK.",
+    "LabelSelectBar legend testids are tab-scoped via tid prop (label-category-legend / bundle-label-category-legend). Good.",
+    "Pre-existing hydration warning in console: <span> cannot be child of <option> for product-category-filter options (DaftarHarga.jsx L115). Not caused by this feature but worth cleaning up — remove the <span data-ve-dynamic> wrapper injection from option children, or render plain string."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A (not tested per request)", "frontend": "100%"},
+  "test_credentials": "Admin nannsond@gmail.com / admin123 (from /app/memory/test_credentials.md)",
+  "seed_data_creation": "Created 3 TEST_ products (TEST-BNH-1 Benih, TEST-PST-1 Pestisida, TEST-ALT-1 Alat Tani) and 1 TEST_ bundle (TEST_Paket) via API; deleted all afterwards. User's product 'ZA' untouched; no transactions.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "To re-verify category stripe colors: login as admin, visit /daftar-harga, choose size via [data-testid=label-size-select], click [data-testid=print-shelf-labels-button] (or [data-testid=bundle-print-labels-button] after clicking [data-testid=view-bundling]). Save PDF then run /app/test_reports/verify_category_colors.py which samples pixel inside the left stripe for each label and compares to CATEGORY_COLORS. Note: LabelSizePicker testid is NOT prefixed by tid; both tabs use plain [data-testid=label-size-select]."
+}
