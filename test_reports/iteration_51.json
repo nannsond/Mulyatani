@@ -1,0 +1,21 @@
+{
+  "summary": "Iter 51 - jadwal_antar + carry-over feature. Backend: 10/10 pytest cases passed covering create/update transaction, PUT /deliveries/{id}/schedule, carry-over logic (previous-month unfinished appearing in current month with dari_bulan_lalu=true), and jadwal_antar matching month filter. Frontend: Pengantaran shows jadwal date input per unfinished card, Terjadwal/Dari-bulan-lalu/Terlambat/Antar-hari-ini badges render correctly, summary line shows carry-over wording when applicable, totalOngkir excludes carry-over rows. POS shows pos-jadwal-antar date input only when alamat or ongkir>0, hides when both cleared.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_iter51_jadwal_antar.py",
+    "/app/test_reports/pytest/iter51_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "list_deliveries carry-over OR clause includes created_at<prefix for unfinished regardless of jadwal_antar; this means a future-scheduled unfinished order from an earlier month is also surfaced in the current month view labelled dari_bulan_lalu=true - likely desired given spec but worth confirming when both filter month and jadwal month differ.",
+    "server.py file size is 2444 lines - splitting by resource (transactions, deliveries, reports) would help maintainability."
+  ],
+  "updated_files": ["/app/backend/tests/test_iter51_jadwal_antar.py"],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "test_credentials": "Admin nannsond@gmail.com/admin123, Kasir kasir@tokotani.com/kasir123",
+  "seed_data_creation": "Pytest fixture creates TEST_ transactions and cleans them up via DELETE /api/transactions/{id}. One carry-over test backdates created_at directly in Mongo and resets by delete.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "POS route is /pos (not /kasir). Use get_by_text('Kasir Penjualan') from side nav. For deliveries carry-over tests, mutate created_at via Mongo using ObjectId since id is the Mongo _id string. CartItem requires name and harga fields in payload (not just product_id/qty)."
+}
