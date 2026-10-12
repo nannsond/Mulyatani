@@ -1585,7 +1585,8 @@ async def delete_ecom_sale(sid: str, admin: dict = Depends(require_admin)):
     doc = await db.ecommerce_sales.find_one({"_id": ObjectId(sid)})
     if not doc:
         raise HTTPException(status_code=404, detail="Penjualan tidak ditemukan")
-    await _restore_sale_items(doc.get("items", []))
+    if not doc.get("stock_restored"):
+        await _restore_sale_items(doc.get("items", []))
     await db.ecommerce_sales.delete_one({"_id": ObjectId(sid)})
     return {"ok": True}
 
