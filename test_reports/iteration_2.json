@@ -1,0 +1,31 @@
+{
+  "summary": "Regression test for DELETE /api/ecommerce/sales/{sid} stock-restore guard. Verified fix at server.py:1583-1591 that skips _restore_sale_items when doc.stock_restored is True. 2/2 pytests passed. Scenario A (create sale -> status Dikembalikan+restore_stock=true -> delete): stock sequence before=47 -> after_create=45 -> after_return=47 -> after_delete=47 (no double restore). Scenario B (create sale -> delete without return): stock sequence before=47 -> after_create=44 -> after_delete=47 (single restore). All created sales deleted; ecommerce sales collection ends at 0 docs; product stock returned to original values.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter_delete_ecom_stock_guard.py",
+    "/app/test_reports/pytest/iter_delete_ecom_stock_guard.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "Guard added correctly, but consider also setting stock_restored=True inside delete_ecom_sale after restoring (defensive) so future reads reflect state before deletion is committed — not critical since the doc is deleted immediately.",
+    "delete_ecom_sale still calls ObjectId(sid) without try/except InvalidId — same minor issue flagged in iteration_1."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter_delete_ecom_stock_guard.py (new)"
+  ],
+  "success_rate": {"backend": "100% (2/2)", "frontend": "not tested (backend only)"},
+  "test_credentials": "Admin nannsond@gmail.com/admin123 (verified; login returns 'token' key, not 'access_token').",
+  "seed_data_creation": "Uses existing CONTOH-001 (stok 47). Each test creates one ecom sale and deletes it; final ecom_sales count = 0; product stok restored to 47.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Product fields are 'stok' and 'harga_jual' (not 'stock'/'price'). Ecommerce sale items require 'name' and 'harga' fields. Auth login returns {'token': ...}. Run: cd /app && REACT_APP_BACKEND_URL=... python -m pytest backend/tests/test_iter_delete_ecom_stock_guard.py -n 0 -v",
+  "rca of the issue": "Original minor bug: DELETE /api/ecommerce/sales/{sid} called _restore_sale_items unconditionally; if the sale was already returned (status Dikembalikan with restore_stock=true), stock was incremented twice. Fix verified at server.py line 1588: `if not doc.get('stock_restored'): await _restore_sale_items(...)`. Test confirms stock stays at original value across return->delete sequence."
+}
