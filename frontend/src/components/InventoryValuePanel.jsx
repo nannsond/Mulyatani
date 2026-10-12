@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { exportPDF, exportExcel } from "@/lib/exporter";
-import { Warehouse, FileDown, FileSpreadsheet, ChevronLeft, ChevronRight, Search, ChevronDown, ChevronUp, ClipboardCheck } from "lucide-react";
+import { Warehouse, FileDown, FileSpreadsheet, ChevronLeft, ChevronRight, Search, ChevronDown, ChevronUp } from "lucide-react";
 
 const PER_PAGE = 10;
 
@@ -12,7 +12,7 @@ const Card = ({ label, value, testid, strong }) => (
   </div>
 );
 
-export const InventoryValuePanel = ({ refreshKey, onStartCategory }) => {
+export const InventoryValuePanel = ({ refreshKey }) => {
   const [data, setData] = useState(null);
   const [cat, setCat] = useState("all");
   const [q, setQ] = useState("");
@@ -66,17 +66,9 @@ export const InventoryValuePanel = ({ refreshKey, onStartCategory }) => {
             <b>Semua</b> · {data.items.length} produk
           </button>
           {[...categories].sort((a, b) => a.category.localeCompare(b.category, "id")).map((c) => (
-            <div key={c.category} className="inline-flex">
-              <button type="button" onClick={() => pickCat(c.category)} data-testid={`inventory-category-${c.category}`} className={`${chip(cat === c.category)} ${onStartCategory ? "rounded-r-none" : ""}`}>
-                <b>{c.category}</b> · {c.produk} produk
-              </button>
-              {onStartCategory && (
-                <button type="button" onClick={() => onStartCategory(c.category)} data-testid={`inventory-start-opname-${c.category}`} title={`Mulai opname semua produk ${c.category}`}
-                  className="inline-flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-r-lg border border-l-0 border-[#1B5E3B] bg-white text-[#1B5E3B] font-semibold hover:bg-[#1B5E3B] hover:text-white transition-colors">
-                  <ClipboardCheck className="w-3.5 h-3.5" /> Mulai opname
-                </button>
-              )}
-            </div>
+            <button type="button" key={c.category} onClick={() => pickCat(c.category)} data-testid={`inventory-category-${c.category}`} className={chip(cat === c.category)}>
+              <b>{c.category}</b> · {c.produk} produk
+            </button>
           ))}
         </div>
       )}

@@ -20,7 +20,6 @@ export default function StokOpname() {
     api.get("/stok-opname").then((r) => setHistory(r.data));
   };
   useEffect(() => { load(); }, []);
-  const [catRequest, setCatRequest] = useState(null);
 
   const [month, setMonth] = useState(monthKey(new Date().toISOString()));
   const months = [...new Set([monthKey(new Date().toISOString()), ...history.map((h) => monthKey(h.created_at))])].sort().reverse();
@@ -32,9 +31,9 @@ export default function StokOpname() {
 
   return (
     <div className="space-y-6">
-    <InventoryValuePanel refreshKey={history.length} onStartCategory={(cat) => setCatRequest({ cat, n: Date.now() })} />
+    <InventoryValuePanel refreshKey={history.length} />
     <div className="grid lg:grid-cols-3 gap-6">
-      <OpnameSessionForm products={products} onSaved={load} catRequest={catRequest} />
+      <OpnameSessionForm products={products} onSaved={load} />
 
       <div className="lg:col-span-2 bg-card rounded-2xl border border-slate-200 p-6">
         <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
