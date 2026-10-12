@@ -2,10 +2,12 @@ import { useEffect, useState } from "react";
 import { api, apiError } from "@/lib/api";
 import { rupiah } from "@/lib/format";
 import { calcFees } from "@/lib/fees";
-import { exportPDF, exportExcel, exportBundleTemplate, readBundleExcel } from "@/lib/exporter";
+import { exportPDF, exportExcel, exportBundleTemplate, readBundleExcel, printShelfLabels } from "@/lib/exporter";
+import LabelSelectBar from "@/components/LabelSelectBar";
+import { loadLabelSize } from "@/components/LabelSizePicker";
 import ExcelImport from "@/components/ExcelImport";
 import { toast } from "sonner";
-import { Plus, Pencil, Trash2, Boxes, AlertTriangle, PackageMinus, Loader2, Search, FileDown, FileSpreadsheet } from "lucide-react";
+import { Plus, Pencil, Trash2, Boxes, AlertTriangle, PackageMinus, Loader2, Search, FileDown, FileSpreadsheet, Tag } from "lucide-react";
 import BundleModal from "@/components/BundleModal";
 import PriceCell from "@/components/PriceCell";
 
@@ -19,6 +21,9 @@ export default function BundlingPanel({ isAdmin, onChanged, channels = [] }) {
   const [modal, setModal] = useState(null);
   const [search, setSearch] = useState("");
   const [sortBy, setSortBy] = useState("name");
+  const [selected, setSelected] = useState(new Set());
+  const [labelSize, setLabelSize] = useState(loadLabelSize);
+  const toggleSelect = (id) => setSelected((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
 
   const load = () => Promise.all([api.get("/bundles"), api.get("/products")]).then(([b, p]) => { setBundles(b.data); setProducts(p.data); setLoading(false); });
   useEffect(() => { load(); }, []);
@@ -74,6 +79,12 @@ export default function BundlingPanel({ isAdmin, onChanged, channels = [] }) {
   const cols = ["Nama Paket", "Komposisi", "Modal", "Harga Normal", "Harga Reseller", ...channels.map((c) => c.name), "Stok"];
   const rows = sorted.map((b) => [b.name, b.components.map((c) => `${c.qty}x ${c.name}`).join(", "), b.hpp, b.harga_jual || 0, b.harga_reseller || 0, ...channels.map((c) => b.harga_channel?.[c.name] || 0), b.stok]);
   const exportTitle = "Daftar Harga Paket";
+  const printLabels = () => {
+    const list = selected.size ? sorted.filter((b) => selected.has(b.id)) : sorted;
+    if (!list.length) { toast.error("Belum ada paket untuk dicetak"); return; }
+    printShelfLabels({ w: labelSize.w, h: labelSize.h, items: list.map((b) => ({
+      name: b.name, harga_jual: b.harga_jual, unit: "paket", sku: b.hemat > 0 ? `Hemat ${rupiah(b.hemat)}` : "PAKET" })) });
+  };
 
   return (
     <div className="space-y-5" data-testid="bundling-panel">
@@ -89,6 +100,8 @@ export default function BundlingPanel({ isAdmin, onChanged, channels = [] }) {
           <option value="name_desc">Urutkan: Nama Z-A</option>
         </select>
         <div className="flex gap-2">
+          <button onClick={printLabels} data-testid="bundle-print-labels-button" title="Cetak label rak untuk paket yang dicentang, atau semua yang tampil"
+            className="flex items-center gap-2 px-3 py-2.5 rounded-xl border border-input text-sm hover:bg-secondary"><Tag className="w-4 h-4" /> Label Rak{selected.size > 0 && ` (${selected.size})`}</button>
           <button onClick={() => exportPDF({ title: exportTitle, columns: cols, rows })} data-testid="bundle-export-pdf"
             className="flex items-center gap-2 px-3 py-2.5 rounded-xl border border-input text-sm hover:bg-secondary"><FileDown className="w-4 h-4" /> PDF</button>
           <button onClick={() => exportExcel({ filename: exportTitle.replace(/\s+/g, "_"), sheetName: "Paket", columns: cols, rows })} data-testid="bundle-export-excel"
@@ -102,10 +115,18 @@ export default function BundlingPanel({ isAdmin, onChanged, channels = [] }) {
         </div>
       </div>
 
+      <LabelSelectBar visible={sorted} selected={selected} setSelected={setSelected} size={labelSize} setSize={setLabelSize}
+        noun="paket" showRecent={false} tid="bundle-label" />
+
       <div className="bg-card rounded-2xl border border-slate-200 overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-slate-200 bg-secondary/50 text-left">
+              <th className="pl-4 py-3 w-8">
+                <input type="checkbox" data-testid="bundle-label-select-all" className="w-4 h-4 accent-[#1B5E3B] cursor-pointer"
+                  checked={sorted.length > 0 && sorted.every((b) => selected.has(b.id))}
+                  onChange={(e) => setSelected(e.target.checked ? new Set(sorted.map((b) => b.id)) : new Set())} />
+              </th>
               <th className="px-4 py-3 font-semibold">Nama Paket</th>
               <th className="px-4 py-3 font-semibold text-right">Modal</th>
               <th className="px-4 py-3 font-semibold text-right text-[#1B5E3B]">Harga Normal</th>
@@ -117,12 +138,13 @@ export default function BundlingPanel({ isAdmin, onChanged, channels = [] }) {
           </thead>
           <tbody>
             {sorted.length === 0 && (
-              <tr><td colSpan={7 + channels.length} className="px-4 py-10 text-center text-muted-foreground" data-testid="bundle-empty">
+              <tr><td colSpan={8 + channels.length} className="px-4 py-10 text-center text-muted-foreground" data-testid="bundle-empty">
                 <Boxes className="w-8 h-8 mx-auto mb-2 opacity-40" /> Belum ada paket bundling. {isAdmin && "Klik \"Tambah\" untuk membuat."}
               </td></tr>
             )}
             {sorted.map((b) => <BundleRow key={b.id} b={b} channels={channels} isAdmin={isAdmin}
-              onPrice={(f, v, ch) => setPrice(b, f, v, ch)} onEdit={() => openEdit(b)} onDelete={() => del(b)} onReduce={() => reduce(b)} />)}
+              onPrice={(f, v, ch) => setPrice(b, f, v, ch)} onEdit={() => openEdit(b)} onDelete={() => del(b)} onReduce={() => reduce(b)}
+              checked={selected.has(b.id)} onToggle={() => toggleSelect(b.id)} />)}
           </tbody>
         </table>
       </div>
@@ -132,10 +154,13 @@ export default function BundlingPanel({ isAdmin, onChanged, channels = [] }) {
   );
 }
 
-function BundleRow({ b, channels, isAdmin, onPrice, onEdit, onDelete, onReduce }) {
+function BundleRow({ b, channels, isAdmin, onPrice, onEdit, onDelete, onReduce, checked, onToggle }) {
   const anyHabis = b.components.some((c) => c.habis || c.missing);
   return (
-    <tr className="border-b border-slate-100 hover:bg-secondary/30 align-top" data-testid={`bundle-row-${b.id}`}>
+    <tr className={`border-b border-slate-100 hover:bg-secondary/30 align-top ${checked ? "bg-green-50/60" : ""}`} data-testid={`bundle-row-${b.id}`}>
+      <td className="pl-4 py-3">
+        <input type="checkbox" data-testid={`bundle-label-select-${b.id}`} className="w-4 h-4 accent-[#1B5E3B] cursor-pointer" checked={checked} onChange={onToggle} />
+      </td>
       <td className="px-4 py-3 font-medium">
         <div className="flex items-center gap-2 flex-wrap">
           <span>{b.name}</span>
