@@ -7,6 +7,7 @@ import { Plus, Pencil, Trash2, FileDown, FileSpreadsheet, X, Search, Printer, Al
 import BundlingPanel from "@/components/BundlingPanel";
 import PriceCell from "@/components/PriceCell";
 import ExcelImport from "@/components/ExcelImport";
+import LabelSelectBar, { isPriceNew } from "@/components/LabelSelectBar";
 import { exportPDF, exportExcel, printPriceList, printShelfLabels, exportProductTemplate, readProductExcel } from "@/lib/exporter";
 import { toast } from "sonner";
 import { calcFees } from "@/lib/fees";
@@ -29,6 +30,8 @@ export default function DaftarHarga() {
   const [modal, setModal] = useState(null);
   const [view, setView] = useState("satuan");
   const [channels, setChannels] = useState([]);
+  const [selected, setSelected] = useState(new Set());
+  const toggleSelect = (id) => setSelected((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
 
   const load = () => api.get("/products").then((r) => setProducts(r.data));
   useEffect(() => { load(); api.get("/channels").then((r) => setChannels(r.data.filter((c) => c.active))); }, []);
@@ -119,9 +122,12 @@ export default function DaftarHarga() {
         <div className="flex gap-2">
           <button onClick={() => printPriceList({ products: sorted, channels, logoUrl, info: storeInfo })} data-testid="print-pricelist-button"
             className="flex items-center gap-2 px-3 py-2.5 rounded-xl border border-input text-sm hover:bg-secondary"><Printer className="w-4 h-4" /> Cetak</button>
-          <button onClick={() => sorted.length ? printShelfLabels({ items: sorted, info: storeInfo }) : toast.error("Belum ada produk untuk dicetak")} data-testid="print-shelf-labels-button"
-            title="Cetak label harga rak untuk produk yang sedang tampil (ikut filter & pencarian)"
-            className="flex items-center gap-2 px-3 py-2.5 rounded-xl border border-input text-sm hover:bg-secondary"><Tag className="w-4 h-4" /> Label Rak</button>
+          <button onClick={() => {
+              const items = selected.size ? sorted.filter((p) => selected.has(p.id)) : sorted;
+              items.length ? printShelfLabels({ items }) : toast.error("Belum ada produk untuk dicetak");
+            }} data-testid="print-shelf-labels-button"
+            title="Cetak label rak untuk produk yang dicentang, atau semua yang tampil bila tidak ada yang dicentang"
+            className="flex items-center gap-2 px-3 py-2.5 rounded-xl border border-input text-sm hover:bg-secondary"><Tag className="w-4 h-4" /> Label Rak{selected.size > 0 && ` (${selected.size})`}</button>
           <button onClick={() => exportPDF({ title: exportTitle, columns: cols, rows })} data-testid="export-pdf-button"
             className="flex items-center gap-2 px-3 py-2.5 rounded-xl border border-input text-sm hover:bg-secondary"><FileDown className="w-4 h-4" /> PDF</button>
           <button onClick={() => exportExcel({ filename: exportTitle.replace(/\s+/g, "_"), sheetName: "Produk", columns: cols, rows })} data-testid="export-excel-button"
@@ -135,10 +141,17 @@ export default function DaftarHarga() {
         </div>
       </div>
 
+      <LabelSelectBar visible={sorted} selected={selected} setSelected={setSelected} />
+
       <div className="bg-card rounded-2xl border border-slate-200 overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-slate-200 bg-secondary/50 text-left">
+              <th className="pl-4 py-3 w-8">
+                <input type="checkbox" data-testid="label-select-all" className="w-4 h-4 accent-[#1B5E3B] cursor-pointer"
+                  checked={sorted.length > 0 && sorted.every((p) => selected.has(p.id))}
+                  onChange={(e) => setSelected(e.target.checked ? new Set(sorted.map((p) => p.id)) : new Set())} />
+              </th>
               <th className="px-4 py-3 font-semibold">SKU</th>
               <th className="px-4 py-3 font-semibold">Nama Produk</th>
               <th className="px-4 py-3 font-semibold">Kategori</th>
@@ -152,11 +165,16 @@ export default function DaftarHarga() {
           </thead>
           <tbody>
             {sorted.map((p) => (
-              <tr key={p.id} className="border-b border-slate-100 hover:bg-secondary/30" data-testid={`product-row-${p.id}`}>
+              <tr key={p.id} className={`border-b border-slate-100 hover:bg-secondary/30 ${selected.has(p.id) ? "bg-green-50/60" : ""}`} data-testid={`product-row-${p.id}`}>
+                <td className="pl-4 py-3">
+                  <input type="checkbox" data-testid={`label-select-${p.id}`} className="w-4 h-4 accent-[#1B5E3B] cursor-pointer"
+                    checked={selected.has(p.id)} onChange={() => toggleSelect(p.id)} />
+                </td>
                 <td className="px-4 py-3 font-mono text-xs text-muted-foreground">{p.sku}</td>
                 <td className="px-4 py-3 font-medium">
                   <div className="flex items-center gap-2">
                     <span>{p.name}</span>
+                    {isPriceNew(p) && <span data-testid={`price-new-badge-${p.id}`} className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-100 text-blue-700">Harga baru</span>}
                     {p.stok <= 0 ? (
                       <span data-testid={`stock-badge-${p.id}`} className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-destructive text-white">
                         <AlertTriangle className="w-3 h-3" /> Habis

@@ -253,6 +253,7 @@ class Product(BaseModel):
     harga_channel: Dict[str, float] = {}
     stok: int = 0
     stok_minimal: int = 5
+    harga_jual_updated: Optional[str] = None
 
 class ProductInput(BaseModel):
     sku: str
@@ -392,6 +393,8 @@ async def bulk_products(data: ProductBulkInput, admin: dict = Depends(require_ad
             continue
         doc = r.model_dump(exclude={"row"})
         doc.update(sku=sku, name=name, category=r.category.strip() or "Lainnya")
+        if old and old.get("harga_jual") != doc["harga_jual"]:
+            doc["harga_jual_updated"] = now_iso()
         if old:
             doc.pop("stok")
             doc["harga_channel"] = {**old.get("harga_channel", {}), **doc["harga_channel"]}
@@ -405,7 +408,11 @@ async def bulk_products(data: ProductBulkInput, admin: dict = Depends(require_ad
 
 @api_router.put("/products/{pid}")
 async def update_product(pid: str, data: ProductInput, admin: dict = Depends(require_admin)):
-    await db.products.update_one({"_id": ObjectId(pid)}, {"$set": data.model_dump()})
+    old = await db.products.find_one({"_id": ObjectId(pid)}, {"harga_jual": 1})
+    upd = data.model_dump()
+    if old and old.get("harga_jual") != data.harga_jual:
+        upd["harga_jual_updated"] = now_iso()
+    await db.products.update_one({"_id": ObjectId(pid)}, {"$set": upd})
     doc = await db.products.find_one({"_id": ObjectId(pid)})
     if not doc:
         raise HTTPException(status_code=404, detail="Produk tidak ditemukan")
@@ -428,7 +435,12 @@ def _price_update(data: PriceUpdate) -> dict:
 
 @api_router.patch("/products/{pid}/price")
 async def update_product_price(pid: str, data: PriceUpdate, admin: dict = Depends(require_admin)):
-    r = await db.products.update_one({"_id": ObjectId(pid)}, _price_update(data))
+    upd = _price_update(data)
+    if data.field == "harga_jual":
+        old = await db.products.find_one({"_id": ObjectId(pid)}, {"harga_jual": 1})
+        if old and old.get("harga_jual") != data.value:
+            upd["$set"]["harga_jual_updated"] = now_iso()
+    r = await db.products.update_one({"_id": ObjectId(pid)}, upd)
     if r.matched_count == 0:
         raise HTTPException(status_code=404, detail="Produk tidak ditemukan")
     return {"ok": True}
