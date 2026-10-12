@@ -386,8 +386,12 @@ export async function readBundleExcel(file) {
   return [...map.values()].map((b) => ({ ...b, category: b.category || "Paket" }));
 }
 
-export function printShelfLabels({ items, w = 40, h = 20 }) {
+export async function printShelfLabels({ items, w = 40, h = 20, logoUrl }) {
   const doc = new jsPDF();
+  let logo = null;
+  if (logoUrl && h >= 30) {
+    try { const data = await loadImageData(logoUrl); const pr = doc.getImageProperties(data); logo = { data, r: pr.width / pr.height }; } catch { /* tanpa logo */ }
+  }
   const cols = Math.max(1, Math.floor(200 / w)), rows = Math.max(1, Math.floor(287 / h)), perPage = cols * rows;
   const x0 = (210 - cols * w) / 2, y0 = (297 - rows * h) / 2;
   const s = Math.min(h / 20, w / 40), pad = Math.max(1, 1.5 * s), PT = 0.3528;
@@ -398,9 +402,15 @@ export function printShelfLabels({ items, w = 40, h = 20 }) {
     const k = i % perPage, x = x0 + (k % cols) * w, y = y0 + Math.floor(k / cols) * h;
     const withContents = showContents && p.contents;
     doc.setLineDashPattern([0.8, 0.8], 0); doc.setDrawColor(170, 170, 170); doc.rect(x, y, w, h);
+    let tw = w - 2 * pad;
+    if (logo) {
+      const L = h * 0.28, lw = logo.r >= 1 ? L : L * logo.r, lh = logo.r >= 1 ? L / logo.r : L;
+      doc.addImage(logo.data, "PNG", x + w - pad - lw, y + pad, lw, lh);
+      tw -= lw + 1;
+    }
     doc.setFont("helvetica", "bold"); doc.setFontSize(nameFs); doc.setTextColor(20, 20, 20);
     const nameY = y + pad + nameFs * PT * 0.8;
-    const allName = doc.splitTextToSize(p.name, w - 2 * pad), nMax = withContents ? 1 : lines;
+    const allName = doc.splitTextToSize(p.name, tw), nMax = withContents ? 1 : lines;
     const nameLines = allName.slice(0, nMax);
     if (allName.length > nMax) nameLines[nMax - 1] = nameLines[nMax - 1].replace(/.{0,2}$/, "") + "…";
     doc.text(nameLines, x + pad, nameY, { lineHeightFactor: 1.1 });
@@ -412,7 +422,7 @@ export function printShelfLabels({ items, w = 40, h = 20 }) {
       doc.setFont("helvetica", "normal"); doc.setFontSize(cFs); doc.setTextColor(70, 70, 70);
       const top = nameY + (nameLines.length - 1) * nameLineH + 1 + cFs * PT;
       const max = Math.max(1, Math.floor((priceY - fs * PT * 0.75 - 1 - top) / cLineH) + 1);
-      let cl = doc.splitTextToSize(p.contents, w - 2 * pad);
+      let cl = doc.splitTextToSize(p.contents, tw);
       if (cl.length > max) { cl = cl.slice(0, max); cl[max - 1] = cl[max - 1].replace(/.{0,2}$/, "") + "…"; }
       doc.text(cl, x + pad, top, { lineHeightFactor: 1.15 });
       doc.setFont("helvetica", "bold"); doc.setFontSize(fs);

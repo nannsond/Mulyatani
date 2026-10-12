@@ -95,7 +95,7 @@ export default function DaftarHarga() {
         </button>
       </div>
 
-      {view === "bundling" ? <BundlingPanel isAdmin={isAdmin} onChanged={load} channels={channels} labelSize={labelSize} setLabelSize={setLabelSize} /> : (
+      {view === "bundling" ? <BundlingPanel isAdmin={isAdmin} onChanged={load} channels={channels} labelSize={labelSize} setLabelSize={setLabelSize} logoUrl={logoUrl} /> : (
       <>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="relative flex-1 min-w-[200px] max-w-sm">
@@ -126,7 +126,7 @@ export default function DaftarHarga() {
             className="flex items-center gap-2 px-3 py-2.5 rounded-xl border border-input text-sm hover:bg-secondary"><Printer className="w-4 h-4" /> Cetak</button>
           <button onClick={() => {
               const items = selected.size ? sorted.filter((p) => selected.has(p.id)) : sorted;
-              items.length ? printShelfLabels({ items, w: labelSize.w, h: labelSize.h }) : toast.error("Belum ada produk untuk dicetak");
+              items.length ? printShelfLabels({ items, w: labelSize.w, h: labelSize.h, logoUrl }) : toast.error("Belum ada produk untuk dicetak");
             }} data-testid="print-shelf-labels-button"
             title="Cetak label rak untuk produk yang dicentang, atau semua yang tampil bila tidak ada yang dicentang"
             className="flex items-center gap-2 px-3 py-2.5 rounded-xl border border-input text-sm hover:bg-secondary"><Tag className="w-4 h-4" /> Label Rak{selected.size > 0 && ` (${selected.size})`}</button>

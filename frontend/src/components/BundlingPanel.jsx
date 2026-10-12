@@ -13,7 +13,7 @@ import PriceCell from "@/components/PriceCell";
 const EMPTY = { name: "", category: "Paket", harga_jual: 0, harga_reseller: 0, harga_channel: {}, components: [] };
 const slug = (s) => s.replace(/\s+/g, "-").toLowerCase();
 
-export default function BundlingPanel({ isAdmin, onChanged, channels = [], labelSize, setLabelSize }) {
+export default function BundlingPanel({ isAdmin, onChanged, channels = [], labelSize, setLabelSize, logoUrl }) {
   const [bundles, setBundles] = useState([]);
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -80,7 +80,7 @@ export default function BundlingPanel({ isAdmin, onChanged, channels = [], label
   const printLabels = () => {
     const list = selected.size ? sorted.filter((b) => selected.has(b.id)) : sorted;
     if (!list.length) { toast.error("Belum ada paket untuk dicetak"); return; }
-    printShelfLabels({ w: labelSize.w, h: labelSize.h, items: list.map((b) => ({
+    printShelfLabels({ w: labelSize.w, h: labelSize.h, logoUrl, items: list.map((b) => ({
       name: b.name, harga_jual: b.harga_jual, unit: "paket",
       contents: "Isi: " + b.components.map((c) => `${c.qty}× ${c.name}`).join(", "), sku: b.hemat > 0 ? `Hemat ${rupiah(b.hemat)}` : "PAKET" })) });
   };
