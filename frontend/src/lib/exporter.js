@@ -392,17 +392,33 @@ export function printShelfLabels({ items, w = 40, h = 20 }) {
   const x0 = (210 - cols * w) / 2, y0 = (297 - rows * h) / 2;
   const s = Math.min(h / 20, w / 40), pad = Math.max(1, 1.5 * s), PT = 0.3528;
   const nameFs = Math.max(4.5, 6.5 * s), smallFs = Math.max(3.8, 5 * s), lines = h >= 18 ? 2 : 1;
+  const showContents = h >= 30, cFs = Math.max(4, 5.2 * s), cLineH = cFs * PT * 1.15, nameLineH = nameFs * PT * 1.1;
   items.forEach((p, i) => {
     if (i > 0 && i % perPage === 0) doc.addPage();
     const k = i % perPage, x = x0 + (k % cols) * w, y = y0 + Math.floor(k / cols) * h;
+    const withContents = showContents && p.contents;
     doc.setLineDashPattern([0.8, 0.8], 0); doc.setDrawColor(170, 170, 170); doc.rect(x, y, w, h);
     doc.setFont("helvetica", "bold"); doc.setFontSize(nameFs); doc.setTextColor(20, 20, 20);
-    doc.text(doc.splitTextToSize(p.name, w - 2 * pad).slice(0, lines), x + pad, y + pad + nameFs * PT * 0.8, { lineHeightFactor: 1.1 });
+    const nameY = y + pad + nameFs * PT * 0.8;
+    const allName = doc.splitTextToSize(p.name, w - 2 * pad), nMax = withContents ? 1 : lines;
+    const nameLines = allName.slice(0, nMax);
+    if (allName.length > nMax) nameLines[nMax - 1] = nameLines[nMax - 1].replace(/.{0,2}$/, "") + "…";
+    doc.text(nameLines, x + pad, nameY, { lineHeightFactor: 1.1 });
     let fs = 12 * s;
     doc.setFontSize(fs);
     while (fs > 5 && doc.getTextWidth(rp(p.harga_jual)) > w - 2 * pad) { fs -= 0.5; doc.setFontSize(fs); }
+    const priceY = y + h * (withContents ? 0.8 : 0.7);
+    if (withContents) {
+      doc.setFont("helvetica", "normal"); doc.setFontSize(cFs); doc.setTextColor(70, 70, 70);
+      const top = nameY + (nameLines.length - 1) * nameLineH + 1 + cFs * PT;
+      const max = Math.max(1, Math.floor((priceY - fs * PT * 0.75 - 1 - top) / cLineH) + 1);
+      let cl = doc.splitTextToSize(p.contents, w - 2 * pad);
+      if (cl.length > max) { cl = cl.slice(0, max); cl[max - 1] = cl[max - 1].replace(/.{0,2}$/, "") + "…"; }
+      doc.text(cl, x + pad, top, { lineHeightFactor: 1.15 });
+      doc.setFont("helvetica", "bold"); doc.setFontSize(fs);
+    }
     doc.setTextColor(27, 94, 59);
-    doc.text(rp(p.harga_jual), x + pad, y + h * 0.7);
+    doc.text(rp(p.harga_jual), x + pad, priceY);
     doc.setFont("helvetica", "normal"); doc.setFontSize(smallFs); doc.setTextColor(110, 110, 110);
     const by = y + h - pad * 0.8;
     doc.text(`per ${p.unit || "pcs"}`, x + pad, by);

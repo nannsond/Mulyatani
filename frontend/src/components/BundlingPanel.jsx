@@ -81,7 +81,8 @@ export default function BundlingPanel({ isAdmin, onChanged, channels = [], label
     const list = selected.size ? sorted.filter((b) => selected.has(b.id)) : sorted;
     if (!list.length) { toast.error("Belum ada paket untuk dicetak"); return; }
     printShelfLabels({ w: labelSize.w, h: labelSize.h, items: list.map((b) => ({
-      name: b.name, harga_jual: b.harga_jual, unit: "paket", sku: b.hemat > 0 ? `Hemat ${rupiah(b.hemat)}` : "PAKET" })) });
+      name: b.name, harga_jual: b.harga_jual, unit: "paket",
+      contents: "Isi: " + b.components.map((c) => `${c.qty}× ${c.name}`).join(", "), sku: b.hemat > 0 ? `Hemat ${rupiah(b.hemat)}` : "PAKET" })) });
   };
 
   return (
@@ -114,7 +115,8 @@ export default function BundlingPanel({ isAdmin, onChanged, channels = [], label
       </div>
 
       <LabelSelectBar visible={sorted} selected={selected} setSelected={setSelected} size={labelSize} setSize={setLabelSize}
-        noun="paket" showRecent={false} tid="bundle-label" />
+        noun="paket" showRecent={false} tid="bundle-label"
+        hint={labelSize.h >= 30 ? "Isi paket ikut tercetak di label" : "Pilih ukuran 5 × 3 cm (tinggi ≥ 3 cm) agar isi paket ikut tercetak"} />
 
       <div className="bg-card rounded-2xl border border-slate-200 overflow-x-auto">
         <table className="w-full text-sm">

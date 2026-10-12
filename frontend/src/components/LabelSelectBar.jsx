@@ -4,7 +4,7 @@ import LabelSizePicker from "@/components/LabelSizePicker";
 const DAY = 86400000;
 export const isPriceNew = (p, days = 7) => p.harga_jual_updated && Date.now() - new Date(p.harga_jual_updated).getTime() <= days * DAY;
 
-export default function LabelSelectBar({ visible, selected, setSelected, size, setSize, noun = "produk", showRecent = true, tid = "label" }) {
+export default function LabelSelectBar({ visible, selected, setSelected, size, setSize, noun = "produk", showRecent = true, tid = "label", hint }) {
   const recent = visible.filter((p) => isPriceNew(p));
   const btn = "flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-semibold transition-colors";
   return (
@@ -13,6 +13,7 @@ export default function LabelSelectBar({ visible, selected, setSelected, size, s
       <span className="text-[#0F281E]" data-testid={`${tid}-selected-count`}>
         {selected.size ? <><b>{selected.size}</b> {noun} dipilih untuk Label Rak</> : `Centang ${noun} untuk mencetak label tertentu saja (tanpa centang = semua yang tampil)`}
       </span>
+      {hint && <span className="text-xs text-muted-foreground" data-testid={`${tid}-hint`}>{hint}</span>}
       <div className="flex flex-wrap items-center gap-2 ml-auto">
         <LabelSizePicker size={size} setSize={setSize} />
         {showRecent && <button onClick={() => setSelected(new Set(recent.map((p) => p.id)))} disabled={!recent.length} data-testid={`${tid}-select-recent`}
