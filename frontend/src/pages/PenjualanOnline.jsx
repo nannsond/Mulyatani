@@ -150,7 +150,7 @@ export default function PenjualanOnline() {
 
   const isBelumCair = (x) => !x.cair && x.status !== "Dikembalikan";
   const belumCair = recent.filter(isBelumCair);
-  const shownSales = filterCair === "belum" ? belumCair : filterCair === "sudah" ? recent.filter((x) => x.cair) : recent;
+  const shownSales = filterCair === "belum" ? [...belumCair].sort((a, b) => a.created_at.localeCompare(b.created_at)) : filterCair === "sudah" ? recent.filter((x) => x.cair) : recent;
 
   return (
     <div className="space-y-6">

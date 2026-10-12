@@ -1,0 +1,19 @@
+{
+  "summary": "Iter56 — Penjualan Online: filter dana cair + summary chip. Seeded 4 Shopee sales for current month (Selesai no-cair, Selesai+cair, Dikembalikan no-cair, Diproses no-cair). As admin on /penjualan-online with channel=Shopee: filter 'Semua dana' shows 5 rows (incl 1 pre-existing cair sale), 'Belum cair' shows 2 rows (Selesai + Diproses, Dikembalikan correctly excluded), 'Sudah cair' shows 2 rows (all have cair data). Summary chip ecom-belum-cair-summary reads '2 pesanan belum cair · estimasi Rp 96.000' = 2 * (50000-2000) ✓. Clicking chip toggles filterCair to 'belum' and chip class turns amber-500; clicking again clears. Empty state text 'Tidak ada penjualan sesuai filter dana.' shown for month=2020-01+belum. Recording cair via ecom-cair-open/nominal/save on first belum row removes it from belum view (2→1) and updates chip (Rp 48.000) immediately. Kasir role: no 'Tandai cair' button rendered; filter and chip visible; sudah-cair rows render as read-only DIV (3 divs, 0 buttons). Seed data fully deleted (4/4 DELETE 200).",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "Spec says 'Belum cair sorted oldest first', but shownSales for filterCair==='belum' uses recent.filter(isBelumCair) without any sort — relies on backend ordering of GET /ecommerce/sales. If backend returns newest-first (typical), belum-cair rows will not be oldest-first. Consider explicit sort by created_at asc in frontend when filter is 'belum'.",
+    "Chip math uses s.omzet - s.admin_fee which matches 'estimasi diterima'; consistent with 'Diterima' column.",
+    "Minor: chip text 'estimasi Rp X' + '(klik untuk ...)' rendered without space between the two spans in output (reads 'Rp 96.000(klik untuk lihat)'). Add a space or whitespace class."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "n/a (skipped)", "frontend": "100%"},
+  "test_credentials": "Admin nannsond@gmail.com/admin123, Kasir kasir@tokotani.com/kasir123",
+  "seed_data_creation": "Created 4 TEST_iter56 Shopee ecommerce sales, cleaned up via DELETE /api/ecommerce/sales/{id} after testing. No junk left.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Filter dana cair feature works end-to-end for admin and kasir. Two cosmetic nits noted (chip text spacing + no explicit oldest-first sort). Vite dev 429 not encountered this run."
+}
